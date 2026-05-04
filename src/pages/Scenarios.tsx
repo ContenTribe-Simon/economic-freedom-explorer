@@ -20,13 +20,14 @@ export default function Scenarios() {
     () =>
       scenarios.map((s) => {
         const years = project(s, assumptions);
-        return { scenario: s, kpis: deriveKPIs(s, years) };
+        return { scenario: s, kpis: deriveKPIs(s, years, assumptions) };
       }),
     [scenarios, assumptions],
   );
 
   const metrics = [
-    { key: "earliestStopAge", label: "Tidligste stop", fmt: (v: number | null) => (v ? `${v} år` : "—"), better: "lower" },
+    { key: "plannedStopAge", label: "Planlagt stop", fmt: (v: number) => `${v} år`, better: "lower" },
+    { key: "earliestSustainableStopAge", label: "Tidligste bæredygtige stop", fmt: (v: number | null) => (v ? `${v} år` : "—"), better: "lower" },
     { key: "capitalAtStopAge", label: "Kapital v. stop", fmt: (v: number) => formatDKK(v, { compact: true }), better: "higher" },
     { key: "capitalAt65", label: "Kapital v. 65", fmt: (v: number) => formatDKK(v, { compact: true }), better: "higher" },
     { key: "capitalAt95", label: "Kapital v. 95", fmt: (v: number) => formatDKK(v, { compact: true }), better: "higher" },
