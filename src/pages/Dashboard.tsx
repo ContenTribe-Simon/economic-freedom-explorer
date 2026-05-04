@@ -16,12 +16,15 @@ import {
   YAxis,
 } from "recharts";
 
-function KPI({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "good" | "bad" | "warn" }) {
+function KPI({ label, value, sub, tone, tooltip }: { label: string; value: string; sub?: string; tone?: "good" | "bad" | "warn"; tooltip?: string }) {
   const toneClass =
     tone === "good" ? "text-success" : tone === "bad" ? "text-destructive" : tone === "warn" ? "text-warning" : "text-foreground";
   return (
-    <Card className="p-5">
-      <div className="kpi-label">{label}</div>
+    <Card className="p-5" title={tooltip}>
+      <div className="kpi-label flex items-center gap-1">
+        {label}
+        {tooltip && <span className="text-muted-foreground text-[10px] cursor-help">ⓘ</span>}
+      </div>
       <div className={`kpi-value mt-2 ${toneClass}`}>{value}</div>
       {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
     </Card>
@@ -76,7 +79,8 @@ export default function Dashboard() {
         <KPI
           label="Tidligste bæredygtige stop"
           value={kpis.earliestSustainableStopAge ? `${kpis.earliestSustainableStopAge} år` : "—"}
-          sub="Holder til levealder uden shortfall"
+          sub="Holder til levealder + minimumsformue"
+          tooltip="Den tidligste alder, hvor scenariet holder til forventet levealder uden shortfall og med mindst den ønskede minimumsformue tilbage."
           tone={
             kpis.earliestSustainableStopAge && kpis.earliestSustainableStopAge <= kpis.plannedStopAge
               ? "good"

@@ -21,7 +21,11 @@ export interface HoldingBucketInputs {
   balance: number;
   expectedExitValue: number;
   exitYear: number; // calendar year (or 0 = none)
-  annualDistribution: number; // planned dividend before stop
+  annualDistribution: number; // planned dividend
+  /** Modellen må først udlodde fra denne alder. */
+  distributionFromAge: number;
+  /** Hvis true: distributionFromAge følger altid stopAge. */
+  startDistributionAtStopAge: boolean;
 }
 
 export interface DebtInputs {
@@ -44,6 +48,11 @@ export interface SpendingInputs {
   desiredMonthlyNet: number; // in real DKK
 }
 
+export interface TargetInputs {
+  /** Mindste ønskede nettoformue ved slutalder (levealder). */
+  minNetWorthAtEnd: number;
+}
+
 export type SavingsLogic = "planned" | "cashflow" | "hybrid";
 
 export interface ScenarioInputs {
@@ -54,6 +63,7 @@ export interface ScenarioInputs {
   debt: DebtInputs;
   income: IncomeInputs;
   spending: SpendingInputs;
+  target: TargetInputs;
   stopAge: number; // age fuldtidsstop
   fullRetireAge: number; // age helt stop (deltid slutter)
   savingsLogic: SavingsLogic; // hvordan opsparing håndteres før stopalder

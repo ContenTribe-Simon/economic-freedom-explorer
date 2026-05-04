@@ -116,11 +116,18 @@ export function projectWithStopAge(
       bal.holding += inp.holding.expectedExitValue;
     }
 
-    // Planlagt holding-udlodning
+    // Planlagt holding-udlodning – kun hvis alder ≥ udlodningsalder
+    const distFromAge = inp.holding.startDistributionAtStopAge
+      ? stopAge
+      : inp.holding.distributionFromAge;
     let holdingDistGross = 0;
     let holdingDistNet = 0;
     let holdingDistTax = 0;
-    if (inp.holding.annualDistribution > 0 && bal.holding > 0) {
+    if (
+      inp.holding.annualDistribution > 0 &&
+      bal.holding > 0 &&
+      age >= distFromAge
+    ) {
       holdingDistGross = Math.min(bal.holding, inp.holding.annualDistribution);
       const r = shareTax(holdingDistGross, a.tax);
       holdingDistNet = r.net;
@@ -147,82 +154,53 @@ export function projectWithStopAge(
     let pensionPayoutNet = 0;
     let cashflowSurplus = 0;
 
+    // Hvilke kasser må vi hæve fra i år (holding først tilladt fra distFromAge)
+    const allowedOrder = a.withdrawOrder.filter(
+      (b) => b !== "holding" || age >= distFromAge,
+    );
+    const drainShortfall = (needed: number) => {
+      for (const b of allowedOrder) {
+        if (needed <= 0) break;
+        const r = withdrawFromBucket(b, needed, bal, a);
+        withdrawals[b] += r.netCovered;
+        withdrawalsGross[b] += r.gross;
+        if (b === "pension") pensionPayoutNet += r.netCovered;
+        if (b === "holding") {
+          holdingDistNet += r.netCovered;
+          holdingDistGross += r.gross;
+          holdingDistTax += r.tax;
+        }
+        needed -= r.netCovered;
+      }
+    };
+
     if (working) {
       const planned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
       cashflowSurplus = cashflow - planned;
 
       if (savingsLogic === "cashflow") {
-        // Investér hele overskuddet, eller hæv hvis underskud
         if (cashflow >= 0) {
           freeContribution = cashflow;
           bal.free += freeContribution;
         } else {
-          let needed = -cashflow;
-          for (const b of a.withdrawOrder) {
-            if (needed <= 0) break;
-            const r = withdrawFromBucket(b, needed, bal, a);
-            withdrawals[b] += r.netCovered;
-            withdrawalsGross[b] += r.gross;
-            if (b === "pension") pensionPayoutNet += r.netCovered;
-            if (b === "holding") {
-              holdingDistNet += r.netCovered;
-              holdingDistGross += r.gross;
-              holdingDistTax += r.tax;
-            }
-            needed -= r.netCovered;
-          }
+          drainShortfall(-cashflow);
         }
+      } else if (savingsLogic === "planned") {
+        freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
+        bal.free += freeContribution;
       } else {
-        // planned eller hybrid: brug planlagt opsparing
-        // Hvis cashflow ikke kan dække planlagt → reducer til hvad der er råd til (planned mode),
-        // eller behold planlagt og lad shortfall vise sig (hybrid)
-        if (savingsLogic === "planned") {
-          freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
-          bal.free += freeContribution;
-          // Resterende cashflow ignoreres (forbruges) – ingen dobbeltregning
-        } else {
-          // hybrid: træk altid planlagt, dæk underskud via udtræk
-          freeContribution = planned;
-          bal.free += freeContribution;
-          const net = cashflow - planned;
-          if (net < 0) {
-            let needed = -net;
-            for (const b of a.withdrawOrder) {
-              if (needed <= 0) break;
-              const r = withdrawFromBucket(b, needed, bal, a);
-              withdrawals[b] += r.netCovered;
-              withdrawalsGross[b] += r.gross;
-              if (b === "pension") pensionPayoutNet += r.netCovered;
-              if (b === "holding") {
-                holdingDistNet += r.netCovered;
-                holdingDistGross += r.gross;
-                holdingDistTax += r.tax;
-              }
-              needed -= r.netCovered;
-            }
-          }
-        }
+        // hybrid
+        freeContribution = planned;
+        bal.free += freeContribution;
+        const net = cashflow - planned;
+        if (net < 0) drainShortfall(-net);
       }
     } else {
-      // Efter stopalder: dæk evt. underskud via prioriteret udtræk
       if (cashflow >= 0) {
         freeContribution = cashflow;
         bal.free += freeContribution;
       } else {
-        let needed = -cashflow;
-        for (const b of a.withdrawOrder) {
-          if (needed <= 0) break;
-          const r = withdrawFromBucket(b, needed, bal, a);
-          withdrawals[b] += r.netCovered;
-          withdrawalsGross[b] += r.gross;
-          if (b === "pension") pensionPayoutNet += r.netCovered;
-          if (b === "holding") {
-            holdingDistNet += r.netCovered;
-            holdingDistGross += r.gross;
-            holdingDistTax += r.tax;
-          }
-          needed -= r.netCovered;
-        }
+        drainShortfall(-cashflow);
       }
     }
 
@@ -289,18 +267,24 @@ export function projectWithStopAge(
   return years;
 }
 
-/** Find tidligste stopalder hvor scenariet kan gennemføres uden shortfall. */
+/**
+ * Tidligste stopalder hvor scenariet holder uden shortfall OG slutter
+ * med mindst inputs.target.minNetWorthAtEnd i nettoformue.
+ */
 export function findEarliestSustainableStopAge(
   scenario: Scenario,
   globalAssumptions: Assumptions,
 ): number | null {
   const a = mergeAssumptions(globalAssumptions, scenario.assumptionsOverride);
   const inp = scenario.inputs;
+  const minRequired = inp.target?.minNetWorthAtEnd ?? 0;
   const minAge = Math.max(inp.person.currentAge, 40);
   const maxAge = Math.min(inp.person.lifeExpectancy, 75);
   for (let age = minAge; age <= maxAge; age++) {
     const ys = projectWithStopAge(inp, a, age);
-    if (!ys.some((y) => y.shortfall)) return age;
+    const noShort = !ys.some((y) => y.shortfall);
+    const endNW = ys[ys.length - 1].netWorth;
+    if (noShort && endNW >= minRequired) return age;
   }
   return null;
 }

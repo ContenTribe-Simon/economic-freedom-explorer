@@ -6,6 +6,68 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
 import { Trash2 } from "lucide-react";
+import { Scenario } from "@/lib/finance/types";
+
+type StressMod = { suffix: string; apply: (s: Scenario) => void };
+
+const STRESS_TESTS: { key: string; label: string; mod: StressMod }[] = [
+  {
+    key: "no-barma",
+    label: "No Barma",
+    mod: {
+      suffix: "uden Barma",
+      apply: (s) => {
+        s.inputs.holding.balance = 0;
+        s.inputs.holding.expectedExitValue = 0;
+        s.inputs.holding.annualDistribution = 0;
+      },
+    },
+  },
+  {
+    key: "no-parttime",
+    label: "No part-time",
+    mod: {
+      suffix: "uden deltid",
+      apply: (s) => {
+        s.inputs.income.partTimeAnnualGross = 0;
+        s.inputs.fullRetireAge = s.inputs.stopAge;
+      },
+    },
+  },
+  {
+    key: "low-return",
+    label: "Low return",
+    mod: {
+      suffix: "lavt afkast",
+      apply: (s) => {
+        s.assumptionsOverride = {
+          ...(s.assumptionsOverride ?? {}),
+          realReturn: { free: 0.02, pension: 0.02, holding: 0.01 },
+        };
+      },
+    },
+  },
+  {
+    key: "higher-spending",
+    label: "Higher spending",
+    mod: {
+      suffix: "højere forbrug",
+      apply: (s) => {
+        s.inputs.spending.desiredMonthlyNet = Math.round(s.inputs.spending.desiredMonthlyNet * 1.25);
+      },
+    },
+  },
+  {
+    key: "no-folkepension",
+    label: "No folkepension",
+    mod: {
+      suffix: "uden folkepension",
+      apply: (s) => {
+        s.inputs.income.statePensionFromAge = 999;
+      },
+    },
+  },
+];
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
@@ -15,6 +77,20 @@ export default function Scenarios() {
   const duplicate = useFinanceStore((s) => s.duplicateScenario);
   const del = useFinanceStore((s) => s.deleteScenario);
   const add = useFinanceStore((s) => s.addScenario);
+  const updateScenario = useFinanceStore((s) => s.updateScenario);
+
+  const runStress = (key: string) => {
+    const test = STRESS_TESTS.find((t) => t.key === key);
+    if (!test) return;
+    const sourceId = activeId;
+    const sourceName = scenarios.find((s) => s.id === sourceId)?.name ?? "Base";
+    const newId = add(`${sourceName} – ${test.mod.suffix}`, sourceId);
+    updateScenario(newId, (s) => {
+      const copy = structuredClone(s);
+      test.mod.apply(copy);
+      return copy;
+    });
+  };
 
   const rows = useMemo(
     () =>
@@ -52,6 +128,20 @@ export default function Scenarios() {
         </div>
         <Button onClick={() => add(`Scenarie ${scenarios.length + 1}`)}>+ Nyt scenarie</Button>
       </header>
+
+      <Card className="p-4">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Stress-tests</div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Dupliker det aktive scenarie med en specifik ændring. Det nye scenarie tilføjes til sammenligningen herunder.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {STRESS_TESTS.map((t) => (
+            <Button key={t.key} size="sm" variant="outline" onClick={() => runStress(t.key)}>
+              {t.label}
+            </Button>
+          ))}
+        </div>
+      </Card>
 
       <Card className="p-0 overflow-auto">
         <table className="w-full text-sm">

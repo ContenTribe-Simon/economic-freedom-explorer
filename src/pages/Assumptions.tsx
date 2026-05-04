@@ -6,15 +6,17 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { defaultAssumptions } from "@/lib/finance/defaults";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
+import { NumberInput } from "@/components/NumberInput";
 
-function NumberField({ label, value, onChange, suffix, step = 1 }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number }) {
+function NumberField({ label, value, onChange, suffix, step = 1, hint }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number; hint?: string }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
-        <Input type="number" step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value || "0"))} className="num" />
+        <NumberInput value={value} step={step} onChange={onChange} className="num" />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
       </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -88,7 +90,7 @@ export default function Assumptions() {
         <div className="grid md:grid-cols-3 gap-4">
           <PctField label="Sats lav" value={a.tax.shareLowRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareLowRate: v } }))} />
           <PctField label="Sats høj" value={a.tax.shareHighRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareHighRate: v } }))} />
-          <NumberField label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} />
+          <NumberField label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} hint="2026: 79.400 kr (single)" />
           <PctField label="Selskabsskat (info)" value={a.tax.corporateRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, corporateRate: v } }))} />
         </div>
       </Card>
@@ -97,7 +99,7 @@ export default function Assumptions() {
         <h2 className="font-display text-xl font-semibold mb-4">Pension & folkepension</h2>
         <div className="grid md:grid-cols-3 gap-4">
           <PctField label="Afgift v. udbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
-          <NumberField label="Folkepension netto/år" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} />
+          <NumberField label="Folkepension netto/år (manuelt)" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} hint="OBS: Manuelt nettotal. Hvis du kun regner med folkepensionens grundbeløb, er 2026-beløbet ca. 90.528 kr. brutto/år, ikke netto." />
         </div>
       </Card>
 
