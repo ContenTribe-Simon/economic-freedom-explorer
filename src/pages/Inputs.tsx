@@ -1,9 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScenarioInputs } from "@/lib/finance/types";
+import { ScenarioInputs, SavingsLogic } from "@/lib/finance/types";
+import { decimalToPctString, parsePctInput } from "@/lib/format";
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -42,6 +43,45 @@ function NumField({
           className="num"
         />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
+      </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function PctField({
+  label,
+  value,
+  onChange,
+  hint,
+  step = 0.1,
+}: {
+  label: string;
+  value: number; // decimal
+  onChange: (decimal: number) => void;
+  hint?: string;
+  step?: number;
+}) {
+  const [text, setText] = useState(decimalToPctString(value));
+  useEffect(() => {
+    setText(decimalToPctString(value));
+  }, [value]);
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          step={step}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            const dec = parsePctInput(e.target.value);
+            if (Number.isFinite(dec)) onChange(dec);
+          }}
+          className="num"
+        />
+        <span className="text-sm text-muted-foreground">%</span>
       </div>
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
