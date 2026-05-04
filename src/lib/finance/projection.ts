@@ -116,11 +116,18 @@ export function projectWithStopAge(
       bal.holding += inp.holding.expectedExitValue;
     }
 
-    // Planlagt holding-udlodning
+    // Planlagt holding-udlodning – kun hvis alder ≥ udlodningsalder
+    const distFromAge = inp.holding.startDistributionAtStopAge
+      ? stopAge
+      : inp.holding.distributionFromAge;
     let holdingDistGross = 0;
     let holdingDistNet = 0;
     let holdingDistTax = 0;
-    if (inp.holding.annualDistribution > 0 && bal.holding > 0) {
+    if (
+      inp.holding.annualDistribution > 0 &&
+      bal.holding > 0 &&
+      age >= distFromAge
+    ) {
       holdingDistGross = Math.min(bal.holding, inp.holding.annualDistribution);
       const r = shareTax(holdingDistGross, a.tax);
       holdingDistNet = r.net;
