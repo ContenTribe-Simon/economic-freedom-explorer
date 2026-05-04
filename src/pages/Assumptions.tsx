@@ -6,15 +6,17 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { defaultAssumptions } from "@/lib/finance/defaults";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
+import { NumberInput } from "@/components/NumberInput";
 
-function NumberField({ label, value, onChange, suffix, step = 1 }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number }) {
+function NumberField({ label, value, onChange, suffix, step = 1, hint }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number; hint?: string }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
-        <Input type="number" step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value || "0"))} className="num" />
+        <NumberInput value={value} step={step} onChange={onChange} className="num" />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
       </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
