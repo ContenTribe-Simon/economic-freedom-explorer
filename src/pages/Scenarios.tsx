@@ -77,6 +77,20 @@ export default function Scenarios() {
   const duplicate = useFinanceStore((s) => s.duplicateScenario);
   const del = useFinanceStore((s) => s.deleteScenario);
   const add = useFinanceStore((s) => s.addScenario);
+  const updateScenario = useFinanceStore((s) => s.updateScenario);
+
+  const runStress = (key: string) => {
+    const test = STRESS_TESTS.find((t) => t.key === key);
+    if (!test) return;
+    const sourceId = activeId;
+    const sourceName = scenarios.find((s) => s.id === sourceId)?.name ?? "Base";
+    const newId = add(`${sourceName} – ${test.mod.suffix}`, sourceId);
+    updateScenario(newId, (s) => {
+      const copy = structuredClone(s);
+      test.mod.apply(copy);
+      return copy;
+    });
+  };
 
   const rows = useMemo(
     () =>
