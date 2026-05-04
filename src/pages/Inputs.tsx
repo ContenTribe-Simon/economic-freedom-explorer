@@ -133,7 +133,24 @@ export default function Inputs() {
         <NumField label="Nuværende holdingkapital" value={inp.holding.balance} onChange={(v) => set("holding", { ...inp.holding, balance: v })} suffix="kr" step={50000} />
         <NumField label="Forventet exitværdi" value={inp.holding.expectedExitValue} onChange={(v) => set("holding", { ...inp.holding, expectedExitValue: v })} suffix="kr" step={100000} hint="Tilføjes til holding i exit-året (efter selskabsskat)" />
         <NumField label="Exit-år (kalenderår)" value={inp.holding.exitYear} onChange={(v) => set("holding", { ...inp.holding, exitYear: v })} step={1} />
-        <NumField label="Planlagt årlig udlodning" value={inp.holding.annualDistribution} onChange={(v) => set("holding", { ...inp.holding, annualDistribution: v })} suffix="kr/år" step={10000} />
+        <NumField label="Planlagt årlig udlodning" value={inp.holding.annualDistribution} onChange={(v) => set("holding", { ...inp.holding, annualDistribution: v })} suffix="kr/år" step={10000} hint="Udloddes først fra alderen nedenfor" />
+        <NumField
+          label="Holdingudlodning fra alder"
+          value={inp.holding.distributionFromAge}
+          onChange={(v) => set("holding", { ...inp.holding, distributionFromAge: v })}
+          suffix="år"
+          hint={inp.holding.startDistributionAtStopAge ? `Følger stopalder (${inp.stopAge})` : "Ignoreres når toggle er aktiv"}
+        />
+        <div className="space-y-1.5 flex flex-col justify-end">
+          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
+            <input
+              type="checkbox"
+              checked={inp.holding.startDistributionAtStopAge}
+              onChange={(e) => set("holding", { ...inp.holding, startDistributionAtStopAge: e.target.checked, distributionFromAge: e.target.checked ? inp.stopAge : inp.holding.distributionFromAge })}
+            />
+            <span className="text-sm">Start holdingudlodning ved stopalder</span>
+          </label>
+        </div>
       </Section>
 
       <Section title="Gæld">
@@ -149,11 +166,22 @@ export default function Inputs() {
         <NumField label="Deltid indtil alder" value={inp.income.partTimeUntilAge} onChange={(v) => set("income", { ...inp.income, partTimeUntilAge: v })} suffix="år" />
         <NumField label="Familiefond (netto/år)" value={inp.income.familyFundAnnualNet} onChange={(v) => set("income", { ...inp.income, familyFundAnnualNet: v })} suffix="kr/år" step={5000} />
         <NumField label="Familiefond indtil alder" value={inp.income.familyFundUntilAge} onChange={(v) => set("income", { ...inp.income, familyFundUntilAge: v })} suffix="år" />
-        <NumField label="Folkepension fra alder" value={inp.income.statePensionFromAge} onChange={(v) => set("income", { ...inp.income, statePensionFromAge: v })} suffix="år" />
+        <NumField label="Folkepension fra alder" value={inp.income.statePensionFromAge} onChange={(v) => set("income", { ...inp.income, statePensionFromAge: v })} suffix="år" hint="Beløbet styres under Antagelser → Folkepension netto/år. Hvis du kun regner med folkepensionens grundbeløb, er 2026-beløbet ca. 90.528 kr. brutto/år, ikke netto." />
       </Section>
 
       <Section title="Forbrug">
         <NumField label="Ønsket forbrug (netto)" value={inp.spending.desiredMonthlyNet} onChange={(v) => set("spending", { ...inp.spending, desiredMonthlyNet: v })} suffix="kr/md" step={1000} hint="I nutidskroner – antages at følge inflationen" />
+      </Section>
+
+      <Section title="Målsætning" description="Bruges til at beregne tidligste bæredygtige stopalder.">
+        <NumField
+          label="Minimum nettoformue ved slutalder"
+          value={inp.target?.minNetWorthAtEnd ?? 0}
+          onChange={(v) => set("target", { ...(inp.target ?? { minNetWorthAtEnd: 0 }), minNetWorthAtEnd: v })}
+          suffix="kr"
+          step={100000}
+          hint={`Mindste nettoformue ved alder ${inp.person.lifeExpectancy}. Tidligste bæredygtige stop tager højde for dette.`}
+        />
       </Section>
 
       <Section
