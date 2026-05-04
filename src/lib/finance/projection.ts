@@ -73,7 +73,8 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
     const opening = { ...bal };
 
     const working = age < inp.stopAge;
-    const partTime = age >= inp.partTimeFromAgeOrStop(inp) && age < inp.partTimeUntilAge && !working;
+    const ptStart = Math.max(inp.income.partTimeFromAge, inp.stopAge);
+    const partTime = !working && age >= ptStart && age < inp.income.partTimeUntilAge && age < inp.fullRetireAge;
 
     // --- Income ---
     let salaryGross = 0;
