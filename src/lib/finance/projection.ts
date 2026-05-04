@@ -267,18 +267,24 @@ export function projectWithStopAge(
   return years;
 }
 
-/** Find tidligste stopalder hvor scenariet kan gennemføres uden shortfall. */
+/**
+ * Tidligste stopalder hvor scenariet holder uden shortfall OG slutter
+ * med mindst inputs.target.minNetWorthAtEnd i nettoformue.
+ */
 export function findEarliestSustainableStopAge(
   scenario: Scenario,
   globalAssumptions: Assumptions,
 ): number | null {
   const a = mergeAssumptions(globalAssumptions, scenario.assumptionsOverride);
   const inp = scenario.inputs;
+  const minRequired = inp.target?.minNetWorthAtEnd ?? 0;
   const minAge = Math.max(inp.person.currentAge, 40);
   const maxAge = Math.min(inp.person.lifeExpectancy, 75);
   for (let age = minAge; age <= maxAge; age++) {
     const ys = projectWithStopAge(inp, a, age);
-    if (!ys.some((y) => y.shortfall)) return age;
+    const noShort = !ys.some((y) => y.shortfall);
+    const endNW = ys[ys.length - 1].netWorth;
+    if (noShort && endNW >= minRequired) return age;
   }
   return null;
 }
