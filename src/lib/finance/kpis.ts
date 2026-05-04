@@ -1,6 +1,9 @@
 import { KPIs, Scenario, YearRow } from "./types";
+import { findEarliestSustainableStopAge } from "./projection";
+import { defaultAssumptions } from "./defaults";
+import { Assumptions } from "./types";
 
-export function deriveKPIs(scenario: Scenario, years: YearRow[]): KPIs {
+export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: Assumptions = defaultAssumptions): KPIs {
   const stopAge = scenario.inputs.stopAge;
   const yAtStop = years.find((y) => y.age === stopAge);
   const yAt65 = years.find((y) => y.age === 65);
@@ -13,19 +16,8 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[]): KPIs {
       ? afterStopYears.reduce((s, y) => s + y.monthlyGap, 0) / afterStopYears.length
       : 0;
 
-  // Earliest stop = lowest age such that no shortfalls occur from that age onward (rough)
-  let earliest: number | null = null;
-  for (let i = 0; i < years.length; i++) {
-    const candidate = years[i].age;
-    if (candidate > 75) break;
-    const rest = years.slice(i);
-    if (!rest.some((y) => y.shortfall)) {
-      earliest = candidate;
-      break;
-    }
-  }
+  const earliest = findEarliestSustainableStopAge(scenario, assumptions);
 
-  // Robustness 0..100
   const noShortfall = !firstShort;
   const positiveAt95 = yAt95.netWorth > 0;
   const annualSpend = scenario.inputs.spending.desiredMonthlyNet * 12;
@@ -33,7 +25,8 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[]): KPIs {
   const robustness = Math.round((noShortfall ? 40 : 0) + (positiveAt95 ? 30 : 0) + buffer * 30);
 
   return {
-    earliestStopAge: earliest,
+    plannedStopAge: stopAge,
+    earliestSustainableStopAge: earliest,
     capitalAtStopAge: yAtStop?.netWorth ?? 0,
     capitalAt65: yAt65?.netWorth ?? 0,
     capitalAt95: yAt95.netWorth,

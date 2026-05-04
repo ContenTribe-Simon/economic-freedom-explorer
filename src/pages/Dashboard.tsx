@@ -36,7 +36,7 @@ export default function Dashboard() {
     const ys = project(scenario, assumptions);
     return {
       years: ys,
-      kpis: deriveKPIs(scenario, ys),
+      kpis: deriveKPIs(scenario, ys, assumptions),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
@@ -69,9 +69,19 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPI
-          label="Tidligste stop"
-          value={kpis.earliestStopAge ? `${kpis.earliestStopAge} år` : "—"}
-          sub="Uden shortfall"
+          label="Planlagt stopalder"
+          value={`${kpis.plannedStopAge} år`}
+          sub="Som angivet i variabler"
+        />
+        <KPI
+          label="Tidligste bæredygtige stop"
+          value={kpis.earliestSustainableStopAge ? `${kpis.earliestSustainableStopAge} år` : "—"}
+          sub="Holder til levealder uden shortfall"
+          tone={
+            kpis.earliestSustainableStopAge && kpis.earliestSustainableStopAge <= kpis.plannedStopAge
+              ? "good"
+              : "warn"
+          }
         />
         <KPI label="Kapital v. stop" value={formatDKK(kpis.capitalAtStopAge, { compact: true })} sub={`Alder ${scenario.inputs.stopAge}`} />
         <KPI label="Kapital v. 65" value={formatDKK(kpis.capitalAt65, { compact: true })} />

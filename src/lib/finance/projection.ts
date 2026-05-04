@@ -1,4 +1,4 @@
-import { Assumptions, Bucket, Scenario, YearRow } from "./types";
+import { Assumptions, Bucket, Scenario, ScenarioInputs, YearRow } from "./types";
 import {
   grossHoldingForNet,
   grossPensionForNet,
@@ -30,33 +30,40 @@ function withdrawFromBucket(
   netNeeded: number,
   bal: Balances,
   a: Assumptions,
-): { netCovered: number; gross: number; tax: number; withdrawn: number } {
-  if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0, withdrawn: 0 };
+): { netCovered: number; gross: number; tax: number } {
+  if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0 };
   if (bucket === "free") {
     const take = Math.min(bal.free, netNeeded);
     bal.free -= take;
-    return { netCovered: take, gross: take, tax: 0, withdrawn: take };
+    return { netCovered: take, gross: take, tax: 0 };
   }
   if (bucket === "holding") {
     const grossNeeded = grossHoldingForNet(netNeeded, a.tax);
     const take = Math.min(bal.holding, grossNeeded);
     const { net, tax } = shareTax(take, a.tax);
     bal.holding -= take;
-    return { netCovered: net, gross: take, tax, withdrawn: take };
+    return { netCovered: net, gross: take, tax };
   }
-  // pension
   const grossNeeded = grossPensionForNet(netNeeded, a.tax);
   const take = Math.min(bal.pension, grossNeeded);
   const { net, tax } = pensionPayoutTax(take, a.tax);
   bal.pension -= take;
-  return { netCovered: net, gross: take, tax, withdrawn: take };
+  return { netCovered: net, gross: take, tax };
 }
 
 export function project(scenario: Scenario, globalAssumptions: Assumptions): YearRow[] {
   const a = mergeAssumptions(globalAssumptions, scenario.assumptionsOverride);
-  const inp = scenario.inputs;
+  return projectWithStopAge(scenario.inputs, a, scenario.inputs.stopAge);
+}
+
+export function projectWithStopAge(
+  inp: ScenarioInputs,
+  a: Assumptions,
+  stopAge: number,
+): YearRow[] {
   const startYear = new Date().getFullYear();
   const years: YearRow[] = [];
+  const savingsLogic = inp.savingsLogic ?? "planned";
 
   const bal: Balances = {
     free: inp.free.balance,
@@ -72,11 +79,12 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
     const calYear = startYear + i;
     const opening = { ...bal };
 
-    const working = age < inp.stopAge;
-    const ptStart = Math.max(inp.income.partTimeFromAge, inp.stopAge);
-    const partTime = !working && age >= ptStart && age < inp.income.partTimeUntilAge && age < inp.fullRetireAge;
+    const working = age < stopAge;
+    const ptStart = Math.max(inp.income.partTimeFromAge, stopAge);
+    const partTime =
+      !working && age >= ptStart && age < inp.income.partTimeUntilAge && age < inp.fullRetireAge;
 
-    // --- Income ---
+    // ---- Income ----
     let salaryGross = 0;
     let salaryNet = 0;
     let laborTaxAmt = 0;
@@ -85,7 +93,8 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
 
     if (working) {
       salaryGross = inp.income.salaryGross;
-      const r = laborTax(Math.max(0, salaryGross - inp.pension.monthlyContribution * 12), a.tax);
+      const taxableGross = Math.max(0, salaryGross - inp.pension.monthlyContribution * 12);
+      const r = laborTax(taxableGross, a.tax);
       salaryNet = r.net;
       laborTaxAmt = r.tax;
       employerPension = inp.pension.employerContribution * 12;
@@ -102,7 +111,12 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
     const familyFundNet = age < inp.income.familyFundUntilAge ? inp.income.familyFundAnnualNet : 0;
     const statePensionNet = age >= inp.income.statePensionFromAge ? a.statePensionAnnualNet : 0;
 
-    // Planned holding distribution (taxed as share income)
+    // Holding-exit (tilføjes saldo før vækst)
+    if (inp.holding.exitYear === calYear && inp.holding.expectedExitValue > 0) {
+      bal.holding += inp.holding.expectedExitValue;
+    }
+
+    // Planlagt holding-udlodning
     let holdingDistGross = 0;
     let holdingDistNet = 0;
     let holdingDistTax = 0;
@@ -114,72 +128,127 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
       bal.holding -= holdingDistGross;
     }
 
-    // Planned pension payout (after fullRetireAge, simple flat: cover gap; handled below via withdrawOrder)
-    let pensionPayoutNet = 0;
-
-    // Holding exit (adds to holding before growth; net of corp tax assumption already)
-    if (inp.holding.exitYear === calYear && inp.holding.expectedExitValue > 0) {
-      bal.holding += inp.holding.expectedExitValue;
-    }
-
-    // Debt servicing
+    // Gæld
     const debtInterest = bal.debt * inp.debt.interestRate;
     const yearlyDebtPayment = Math.min(bal.debt + debtInterest, inp.debt.monthlyPayment * 12);
     const debtPrincipal = Math.max(0, yearlyDebtPayment - debtInterest);
     bal.debt = Math.max(0, bal.debt + debtInterest - yearlyDebtPayment);
 
-    // Spending (real DKK)
     const spending = inp.spending.desiredMonthlyNet * 12;
-
-    // Cashflow: income net minus debt payment minus spending
     const incomeNet = salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingDistNet;
-    let cashflow = incomeNet - yearlyDebtPayment - spending;
 
+    // Cashflow før opsparing/udtræk
+    const cashflow = incomeNet - yearlyDebtPayment - spending;
+
+    // ---- Opsparing / udtræk efter logik ----
     let freeContribution = 0;
-    const withdrawn = { free: 0, pension: 0, holding: 0 };
+    const withdrawals = { free: 0, pension: 0, holding: 0 };
+    const withdrawalsGross = { free: 0, pension: 0, holding: 0 };
+    let pensionPayoutNet = 0;
+    let cashflowSurplus = 0;
 
-    if (cashflow >= 0) {
-      // Surplus: contribute to free, plus planned recurring contributions while working
-      let surplus = cashflow;
-      if (working) {
-        // monthlyContribution to free
-        const planned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
-        const actuallyContrib = Math.min(surplus, planned);
-        freeContribution += actuallyContrib;
-        surplus -= actuallyContrib;
+    if (working) {
+      const planned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
+      cashflowSurplus = cashflow - planned;
+
+      if (savingsLogic === "cashflow") {
+        // Investér hele overskuddet, eller hæv hvis underskud
+        if (cashflow >= 0) {
+          freeContribution = cashflow;
+          bal.free += freeContribution;
+        } else {
+          let needed = -cashflow;
+          for (const b of a.withdrawOrder) {
+            if (needed <= 0) break;
+            const r = withdrawFromBucket(b, needed, bal, a);
+            withdrawals[b] += r.netCovered;
+            withdrawalsGross[b] += r.gross;
+            if (b === "pension") pensionPayoutNet += r.netCovered;
+            if (b === "holding") {
+              holdingDistNet += r.netCovered;
+              holdingDistGross += r.gross;
+              holdingDistTax += r.tax;
+            }
+            needed -= r.netCovered;
+          }
+        }
+      } else {
+        // planned eller hybrid: brug planlagt opsparing
+        // Hvis cashflow ikke kan dække planlagt → reducer til hvad der er råd til (planned mode),
+        // eller behold planlagt og lad shortfall vise sig (hybrid)
+        if (savingsLogic === "planned") {
+          freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
+          bal.free += freeContribution;
+          // Resterende cashflow ignoreres (forbruges) – ingen dobbeltregning
+        } else {
+          // hybrid: træk altid planlagt, dæk underskud via udtræk
+          freeContribution = planned;
+          bal.free += freeContribution;
+          const net = cashflow - planned;
+          if (net < 0) {
+            let needed = -net;
+            for (const b of a.withdrawOrder) {
+              if (needed <= 0) break;
+              const r = withdrawFromBucket(b, needed, bal, a);
+              withdrawals[b] += r.netCovered;
+              withdrawalsGross[b] += r.gross;
+              if (b === "pension") pensionPayoutNet += r.netCovered;
+              if (b === "holding") {
+                holdingDistNet += r.netCovered;
+                holdingDistGross += r.gross;
+                holdingDistTax += r.tax;
+              }
+              needed -= r.netCovered;
+            }
+          }
+        }
       }
-      freeContribution += surplus;
-      bal.free += freeContribution;
     } else {
-      // Shortfall: withdraw per priority
-      let needed = -cashflow;
-      const order = a.withdrawOrder;
-      for (const b of order) {
-        if (needed <= 0) break;
-        const r = withdrawFromBucket(b, needed, bal, a);
-        withdrawn[b] += r.withdrawn;
-        needed -= r.netCovered;
-        if (b === "pension") pensionPayoutNet += r.netCovered;
-        if (b === "holding") holdingDistNet += r.netCovered, (holdingDistTax += r.tax);
+      // Efter stopalder: dæk evt. underskud via prioriteret udtræk
+      if (cashflow >= 0) {
+        freeContribution = cashflow;
+        bal.free += freeContribution;
+      } else {
+        let needed = -cashflow;
+        for (const b of a.withdrawOrder) {
+          if (needed <= 0) break;
+          const r = withdrawFromBucket(b, needed, bal, a);
+          withdrawals[b] += r.netCovered;
+          withdrawalsGross[b] += r.gross;
+          if (b === "pension") pensionPayoutNet += r.netCovered;
+          if (b === "holding") {
+            holdingDistNet += r.netCovered;
+            holdingDistGross += r.gross;
+            holdingDistTax += r.tax;
+          }
+          needed -= r.netCovered;
+        }
       }
     }
 
-    // Add own pension contribution to pension bucket (pre-growth)
+    // Pensionsindbetalinger (efter cashflow-håndtering, før vækst)
     if (working) {
       bal.pension += ownPensionContribution + employerPension;
     }
 
-    const shortfallAmount = cashflow < 0 ? Math.max(0, -cashflow - (incomeNet - yearlyDebtPayment - spending + (cashflow))) : 0; // recompute below
-    // Recompute shortfall properly: did we cover spending?
-    const totalAvailableNet =
-      incomeNet + withdrawn.free + (withdrawn.pension > 0 ? pensionPayoutTax(withdrawn.pension, a.tax).net : 0) + (withdrawn.holding > 0 ? shareTax(withdrawn.holding, a.tax).net : 0);
-    // Simplify shortfall: if needed > 0 still after withdrawals
-    const stillShort = cashflow < 0 ? Math.max(0, -cashflow - (withdrawn.free + (withdrawn.pension ? pensionPayoutTax(withdrawn.pension, a.tax).net : 0) + (withdrawn.holding ? shareTax(withdrawn.holding, a.tax).net : 0))) : 0;
+    // Beregn faktisk shortfall: kunne vi dække forbrug + gæld?
+    const totalNetCovered =
+      incomeNet + withdrawals.free + withdrawals.pension + withdrawals.holding - holdingDistNet;
+    // Note: holdingDistNet er allerede del af incomeNet, så vi trækker det fra for ikke at dobbelttælle
+    const required = spending + yearlyDebtPayment;
+    const provided = incomeNet + withdrawals.free + withdrawals.pension + (withdrawals.holding > 0 ? 0 : 0);
+    // Forenklet: shortfall = manglende dækning efter alle udtræk
+    const stillShort = Math.max(0, required - (incomeNet + withdrawals.free + withdrawals.pension + withdrawals.holding));
 
-    // Growth (real return)
-    bal.free *= 1 + a.realReturn.free;
-    bal.pension *= 1 + a.realReturn.pension;
-    bal.holding *= 1 + a.realReturn.holding;
+    // Vækst (realafkast)
+    const growth = {
+      free: bal.free * a.realReturn.free,
+      pension: bal.pension * a.realReturn.pension,
+      holding: bal.holding * a.realReturn.holding,
+    };
+    bal.free += growth.free;
+    bal.pension += growth.pension;
+    bal.holding += growth.holding;
 
     const closing = { ...bal };
     const netWorth = closing.free + closing.pension + closing.holding - closing.debt;
@@ -204,7 +273,10 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
         taxes: laborTaxAmt + holdingDistTax,
         debtInterest,
         debtPrincipal,
-        withdrawals: withdrawn,
+        withdrawals,
+        withdrawalsGross,
+        cashflowSurplus,
+        growth,
       },
       totalIncomeNet: incomeNet,
       netWorth,
@@ -215,4 +287,20 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
   }
 
   return years;
+}
+
+/** Find tidligste stopalder hvor scenariet kan gennemføres uden shortfall. */
+export function findEarliestSustainableStopAge(
+  scenario: Scenario,
+  globalAssumptions: Assumptions,
+): number | null {
+  const a = mergeAssumptions(globalAssumptions, scenario.assumptionsOverride);
+  const inp = scenario.inputs;
+  const minAge = Math.max(inp.person.currentAge, 40);
+  const maxAge = Math.min(inp.person.lifeExpectancy, 75);
+  for (let age = minAge; age <= maxAge; age++) {
+    const ys = projectWithStopAge(inp, a, age);
+    if (!ys.some((y) => y.shortfall)) return age;
+  }
+  return null;
 }

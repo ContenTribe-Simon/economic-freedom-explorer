@@ -1,9 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScenarioInputs } from "@/lib/finance/types";
+import { ScenarioInputs, SavingsLogic } from "@/lib/finance/types";
+import { decimalToPctString, parsePctInput } from "@/lib/format";
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -42,6 +43,45 @@ function NumField({
           className="num"
         />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
+      </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function PctField({
+  label,
+  value,
+  onChange,
+  hint,
+  step = 0.1,
+}: {
+  label: string;
+  value: number; // decimal
+  onChange: (decimal: number) => void;
+  hint?: string;
+  step?: number;
+}) {
+  const [text, setText] = useState(decimalToPctString(value));
+  useEffect(() => {
+    setText(decimalToPctString(value));
+  }, [value]);
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          step={step}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            const dec = parsePctInput(e.target.value);
+            if (Number.isFinite(dec)) onChange(dec);
+          }}
+          className="num"
+        />
+        <span className="text-sm text-muted-foreground">%</span>
       </div>
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
@@ -98,7 +138,7 @@ export default function Inputs() {
 
       <Section title="Gæld">
         <NumField label="Restgæld" value={inp.debt.balance} onChange={(v) => set("debt", { ...inp.debt, balance: v })} suffix="kr" step={10000} />
-        <NumField label="Effektiv rente" value={inp.debt.interestRate} onChange={(v) => set("debt", { ...inp.debt, interestRate: v })} suffix="(0,04 = 4%)" step={0.005} />
+        <PctField label="Effektiv rente" value={inp.debt.interestRate} onChange={(v) => set("debt", { ...inp.debt, interestRate: v })} hint="Indtast som procent, fx 4 for 4%" />
         <NumField label="Månedlig ydelse" value={inp.debt.monthlyPayment} onChange={(v) => set("debt", { ...inp.debt, monthlyPayment: v })} suffix="kr/md" step={500} />
       </Section>
 
@@ -114,6 +154,38 @@ export default function Inputs() {
 
       <Section title="Forbrug">
         <NumField label="Ønsket forbrug (netto)" value={inp.spending.desiredMonthlyNet} onChange={(v) => set("spending", { ...inp.spending, desiredMonthlyNet: v })} suffix="kr/md" step={1000} hint="I nutidskroner – antages at følge inflationen" />
+      </Section>
+
+      <Section
+        title="Opsparingslogik"
+        description="Hvordan modellen håndterer opsparing før stopalder. Forhindrer at både planlagt opsparing og cashflow-overskud tælles dobbelt."
+      >
+        <div className="md:col-span-2 space-y-2">
+          {([
+            { v: "planned", t: "Planlagt opsparing", d: "Kun månedlig opsparing + årligt ekstra investeres. Cashflow-overskud forbruges/ignoreres." },
+            { v: "cashflow", t: "Cashflow-baseret", d: "Hele nettoindkomst minus forbrug investeres automatisk i fri kapital." },
+            { v: "hybrid", t: "Hybrid", d: "Planlagt opsparing bruges, men cashflow-overskud/-underskud vises som information." },
+          ] as { v: SavingsLogic; t: string; d: string }[]).map((opt) => (
+            <label
+              key={opt.v}
+              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                inp.savingsLogic === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="savingsLogic"
+                checked={inp.savingsLogic === opt.v}
+                onChange={() => set("savingsLogic", opt.v)}
+                className="mt-1"
+              />
+              <div>
+                <div className="font-medium text-sm">{opt.t}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
+              </div>
+            </label>
+          ))}
+        </div>
       </Section>
     </div>
   );

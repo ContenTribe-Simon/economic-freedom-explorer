@@ -44,6 +44,8 @@ export interface SpendingInputs {
   desiredMonthlyNet: number; // in real DKK
 }
 
+export type SavingsLogic = "planned" | "cashflow" | "hybrid";
+
 export interface ScenarioInputs {
   person: PersonInputs;
   free: FreeBucketInputs;
@@ -54,6 +56,7 @@ export interface ScenarioInputs {
   spending: SpendingInputs;
   stopAge: number; // age fuldtidsstop
   fullRetireAge: number; // age helt stop (deltid slutter)
+  savingsLogic: SavingsLogic; // hvordan opsparing håndteres før stopalder
 }
 
 export interface TaxAssumptions {
@@ -93,6 +96,12 @@ export interface YearFlows {
   debtInterest: number;
   debtPrincipal: number;
   withdrawals: { free: number; pension: number; holding: number };
+  // Bruttobeløb hævet fra holding/pension (før skat) til at dække udtræk
+  withdrawalsGross: { free: number; pension: number; holding: number };
+  // Hybrid mode: forskel mellem cashflow og planlagt opsparing (kan være negativ)
+  cashflowSurplus: number;
+  // Vækst på hver kasse (for audit)
+  growth: { free: number; pension: number; holding: number };
 }
 
 export interface YearRow {
@@ -118,7 +127,8 @@ export interface Scenario {
 }
 
 export interface KPIs {
-  earliestStopAge: number | null;
+  plannedStopAge: number;
+  earliestSustainableStopAge: number | null;
   capitalAtStopAge: number;
   capitalAt65: number;
   capitalAt95: number;

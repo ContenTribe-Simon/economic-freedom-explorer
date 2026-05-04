@@ -1,17 +1,43 @@
+import { useEffect, useState } from "react";
 import { useFinanceStore } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { defaultAssumptions } from "@/lib/finance/defaults";
+import { decimalToPctString, parsePctInput } from "@/lib/format";
 
-function Field({ label, value, onChange, suffix, step = 0.001 }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number }) {
+function NumberField({ label, value, onChange, suffix, step = 1 }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
         <Input type="number" step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value || "0"))} className="num" />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
+      </div>
+    </div>
+  );
+}
+
+function PctField({ label, value, onChange, step = 0.1 }: { label: string; value: number; onChange: (n: number) => void; step?: number }) {
+  const [text, setText] = useState(decimalToPctString(value));
+  useEffect(() => setText(decimalToPctString(value)), [value]);
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          step={step}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            const dec = parsePctInput(e.target.value);
+            if (Number.isFinite(dec)) onChange(dec);
+          }}
+          className="num"
+        />
+        <span className="text-sm text-muted-foreground">%</span>
       </div>
     </div>
   );
@@ -39,39 +65,39 @@ export default function Assumptions() {
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Realafkast</h2>
         <div className="grid md:grid-cols-3 gap-4">
-          <Field label="Fri kapital" value={a.realReturn.free} onChange={(v) => update((x) => ({ ...x, realReturn: { ...x.realReturn, free: v } }))} suffix="(0,05 = 5%)" />
-          <Field label="Pension" value={a.realReturn.pension} onChange={(v) => update((x) => ({ ...x, realReturn: { ...x.realReturn, pension: v } }))} suffix="(0,05 = 5%)" />
-          <Field label="Holding" value={a.realReturn.holding} onChange={(v) => update((x) => ({ ...x, realReturn: { ...x.realReturn, holding: v } }))} suffix="(0,04 = 4%)" />
-          <Field label="Inflation (info)" value={a.inflation} onChange={(v) => update((x) => ({ ...x, inflation: v }))} suffix="(0,02 = 2%)" />
+          <PctField label="Fri kapital" value={a.realReturn.free} onChange={(v) => update((x) => ({ ...x, realReturn: { ...x.realReturn, free: v } }))} />
+          <PctField label="Pension" value={a.realReturn.pension} onChange={(v) => update((x) => ({ ...x, realReturn: { ...x.realReturn, pension: v } }))} />
+          <PctField label="Holding" value={a.realReturn.holding} onChange={(v) => update((x) => ({ ...x, realReturn: { ...x.realReturn, holding: v } }))} />
+          <PctField label="Inflation (info)" value={a.inflation} onChange={(v) => update((x) => ({ ...x, inflation: v }))} />
         </div>
       </Card>
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Lønindkomst</h2>
         <div className="grid md:grid-cols-3 gap-4">
-          <Field label="AM-bidrag" value={a.tax.amBidrag} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, amBidrag: v } }))} suffix="(0,08 = 8%)" />
-          <Field label="Bundskat (effektiv inkl. kommune)" value={a.tax.laborBottomRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, laborBottomRate: v } }))} suffix="(0,37)" />
-          <Field label="Topskat (effektiv)" value={a.tax.laborTopRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, laborTopRate: v } }))} suffix="(0,52)" />
-          <Field label="Topskattegrænse (efter AM)" value={a.tax.laborTopBracket} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, laborTopBracket: v } }))} suffix="kr" step={1000} />
-          <Field label="Personfradrag" value={a.tax.personalAllowance} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, personalAllowance: v } }))} suffix="kr" step={500} />
+          <PctField label="AM-bidrag" value={a.tax.amBidrag} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, amBidrag: v } }))} />
+          <PctField label="Bundskat (effektiv inkl. kommune)" value={a.tax.laborBottomRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, laborBottomRate: v } }))} />
+          <PctField label="Topskat (effektiv)" value={a.tax.laborTopRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, laborTopRate: v } }))} />
+          <NumberField label="Topskattegrænse (efter AM)" value={a.tax.laborTopBracket} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, laborTopBracket: v } }))} suffix="kr" step={1000} />
+          <NumberField label="Personfradrag" value={a.tax.personalAllowance} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, personalAllowance: v } }))} suffix="kr" step={500} />
         </div>
       </Card>
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Aktieindkomst & holding</h2>
         <div className="grid md:grid-cols-3 gap-4">
-          <Field label="Sats lav" value={a.tax.shareLowRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareLowRate: v } }))} suffix="(0,27)" />
-          <Field label="Sats høj" value={a.tax.shareHighRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareHighRate: v } }))} suffix="(0,42)" />
-          <Field label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} />
-          <Field label="Selskabsskat (info)" value={a.tax.corporateRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, corporateRate: v } }))} suffix="(0,22)" />
+          <PctField label="Sats lav" value={a.tax.shareLowRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareLowRate: v } }))} />
+          <PctField label="Sats høj" value={a.tax.shareHighRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareHighRate: v } }))} />
+          <NumberField label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} />
+          <PctField label="Selskabsskat (info)" value={a.tax.corporateRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, corporateRate: v } }))} />
         </div>
       </Card>
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Pension & folkepension</h2>
         <div className="grid md:grid-cols-3 gap-4">
-          <Field label="Afgift v. udbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} suffix="(0,40)" />
-          <Field label="Folkepension netto/år" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} />
+          <PctField label="Afgift v. udbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
+          <NumberField label="Folkepension netto/år" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} />
         </div>
       </Card>
 
