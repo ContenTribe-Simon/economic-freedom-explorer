@@ -129,6 +129,20 @@ export default function Scenarios() {
         <Button onClick={() => add(`Scenarie ${scenarios.length + 1}`)}>+ Nyt scenarie</Button>
       </header>
 
+      <Card className="p-4">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Stress-tests</div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Dupliker det aktive scenarie med en specifik ændring. Det nye scenarie tilføjes til sammenligningen herunder.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {STRESS_TESTS.map((t) => (
+            <Button key={t.key} size="sm" variant="outline" onClick={() => runStress(t.key)}>
+              {t.label}
+            </Button>
+          ))}
+        </div>
+      </Card>
+
       <Card className="p-0 overflow-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
