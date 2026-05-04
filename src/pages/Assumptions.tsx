@@ -90,7 +90,7 @@ export default function Assumptions() {
         <div className="grid md:grid-cols-3 gap-4">
           <PctField label="Sats lav" value={a.tax.shareLowRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareLowRate: v } }))} />
           <PctField label="Sats høj" value={a.tax.shareHighRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareHighRate: v } }))} />
-          <NumberField label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} />
+          <NumberField label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} hint="2026: 79.400 kr (single)" />
           <PctField label="Selskabsskat (info)" value={a.tax.corporateRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, corporateRate: v } }))} />
         </div>
       </Card>
@@ -99,7 +99,7 @@ export default function Assumptions() {
         <h2 className="font-display text-xl font-semibold mb-4">Pension & folkepension</h2>
         <div className="grid md:grid-cols-3 gap-4">
           <PctField label="Afgift v. udbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
-          <NumberField label="Folkepension netto/år" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} />
+          <NumberField label="Folkepension netto/år (manuelt)" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} hint="OBS: Manuelt nettotal. Hvis du kun regner med folkepensionens grundbeløb, er 2026-beløbet ca. 90.528 kr. brutto/år, ikke netto." />
         </div>
       </Card>
 
