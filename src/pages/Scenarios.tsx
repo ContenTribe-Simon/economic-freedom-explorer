@@ -6,6 +6,68 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
 import { Trash2 } from "lucide-react";
+import { Scenario } from "@/lib/finance/types";
+
+type StressMod = { suffix: string; apply: (s: Scenario) => void };
+
+const STRESS_TESTS: { key: string; label: string; mod: StressMod }[] = [
+  {
+    key: "no-barma",
+    label: "No Barma",
+    mod: {
+      suffix: "uden Barma",
+      apply: (s) => {
+        s.inputs.holding.balance = 0;
+        s.inputs.holding.expectedExitValue = 0;
+        s.inputs.holding.annualDistribution = 0;
+      },
+    },
+  },
+  {
+    key: "no-parttime",
+    label: "No part-time",
+    mod: {
+      suffix: "uden deltid",
+      apply: (s) => {
+        s.inputs.income.partTimeAnnualGross = 0;
+        s.inputs.fullRetireAge = s.inputs.stopAge;
+      },
+    },
+  },
+  {
+    key: "low-return",
+    label: "Low return",
+    mod: {
+      suffix: "lavt afkast",
+      apply: (s) => {
+        s.assumptionsOverride = {
+          ...(s.assumptionsOverride ?? {}),
+          realReturn: { free: 0.02, pension: 0.02, holding: 0.01 },
+        };
+      },
+    },
+  },
+  {
+    key: "higher-spending",
+    label: "Higher spending",
+    mod: {
+      suffix: "højere forbrug",
+      apply: (s) => {
+        s.inputs.spending.desiredMonthlyNet = Math.round(s.inputs.spending.desiredMonthlyNet * 1.25);
+      },
+    },
+  },
+  {
+    key: "no-folkepension",
+    label: "No folkepension",
+    mod: {
+      suffix: "uden folkepension",
+      apply: (s) => {
+        s.inputs.income.statePensionFromAge = 999;
+      },
+    },
+  },
+];
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
