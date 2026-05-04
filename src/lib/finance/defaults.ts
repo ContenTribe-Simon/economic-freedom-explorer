@@ -37,6 +37,7 @@ export const defaultInputs: ScenarioInputs = {
   spending: { desiredMonthlyNet: 35000 },
   stopAge: 55,
   fullRetireAge: 62,
+  savingsLogic: "planned",
 };
 
 export function makeBaseScenario(): Scenario {
