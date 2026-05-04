@@ -33,9 +33,10 @@ describe("projection", () => {
   it("net worth finite and KPIs derive", () => {
     const s = makeBaseScenario();
     const years = project(s, defaultAssumptions);
-    const k = deriveKPIs(s, years);
+    const k = deriveKPIs(s, years, defaultAssumptions);
     expect(Number.isFinite(k.capitalAt95)).toBe(true);
     expect(k.robustnessScore).toBeGreaterThanOrEqual(0);
     expect(k.robustnessScore).toBeLessThanOrEqual(100);
+    expect(k.plannedStopAge).toBe(s.inputs.stopAge);
   });
 });
