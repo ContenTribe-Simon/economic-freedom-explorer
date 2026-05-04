@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScenarioInputs, SavingsLogic } from "@/lib/finance/types";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
+import { NumberInput } from "@/components/NumberInput";
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -35,11 +36,10 @@ function NumField({
     <div className="space-y-1.5">
       <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
-        <Input
-          type="number"
+        <NumberInput
           value={Number.isFinite(value) ? value : 0}
           step={step}
-          onChange={(e) => onChange(parseFloat(e.target.value || "0"))}
+          onChange={onChange}
           className="num"
         />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
