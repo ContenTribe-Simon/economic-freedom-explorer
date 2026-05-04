@@ -63,6 +63,7 @@ export interface ScenarioInputs {
   debt: DebtInputs;
   income: IncomeInputs;
   spending: SpendingInputs;
+  target: TargetInputs;
   stopAge: number; // age fuldtidsstop
   fullRetireAge: number; // age helt stop (deltid slutter)
   savingsLogic: SavingsLogic; // hvordan opsparing håndteres før stopalder
