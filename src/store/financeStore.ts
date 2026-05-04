@@ -78,7 +78,28 @@ export const useFinanceStore = create<FinanceState>()(
         }
       },
     }),
-    { name: "finance-tool.v1" },
+    {
+      name: "finance-tool.v1",
+      version: 2,
+      migrate: (state: any) => {
+        if (!state) return state;
+        if (Array.isArray(state.scenarios)) {
+          state.scenarios = state.scenarios.map((sc: any) => ({
+            ...sc,
+            inputs: {
+              ...sc.inputs,
+              target: sc.inputs?.target ?? { minNetWorthAtEnd: 0 },
+              holding: {
+                distributionFromAge: sc.inputs?.stopAge ?? 55,
+                startDistributionAtStopAge: true,
+                ...sc.inputs?.holding,
+              },
+            },
+          }));
+        }
+        return state;
+      },
+    },
   ),
 );
 
