@@ -96,10 +96,20 @@ export default function Assumptions() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="font-display text-xl font-semibold mb-4">Pension & folkepension</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          <PctField label="Afgift v. udbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
-          <NumberField label="Folkepension netto/år (manuelt)" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} hint="OBS: Manuelt nettotal. Hvis du kun regner med folkepensionens grundbeløb, er 2026-beløbet ca. 90.528 kr. brutto/år, ikke netto." />
+        <h2 className="font-display text-xl font-semibold mb-4">Privat pension</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          <PctField label="Effektiv skat ved privat pensionsudbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          Bruges kun til privat/arbejdsmarkedspension — <strong>ikke folkepension</strong>.
+          Folkepensionens metode og skat sættes pr. scenarie under <em>Variabler → Folkepension</em>.
+        </p>
+      </Card>
+
+      <Card className="p-6">
+        <h2 className="font-display text-xl font-semibold mb-4">Folkepension (fallback)</h2>
+        <div className="grid md:grid-cols-2 gap-4">
+          <NumberField label="Fallback netto/år" value={a.statePensionAnnualNet} onChange={(v) => update((x) => ({ ...x, statePensionAnnualNet: v }))} suffix="kr/år" step={1000} hint="Bruges kun hvis et scenarie endnu ikke har folkepensionsmetode valgt." />
         </div>
       </Card>
 

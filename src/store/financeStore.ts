@@ -80,22 +80,77 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 2,
+      version: 3,
       migrate: (state: any) => {
         if (!state) return state;
         if (Array.isArray(state.scenarios)) {
-          state.scenarios = state.scenarios.map((sc: any) => ({
-            ...sc,
-            inputs: {
-              ...sc.inputs,
-              target: sc.inputs?.target ?? { minNetWorthAtEnd: 0 },
-              holding: {
-                distributionFromAge: sc.inputs?.stopAge ?? 55,
-                startDistributionAtStopAge: true,
-                ...sc.inputs?.holding,
+          state.scenarios = state.scenarios.map((sc: any) => {
+            const old = sc.inputs ?? {};
+            const oldFree = old.free ?? {};
+            const oldDebt = old.debt;
+            const oldIncome = old.income ?? {};
+            const oldHolding = old.holding ?? {};
+
+            const debts = Array.isArray(old.debts)
+              ? old.debts
+              : oldDebt
+                ? [
+                    {
+                      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+                      name: "Privat gæld",
+                      kind: "private",
+                      balance: oldDebt.balance ?? 0,
+                      interestRate: oldDebt.interestRate ?? 0.04,
+                      monthlyPayment: oldDebt.monthlyPayment ?? 0,
+                      impact: "private",
+                    },
+                  ]
+                : [];
+
+            const partTime = oldIncome.partTime ?? {
+              mode: "net_monthly",
+              grossAnnual: oldIncome.partTimeAnnualGross ?? 0,
+              netMonthly: 18000,
+              fromAge: oldIncome.partTimeFromAge ?? 55,
+              untilAge: oldIncome.partTimeUntilAge ?? 62,
+            };
+
+            const statePension = oldIncome.statePension ?? {
+              mode: "baseOnly",
+              fromAge: oldIncome.statePensionFromAge ?? 67,
+              baseGrossAnnual: 90528,
+              effectiveTaxRate: 0.37,
+              manualNetAnnual: state.assumptions?.statePensionAnnualNet ?? 90000,
+            };
+
+            return {
+              ...sc,
+              inputs: {
+                ...old,
+                free: {
+                  balance: oldFree.balance ?? 0,
+                  monthlyContribution: oldFree.monthlyContribution ?? 0,
+                  annualExtraContribution: oldFree.annualExtraContribution ?? 0,
+                  cashBuffer: oldFree.cashBuffer ?? 0,
+                  bufferUsableForShortfall: oldFree.bufferUsableForShortfall ?? false,
+                },
+                debts,
+                holding: {
+                  distributionFromAge: oldHolding.distributionFromAge ?? old.stopAge ?? 55,
+                  startDistributionAtStopAge: oldHolding.startDistributionAtStopAge ?? true,
+                  ...oldHolding,
+                },
+                income: {
+                  salaryGross: oldIncome.salaryGross ?? 0,
+                  familyFundAnnualNet: oldIncome.familyFundAnnualNet ?? 0,
+                  familyFundUntilAge: oldIncome.familyFundUntilAge ?? 70,
+                  partTime,
+                  statePension,
+                },
+                target: old.target ?? { minNetWorthAtEnd: 0 },
               },
-            },
-          }));
+            };
+          });
         }
         return state;
       },
