@@ -278,6 +278,32 @@ export default function Inputs() {
                 <PctField label="Rente" value={d.interestRate} onChange={(v) => updateDebt(i, { interestRate: v })} />
                 <NumField label="Månedlig ydelse" value={d.monthlyPayment} onChange={(v) => updateDebt(i, { monthlyPayment: v })} suffix="kr/md" step={500} />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={d.includeInNetWorth ?? (d.impact !== "risk_only")}
+                    onChange={(e) => updateDebt(i, { includeInNetWorth: e.target.checked })}
+                  />
+                  <span>Medregn i nettoformue {d.kind === "personal_liability" && <span className="text-muted-foreground">(default fra for hæftelse)</span>}</span>
+                </label>
+                {d.kind === "personal_liability" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Knyttet til gældspost</Label>
+                    <select
+                      className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full"
+                      value={d.linkedDebtId ?? ""}
+                      onChange={(e) => updateDebt(i, { linkedDebtId: e.target.value || undefined })}
+                    >
+                      <option value="">— Ingen kobling —</option>
+                      {inp.debts.filter((o) => o.id !== d.id && o.kind !== "personal_liability").map((o) => (
+                        <option key={o.id} value={o.id}>{o.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-muted-foreground">Hæftelsessaldo spejler den underliggende gæld.</p>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
           {inp.debts.length === 0 && <p className="text-sm text-muted-foreground">Ingen gældsposter. Klik “Tilføj gæld”.</p>}
