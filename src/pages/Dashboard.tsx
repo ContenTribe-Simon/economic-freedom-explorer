@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs } from "@/lib/finance/kpis";
+import { sanityChecks } from "@/lib/finance/sanity";
 import { Card } from "@/components/ui/card";
 import { formatDKK } from "@/lib/format";
 import {
@@ -31,18 +32,26 @@ function KPI({ label, value, sub, tone, tooltip }: { label: string; value: strin
   );
 }
 
+const SP_METHOD_LABEL = {
+  none: "Ingen folkepension",
+  baseOnly: "Kun grundbeløb (brutto − skat)",
+  manualNet: "Manuelt nettobeløb",
+} as const;
+
 export default function Dashboard() {
   const scenario = useActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
 
-  const { years, kpis, chartData } = useMemo(() => {
+  const { years, kpis, chartData, checks } = useMemo(() => {
     const ys = project(scenario, assumptions);
     return {
       years: ys,
       kpis: deriveKPIs(scenario, ys, assumptions),
+      checks: sanityChecks(scenario, ys),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
+        Buffer: Math.round(y.closing.buffer),
         Pension: Math.round(y.closing.pension),
         Holding: Math.round(y.closing.holding),
         Forbrug: Math.round(y.flows.spending),
@@ -51,7 +60,9 @@ export default function Dashboard() {
     };
   }, [scenario, assumptions]);
 
-  const robustnessTone = kpis.robustnessScore >= 70 ? "good" : kpis.robustnessScore >= 40 ? "warn" : "bad";
+  const finTone = kpis.financialRobustness >= 70 ? "good" : kpis.financialRobustness >= 40 ? "warn" : "bad";
+  const riskTone = kpis.assumptionRisk <= 30 ? "good" : kpis.assumptionRisk <= 60 ? "warn" : "bad";
+  const spMode = scenario.inputs.income.statePension.mode;
 
   return (
     <div className="space-y-8">
@@ -59,46 +70,66 @@ export default function Dashboard() {
         <div className="text-xs uppercase tracking-widest text-muted-foreground">Aktivt scenarie</div>
         <h1 className="font-display text-4xl font-semibold mt-1">{scenario.name}</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">
-          Alle beløb i nutidskroner (realværdi). Skat og afkast styres under <em>Antagelser</em>.
+          Alle beløb i nutidskroner (realværdi). Folkepensionsmetode: <strong>{SP_METHOD_LABEL[spMode]}</strong>.
         </p>
       </header>
 
       {kpis.firstShortfallAge !== null && (
         <div className="bg-destructive/10 border border-destructive/30 text-destructive-foreground/90 rounded-md p-4 text-sm">
           <strong className="text-destructive">Shortfall ved alder {kpis.firstShortfallAge}.</strong>{" "}
-          Kapitalen rækker ikke til det ønskede forbrug. Justér stopalder, forbrug, afkast eller indbetalinger.
+          Justér stopalder, forbrug, afkast eller indbetalinger.
         </div>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPI
-          label="Planlagt stopalder"
-          value={`${kpis.plannedStopAge} år`}
-          sub="Som angivet i variabler"
-        />
+        <KPI label="Planlagt stopalder" value={`${kpis.plannedStopAge} år`} sub="Som angivet i variabler" />
         <KPI
           label="Tidligste bæredygtige stop"
           value={kpis.earliestSustainableStopAge ? `${kpis.earliestSustainableStopAge} år` : "—"}
-          sub="Holder til levealder + minimumsformue"
-          tooltip="Den tidligste alder, hvor scenariet holder til forventet levealder uden shortfall og med mindst den ønskede minimumsformue tilbage."
-          tone={
-            kpis.earliestSustainableStopAge && kpis.earliestSustainableStopAge <= kpis.plannedStopAge
-              ? "good"
-              : "warn"
-          }
+          sub={`Min ved 95: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}`}
+          tooltip="Tidligste alder hvor scenariet holder uden shortfall og slutter med mindst minimumsformuen."
+          tone={kpis.earliestSustainableStopAge && kpis.earliestSustainableStopAge <= kpis.plannedStopAge ? "good" : "warn"}
         />
         <KPI label="Kapital v. stop" value={formatDKK(kpis.capitalAtStopAge, { compact: true })} sub={`Alder ${scenario.inputs.stopAge}`} />
         <KPI label="Kapital v. 65" value={formatDKK(kpis.capitalAt65, { compact: true })} />
         <KPI label="Kapital v. 95" value={formatDKK(kpis.capitalAt95, { compact: true })} tone={kpis.capitalAt95 > 0 ? "good" : "bad"} />
+        <KPI label="Første shortfall" value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"} tone={kpis.firstShortfallAge ? "bad" : "good"} />
         <KPI
-          label="Første shortfall"
-          value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"}
-          tone={kpis.firstShortfallAge ? "bad" : "good"}
+          label="Finansiel robusthed"
+          value={`${kpis.financialRobustness} / 100`}
+          tone={finTone}
+          tooltip="Baseret på shortfall og slutformue."
         />
-        <KPI label="Mdl. hul efter stop" value={formatDKK(kpis.monthlyGapAfterStop, { compact: true })} />
-        <KPI label="Robusthed" value={`${kpis.robustnessScore} / 100`} tone={robustnessTone} />
-        <KPI label="År simuleret" value={`${years.length}`} />
+        <KPI
+          label="Antagelsesrisiko"
+          value={`${kpis.assumptionRisk} / 100`}
+          tone={riskTone}
+          sub="Lavere = mindre afhængig af optimistiske antagelser"
+          tooltip="Vurderer afhængighed af holding-exit, folkepension, deltidsindtægt, realafkast og slutmargin."
+        />
       </div>
+
+      {checks.length > 0 && (
+        <Card className="p-6">
+          <h2 className="font-display text-xl font-semibold mb-3">Input sanity check</h2>
+          <ul className="space-y-2">
+            {checks.map((c) => {
+              const color =
+                c.severity === "error"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : c.severity === "warn"
+                    ? "border-warning/40 bg-warning/10"
+                    : "border-border bg-muted/30";
+              return (
+                <li key={c.id} className={`border rounded-md p-3 text-sm ${color}`}>
+                  <div className="font-medium">{c.title}</div>
+                  {c.detail && <div className="text-xs text-muted-foreground mt-1">{c.detail}</div>}
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Kapitaludvikling</h2>
@@ -129,6 +160,7 @@ export default function Dashboard() {
               />
               <Legend />
               <Area type="monotone" dataKey="Fri" stackId="1" stroke="hsl(var(--accent))" fill="url(#g-free)" />
+              <Area type="monotone" dataKey="Buffer" stackId="1" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted))" />
               <Area type="monotone" dataKey="Pension" stackId="1" stroke="hsl(var(--primary))" fill="url(#g-pension)" />
               <Area type="monotone" dataKey="Holding" stackId="1" stroke="hsl(var(--success))" fill="url(#g-holding)" />
               <Line type="monotone" dataKey="Forbrug" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} />
