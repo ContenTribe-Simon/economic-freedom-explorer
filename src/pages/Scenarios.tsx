@@ -29,7 +29,8 @@ const STRESS_TESTS: { key: string; label: string; mod: StressMod }[] = [
     mod: {
       suffix: "uden deltid",
       apply: (s) => {
-        s.inputs.income.partTimeAnnualGross = 0;
+        s.inputs.income.partTime.grossAnnual = 0;
+        s.inputs.income.partTime.netMonthly = 0;
         s.inputs.fullRetireAge = s.inputs.stopAge;
       },
     },
@@ -63,7 +64,7 @@ const STRESS_TESTS: { key: string; label: string; mod: StressMod }[] = [
     mod: {
       suffix: "uden folkepension",
       apply: (s) => {
-        s.inputs.income.statePensionFromAge = 999;
+        s.inputs.income.statePension.mode = "none";
       },
     },
   },
