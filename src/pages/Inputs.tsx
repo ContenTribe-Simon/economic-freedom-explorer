@@ -3,9 +3,19 @@ import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScenarioInputs, SavingsLogic } from "@/lib/finance/types";
+import { Button } from "@/components/ui/button";
+import {
+  ScenarioInputs,
+  SavingsLogic,
+  DebtItem,
+  DebtKind,
+  DebtCashflowImpact,
+  PartTimeMode,
+  StatePensionMode,
+} from "@/lib/finance/types";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
+import { Trash2 } from "lucide-react";
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -36,12 +46,7 @@ function NumField({
     <div className="space-y-1.5">
       <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
-        <NumberInput
-          value={Number.isFinite(value) ? value : 0}
-          step={step}
-          onChange={onChange}
-          className="num"
-        />
+        <NumberInput value={Number.isFinite(value) ? value : 0} step={step} onChange={onChange} className="num" />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
       </div>
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
@@ -57,15 +62,13 @@ function PctField({
   step = 0.1,
 }: {
   label: string;
-  value: number; // decimal
+  value: number;
   onChange: (decimal: number) => void;
   hint?: string;
   step?: number;
 }) {
   const [text, setText] = useState(decimalToPctString(value));
-  useEffect(() => {
-    setText(decimalToPctString(value));
-  }, [value]);
+  useEffect(() => setText(decimalToPctString(value)), [value]);
   return (
     <div className="space-y-1.5">
       <Label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</Label>
@@ -88,6 +91,19 @@ function PctField({
   );
 }
 
+const DEBT_KIND_LABEL: Record<DebtKind, string> = {
+  su: "SU-lån",
+  private: "Privat gæld",
+  holding: "Holdinggæld",
+  personal_liability: "Personlig hæftelse",
+};
+
+const IMPACT_LABEL: Record<DebtCashflowImpact, string> = {
+  private: "Privat cashflow",
+  holding: "Holding cashflow",
+  risk_only: "Kun risiko (vises i nettoformue)",
+};
+
 export default function Inputs() {
   const scenario = useActiveScenario();
   const update = useFinanceStore((s) => s.updateScenario);
@@ -97,6 +113,19 @@ export default function Inputs() {
     update(scenario.id, (s) => ({ ...s, inputs: { ...s.inputs, [key]: value } }));
 
   const inp = scenario.inputs;
+
+  const updateDebt = (idx: number, patch: Partial<DebtItem>) => {
+    const next = inp.debts.map((d, i) => (i === idx ? { ...d, ...patch } : d));
+    set("debts", next);
+  };
+  const addDebt = () => {
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    set("debts", [
+      ...inp.debts,
+      { id, name: "Ny gæld", kind: "private", balance: 0, interestRate: 0.04, monthlyPayment: 0, impact: "private" },
+    ]);
+  };
+  const removeDebt = (idx: number) => set("debts", inp.debts.filter((_, i) => i !== idx));
 
   return (
     <div className="space-y-6">
@@ -117,13 +146,28 @@ export default function Inputs() {
         <NumField label="Helt stop (også deltid)" value={inp.fullRetireAge} onChange={(v) => set("fullRetireAge", v)} suffix="år" />
       </Section>
 
-      <Section title="Fri kapital" description="Likvide midler uden for pension og holding.">
+      <Section title="Fri/investerbar kapital" description="Likvide midler der investeres og får realafkast.">
         <NumField label="Nuværende saldo" value={inp.free.balance} onChange={(v) => set("free", { ...inp.free, balance: v })} suffix="kr" step={10000} />
         <NumField label="Månedlig opsparing" value={inp.free.monthlyContribution} onChange={(v) => set("free", { ...inp.free, monthlyContribution: v })} suffix="kr/md" step={500} />
         <NumField label="Årligt ekstra (bonus mv.)" value={inp.free.annualExtraContribution} onChange={(v) => set("free", { ...inp.free, annualExtraContribution: v })} suffix="kr/år" step={5000} />
       </Section>
 
-      <Section title="Pension" description="Bundet kapital med 40 % afgift ved udbetaling.">
+      <Section title="Kontant buffer" description="Tæller med i nettoformue, men investeres ikke og får intet afkast.">
+        <NumField label="Buffer-saldo" value={inp.free.cashBuffer ?? 0} onChange={(v) => set("free", { ...inp.free, cashBuffer: v })} suffix="kr" step={5000} />
+        <div className="space-y-1.5 flex flex-col justify-end">
+          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
+            <input
+              type="checkbox"
+              checked={inp.free.bufferUsableForShortfall}
+              onChange={(e) => set("free", { ...inp.free, bufferUsableForShortfall: e.target.checked })}
+            />
+            <span className="text-sm">Buffer må bruges til shortfall</span>
+          </label>
+          <p className="text-[11px] text-muted-foreground">Hvis aktiveret bruges buffer som sidste udvej før shortfall registreres.</p>
+        </div>
+      </Section>
+
+      <Section title="Pension" description="Bundet kapital — beskattes ved udbetaling efter sats sat under Antagelser.">
         <NumField label="Nuværende saldo" value={inp.pension.balance} onChange={(v) => set("pension", { ...inp.pension, balance: v })} suffix="kr" step={10000} />
         <NumField label="Egen indbetaling" value={inp.pension.monthlyContribution} onChange={(v) => set("pension", { ...inp.pension, monthlyContribution: v })} suffix="kr/md" step={500} />
         <NumField label="Arbejdsgiverbidrag" value={inp.pension.employerContribution} onChange={(v) => set("pension", { ...inp.pension, employerContribution: v })} suffix="kr/md" step={500} />
@@ -133,7 +177,7 @@ export default function Inputs() {
         <NumField label="Nuværende holdingkapital" value={inp.holding.balance} onChange={(v) => set("holding", { ...inp.holding, balance: v })} suffix="kr" step={50000} />
         <NumField label="Forventet exitværdi" value={inp.holding.expectedExitValue} onChange={(v) => set("holding", { ...inp.holding, expectedExitValue: v })} suffix="kr" step={100000} hint="Tilføjes til holding i exit-året (efter selskabsskat)" />
         <NumField label="Exit-år (kalenderår)" value={inp.holding.exitYear} onChange={(v) => set("holding", { ...inp.holding, exitYear: v })} step={1} />
-        <NumField label="Planlagt årlig udlodning" value={inp.holding.annualDistribution} onChange={(v) => set("holding", { ...inp.holding, annualDistribution: v })} suffix="kr/år" step={10000} hint="Udloddes først fra alderen nedenfor" />
+        <NumField label="Planlagt årlig udlodning" value={inp.holding.annualDistribution} onChange={(v) => set("holding", { ...inp.holding, annualDistribution: v })} suffix="kr/år" step={10000} />
         <NumField
           label="Holdingudlodning fra alder"
           value={inp.holding.distributionFromAge}
@@ -153,24 +197,190 @@ export default function Inputs() {
         </div>
       </Section>
 
-      <Section title="Gæld">
-        <NumField label="Restgæld" value={inp.debt.balance} onChange={(v) => set("debt", { ...inp.debt, balance: v })} suffix="kr" step={10000} />
-        <PctField label="Effektiv rente" value={inp.debt.interestRate} onChange={(v) => set("debt", { ...inp.debt, interestRate: v })} hint="Indtast som procent, fx 4 for 4%" />
-        <NumField label="Månedlig ydelse" value={inp.debt.monthlyPayment} onChange={(v) => set("debt", { ...inp.debt, monthlyPayment: v })} suffix="kr/md" step={500} />
-      </Section>
+      <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-semibold">Gæld (poster)</h2>
+          <Button size="sm" variant="outline" onClick={addDebt}>+ Tilføj gæld</Button>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">
+          Hver post har egen rente, ydelse og angiver hvor den påvirker cashflow.
+        </p>
+        <div className="space-y-3">
+          {inp.debts.map((d, i) => (
+            <div key={d.id} className="border border-border rounded-md p-4 space-y-3">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Navn</Label>
+                  <Input value={d.name} onChange={(e) => updateDebt(i, { name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Type</Label>
+                  <select
+                    className="h-10 px-3 rounded-md border border-border bg-background text-sm"
+                    value={d.kind}
+                    onChange={(e) => updateDebt(i, { kind: e.target.value as DebtKind })}
+                  >
+                    {Object.entries(DEBT_KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Påvirker</Label>
+                  <select
+                    className="h-10 px-3 rounded-md border border-border bg-background text-sm"
+                    value={d.impact}
+                    onChange={(e) => updateDebt(i, { impact: e.target.value as DebtCashflowImpact })}
+                  >
+                    {Object.entries(IMPACT_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select>
+                </div>
+                <Button size="icon" variant="ghost" onClick={() => removeDebt(i)} className="text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <NumField label="Restgæld" value={d.balance} onChange={(v) => updateDebt(i, { balance: v })} suffix="kr" step={10000} />
+                <PctField label="Rente" value={d.interestRate} onChange={(v) => updateDebt(i, { interestRate: v })} />
+                <NumField label="Månedlig ydelse" value={d.monthlyPayment} onChange={(v) => updateDebt(i, { monthlyPayment: v })} suffix="kr/md" step={500} />
+              </div>
+            </div>
+          ))}
+          {inp.debts.length === 0 && <p className="text-sm text-muted-foreground">Ingen gældsposter. Klik “Tilføj gæld”.</p>}
+        </div>
+      </Card>
 
-      <Section title="Indkomst">
+      <Section title="Indkomst (løn & familie)">
         <NumField label="Bruttoløn (årlig)" value={inp.income.salaryGross} onChange={(v) => set("income", { ...inp.income, salaryGross: v })} suffix="kr/år" step={10000} hint="Skat beregnes automatisk" />
-        <NumField label="Deltid – brutto/år" value={inp.income.partTimeAnnualGross} onChange={(v) => set("income", { ...inp.income, partTimeAnnualGross: v })} suffix="kr/år" step={10000} />
-        <NumField label="Deltid fra alder" value={inp.income.partTimeFromAge} onChange={(v) => set("income", { ...inp.income, partTimeFromAge: v })} suffix="år" />
-        <NumField label="Deltid indtil alder" value={inp.income.partTimeUntilAge} onChange={(v) => set("income", { ...inp.income, partTimeUntilAge: v })} suffix="år" />
         <NumField label="Familiefond (netto/år)" value={inp.income.familyFundAnnualNet} onChange={(v) => set("income", { ...inp.income, familyFundAnnualNet: v })} suffix="kr/år" step={5000} />
         <NumField label="Familiefond indtil alder" value={inp.income.familyFundUntilAge} onChange={(v) => set("income", { ...inp.income, familyFundUntilAge: v })} suffix="år" />
-        <NumField label="Folkepension fra alder" value={inp.income.statePensionFromAge} onChange={(v) => set("income", { ...inp.income, statePensionFromAge: v })} suffix="år" hint="Beløbet styres under Antagelser → Folkepension netto/år. Hvis du kun regner med folkepensionens grundbeløb, er 2026-beløbet ca. 90.528 kr. brutto/år, ikke netto." />
+      </Section>
+
+      <Section title="Deltidsindtægt" description="Vælg om beløbet er angivet som brutto/år (skat beregnes) eller netto/md (bruges direkte).">
+        <div className="md:col-span-2 flex gap-2">
+          {(["net_monthly", "gross_annual"] as PartTimeMode[]).map((m) => (
+            <label
+              key={m}
+              className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-md border cursor-pointer text-sm ${
+                inp.income.partTime.mode === m ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="ptMode"
+                checked={inp.income.partTime.mode === m}
+                onChange={() => set("income", { ...inp.income, partTime: { ...inp.income.partTime, mode: m } })}
+              />
+              {m === "net_monthly" ? "Netto/md (bruges direkte)" : "Brutto/år (skat beregnes)"}
+            </label>
+          ))}
+        </div>
+        {inp.income.partTime.mode === "gross_annual" ? (
+          <NumField
+            label="Deltid – brutto/år"
+            value={inp.income.partTime.grossAnnual}
+            onChange={(v) => set("income", { ...inp.income, partTime: { ...inp.income.partTime, grossAnnual: v } })}
+            suffix="kr/år"
+            step={10000}
+          />
+        ) : (
+          <NumField
+            label="Deltid – netto/md"
+            value={inp.income.partTime.netMonthly}
+            onChange={(v) => set("income", { ...inp.income, partTime: { ...inp.income.partTime, netMonthly: v } })}
+            suffix="kr/md"
+            step={1000}
+          />
+        )}
+        <NumField
+          label="Deltid fra alder"
+          value={inp.income.partTime.fromAge}
+          onChange={(v) => set("income", { ...inp.income, partTime: { ...inp.income.partTime, fromAge: v } })}
+          suffix="år"
+        />
+        <NumField
+          label="Deltid indtil alder"
+          value={inp.income.partTime.untilAge}
+          onChange={(v) => set("income", { ...inp.income, partTime: { ...inp.income.partTime, untilAge: v } })}
+          suffix="år"
+        />
+      </Section>
+
+      <Section title="Privat pension" description="Arbejdsmarkeds-/private pensionsudtræk. Skattesatsen sættes under Antagelser.">
+        <p className="md:col-span-2 text-sm text-muted-foreground -mt-2">
+          Effektiv skat ved privat pensionsudbetaling bruges <strong>kun</strong> til privat/arbejdsmarkedspension —
+          <em> ikke folkepension</em>. Justér satsen under <strong>Antagelser → Privat pension</strong>.
+        </p>
+      </Section>
+
+      <Section title="Folkepension" description="Vælg metode. Folkepension beskattes ikke med privat pensions-sats.">
+        <div className="md:col-span-2 space-y-2">
+          {([
+            { v: "none", t: "Ingen folkepension", d: "Modellen indregner ikke folkepension." },
+            { v: "baseOnly", t: "Kun grundbeløb (brutto − effektiv skat)", d: "Bruger 2026-grundbeløb ca. 90.528 kr brutto/år. Net = brutto × (1 − effektiv skat)." },
+            { v: "manualNet", t: "Manuelt nettobeløb", d: "Bruger dit indtastede nettobeløb direkte uden yderligere skat." },
+          ] as { v: StatePensionMode; t: string; d: string }[]).map((opt) => (
+            <label
+              key={opt.v}
+              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
+                inp.income.statePension.mode === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="spMode"
+                checked={inp.income.statePension.mode === opt.v}
+                onChange={() => set("income", { ...inp.income, statePension: { ...inp.income.statePension, mode: opt.v } })}
+                className="mt-1"
+              />
+              <div>
+                <div className="font-medium text-sm">{opt.t}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <NumField
+          label="Folkepension fra alder"
+          value={inp.income.statePension.fromAge}
+          onChange={(v) => set("income", { ...inp.income, statePension: { ...inp.income.statePension, fromAge: v } })}
+          suffix="år"
+        />
+        {inp.income.statePension.mode === "baseOnly" && (
+          <>
+            <NumField
+              label="Folkepension brutto/år"
+              value={inp.income.statePension.baseGrossAnnual}
+              onChange={(v) => set("income", { ...inp.income, statePension: { ...inp.income.statePension, baseGrossAnnual: v } })}
+              suffix="kr/år"
+              step={1000}
+              hint="2026-grundbeløb ca. 90.528 kr brutto/år — ikke netto."
+            />
+            <PctField
+              label="Effektiv skat på folkepension"
+              value={inp.income.statePension.effectiveTaxRate}
+              onChange={(v) => set("income", { ...inp.income, statePension: { ...inp.income.statePension, effectiveTaxRate: v } })}
+            />
+            <div className="md:col-span-2 text-xs text-muted-foreground">
+              Beregnet netto:{" "}
+              <strong>
+                {Math.round(inp.income.statePension.baseGrossAnnual * (1 - inp.income.statePension.effectiveTaxRate)).toLocaleString("da-DK")} kr/år
+              </strong>
+            </div>
+          </>
+        )}
+        {inp.income.statePension.mode === "manualNet" && (
+          <NumField
+            label="Folkepension netto/år (manuelt)"
+            value={inp.income.statePension.manualNetAnnual}
+            onChange={(v) => set("income", { ...inp.income, statePension: { ...inp.income.statePension, manualNetAnnual: v } })}
+            suffix="kr/år"
+            step={1000}
+            hint="Bruges direkte uden yderligere skat."
+          />
+        )}
       </Section>
 
       <Section title="Forbrug">
-        <NumField label="Ønsket forbrug (netto)" value={inp.spending.desiredMonthlyNet} onChange={(v) => set("spending", { ...inp.spending, desiredMonthlyNet: v })} suffix="kr/md" step={1000} hint="I nutidskroner – antages at følge inflationen" />
+        <NumField label="Ønsket forbrug (netto)" value={inp.spending.desiredMonthlyNet} onChange={(v) => set("spending", { ...inp.spending, desiredMonthlyNet: v })} suffix="kr/md" step={1000} hint="I nutidskroner" />
       </Section>
 
       <Section title="Målsætning" description="Bruges til at beregne tidligste bæredygtige stopalder.">
@@ -180,23 +390,20 @@ export default function Inputs() {
           onChange={(v) => set("target", { ...(inp.target ?? { minNetWorthAtEnd: 0 }), minNetWorthAtEnd: v })}
           suffix="kr"
           step={100000}
-          hint={`Mindste nettoformue ved alder ${inp.person.lifeExpectancy}. Tidligste bæredygtige stop tager højde for dette.`}
+          hint={`Mindste nettoformue ved alder ${inp.person.lifeExpectancy}.`}
         />
       </Section>
 
-      <Section
-        title="Opsparingslogik"
-        description="Hvordan modellen håndterer opsparing før stopalder. Forhindrer at både planlagt opsparing og cashflow-overskud tælles dobbelt."
-      >
+      <Section title="Opsparingslogik" description="Hvordan modellen håndterer opsparing før stopalder.">
         <div className="md:col-span-2 space-y-2">
           {([
-            { v: "planned", t: "Planlagt opsparing", d: "Kun månedlig opsparing + årligt ekstra investeres. Cashflow-overskud forbruges/ignoreres." },
-            { v: "cashflow", t: "Cashflow-baseret", d: "Hele nettoindkomst minus forbrug investeres automatisk i fri kapital." },
-            { v: "hybrid", t: "Hybrid", d: "Planlagt opsparing bruges, men cashflow-overskud/-underskud vises som information." },
+            { v: "planned", t: "Planlagt opsparing", d: "Kun månedlig opsparing + årligt ekstra investeres." },
+            { v: "cashflow", t: "Cashflow-baseret", d: "Hele nettoindkomst minus forbrug investeres automatisk." },
+            { v: "hybrid", t: "Hybrid", d: "Planlagt opsparing bruges, cashflow-overskud/-underskud vises." },
           ] as { v: SavingsLogic; t: string; d: string }[]).map((opt) => (
             <label
               key={opt.v}
-              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
                 inp.savingsLogic === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
               }`}
             >
