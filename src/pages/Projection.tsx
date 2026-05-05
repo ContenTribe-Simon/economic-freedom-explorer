@@ -72,8 +72,13 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
           <Row label="Pensionsindbetaling (egen)" value={f.ownPensionContribution} />
           <Row label="Pensionsindbetaling (arb.giver)" value={f.employerPensionContribution} />
           <Row label="Udtræk fri" value={-f.withdrawals.free} />
-          <Row label="Udtræk holding (brutto)" value={-f.withdrawalsGross.holding} />
-          <Row label="Udtræk holding (netto)" value={f.withdrawals.holding} indent />
+          <Row label="Planlagt holdingudl. (brutto)" value={-f.holdingPlanned.gross} indent />
+          <Row label="Planlagt holdingudl. (skat)" value={-f.holdingPlanned.tax} indent />
+          <Row label="Planlagt holdingudl. (netto)" value={f.holdingPlanned.net} indent />
+          <Row label="Ekstra holdingudtræk (brutto)" value={-f.holdingExtra.gross} indent />
+          <Row label="Ekstra holdingudtræk (skat)" value={-f.holdingExtra.tax} indent />
+          <Row label="Ekstra holdingudtræk (netto)" value={f.holdingExtra.net} indent />
+          <Row label="Holding-saldo efter udtræk" value={y.closing.holding - f.growth.holding} indent />
           <Row label="Udtræk pension (brutto)" value={-f.withdrawalsGross.pension} />
           <Row label="Udtræk pension (netto)" value={f.withdrawals.pension} indent />
           {f.withdrawals.buffer > 0 && <Row label="Udtræk fra buffer" value={-f.withdrawals.buffer} />}
@@ -81,6 +86,31 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
             <Row label="Cashflow vs. planlagt opsparing" value={f.cashflowSurplus} indent />
           )}
         </section>
+
+        {f.debtsDetail.length > 0 && (
+          <section>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Gældsposter</div>
+            <div className="space-y-2">
+              {f.debtsDetail.map((d) => (
+                <div key={d.id} className="border border-border rounded-md p-2 text-xs">
+                  <div className="flex justify-between font-medium">
+                    <span>{d.name}</span>
+                    <span className="text-muted-foreground">
+                      {d.impact === "private" ? "Privat" : d.impact === "holding" ? "Holding" : "Risiko"}
+                      {d.includeInNetWorth ? " · i NW" : " · ej i NW"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1 mt-1 text-muted-foreground">
+                    <div>Start<div className="num text-foreground">{formatDKK(d.opening, { compact: true })}</div></div>
+                    <div>Rente<div className="num text-foreground">{formatDKK(d.interest, { compact: true })}</div></div>
+                    <div>Afdrag<div className="num text-foreground">{formatDKK(d.principal, { compact: true })}</div></div>
+                    <div>Slut<div className="num text-foreground">{formatDKK(d.closing, { compact: true })}</div></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Vækst (realafkast)</div>
