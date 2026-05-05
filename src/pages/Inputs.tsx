@@ -186,6 +186,13 @@ export default function Inputs() {
           suffix="år"
           hint={inp.holding.startDistributionAtStopAge ? `Følger stopalder (${inp.stopAge})` : "Ignoreres når toggle er aktiv"}
         />
+        <NumField
+          label="Pension tilgængelig fra alder"
+          value={inp.holding.pensionAvailableFromAge ?? 60}
+          onChange={(v) => set("holding", { ...inp.holding, pensionAvailableFromAge: v })}
+          suffix="år"
+          hint="Bruges af strategien 'Pension før ekstra holdingudtræk'."
+        />
         <div className="space-y-1.5 flex flex-col justify-end">
           <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
             <input
@@ -195,6 +202,34 @@ export default function Inputs() {
             />
             <span className="text-sm">Start holdingudlodning ved stopalder</span>
           </label>
+        </div>
+        <div className="md:col-span-2 space-y-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Holdingudtræksstrategi</Label>
+          {([
+            { v: "planned_only", t: "Kun planlagt årlig udlodning", d: "Ingen ekstra udtræk fra holding ved shortfall." },
+            { v: "up_to_low_threshold", t: "Udlod op til lav aktieindkomstgrænse", d: "Udlodder automatisk op til lav-sats grænsen pr. år (efter udlodningsalder)." },
+            { v: "allow_extra_on_shortfall", t: "Tillad ekstra holdingudtræk ved shortfall", d: "Holding kan bruges til at dække shortfall ud over planlagt udlodning." },
+            { v: "pension_before_extra_holding", t: "Brug pension før ekstra holdingudtræk", d: "Når pension er tilgængelig, prioriteres pension før ekstra holding." },
+          ] as { v: HoldingWithdrawalStrategy; t: string; d: string }[]).map((opt) => (
+            <label
+              key={opt.v}
+              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
+                (inp.holding.withdrawalStrategy ?? "planned_only") === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="holdingStrategy"
+                checked={(inp.holding.withdrawalStrategy ?? "planned_only") === opt.v}
+                onChange={() => set("holding", { ...inp.holding, withdrawalStrategy: opt.v })}
+                className="mt-1"
+              />
+              <div>
+                <div className="font-medium text-sm">{opt.t}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
+              </div>
+            </label>
+          ))}
         </div>
       </Section>
 
