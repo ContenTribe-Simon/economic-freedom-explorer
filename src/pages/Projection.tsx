@@ -36,6 +36,7 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Indgående saldi</div>
           <Row label="Fri kapital (start)" value={y.opening.free} />
+          <Row label="Buffer (start)" value={y.opening.buffer} />
           <Row label="Pension (start)" value={y.opening.pension} />
           <Row label="Holding (start)" value={y.opening.holding} />
           <Row label="Gæld (start)" value={y.opening.debt} />
@@ -46,10 +47,16 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
           <Row label="Løn netto" value={f.salaryNet} indent />
           <Row label="Deltid netto" value={f.partTimeNet} indent />
           <Row label="Familiefond" value={f.familyFundNet} indent />
-          <Row label="Folkepension" value={f.statePensionNet} indent />
+          <Row label="Folkepension netto" value={f.statePensionNet} indent />
+          {f.statePensionGross > 0 && (
+            <>
+              <Row label="  – brutto" value={f.statePensionGross} indent />
+              <Row label="  – skat" value={-f.statePensionTax} indent />
+            </>
+          )}
           <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />
           <Row label="Indkomst i alt" value={incomeTotal} strong />
-          <Row label="Skat (løn + aktieindk.)" value={-f.taxes} indent />
+          <Row label="Skat i alt (løn + aktie + folkepension)" value={-f.taxes} indent />
         </section>
 
         <section>
@@ -69,6 +76,7 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
           <Row label="Udtræk holding (netto)" value={f.withdrawals.holding} indent />
           <Row label="Udtræk pension (brutto)" value={-f.withdrawalsGross.pension} />
           <Row label="Udtræk pension (netto)" value={f.withdrawals.pension} indent />
+          {f.withdrawals.buffer > 0 && <Row label="Udtræk fra buffer" value={-f.withdrawals.buffer} />}
           {f.cashflowSurplus !== 0 && (
             <Row label="Cashflow vs. planlagt opsparing" value={f.cashflowSurplus} indent />
           )}
@@ -84,6 +92,7 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Udgående saldi</div>
           <Row label="Fri kapital (slut)" value={y.closing.free} strong />
+          <Row label="Buffer (slut)" value={y.closing.buffer} />
           <Row label="Pension (slut)" value={y.closing.pension} strong />
           <Row label="Holding (slut)" value={y.closing.holding} strong />
           <Row label="Gæld (slut)" value={y.closing.debt} />

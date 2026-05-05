@@ -1,0 +1,86 @@
+import { Scenario, SanityCheck, YearRow } from "./types";
+
+export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[] {
+  const out: SanityCheck[] = [];
+  const inp = scenario.inputs;
+  const thisYear = new Date().getFullYear();
+
+  // Folkepension manuelt netto virker højt vs. grundbeløb
+  const sp = inp.income.statePension;
+  if (sp.mode === "manualNet" && sp.manualNetAnnual > 80000) {
+    out.push({
+      id: "sp-manual-high",
+      severity: "warn",
+      title: "Folkepension netto virker høj",
+      detail: `Du bruger manuelt nettobeløb på ${sp.manualNetAnnual.toLocaleString("da-DK")} kr/år. Grundbeløbet 2026 er ca. 90.528 kr brutto/år — netto vil typisk ligge på 55-65.000 kr afhængigt af effektiv skat.`,
+    });
+  }
+
+  // Exit-år langt ude
+  if (inp.holding.expectedExitValue > 0) {
+    const yrsToExit = inp.holding.exitYear - thisYear;
+    if (yrsToExit > 7) {
+      out.push({
+        id: "exit-far",
+        severity: "warn",
+        title: `Holding-exit ligger ${yrsToExit} år ude`,
+        detail: "Forventet exit længere ude end 3-7 år har stor usikkerhed. Overvej at stress-teste uden exit.",
+      });
+    }
+    // Overlap mellem nuværende holdingkapital og exit-værdi
+    if (inp.holding.balance > 500000 && inp.holding.expectedExitValue > 0) {
+      out.push({
+        id: "holding-overlap",
+        severity: "info",
+        title: "Holdingkapital og exitværdi kan overlappe",
+        detail: `Du har både ${(inp.holding.balance / 1000).toFixed(0)}k kr i holdingkapital og forventer ${(inp.holding.expectedExitValue / 1000).toFixed(0)}k kr ved exit. Tjek at exitværdien ikke allerede er regnet med i nuværende saldo.`,
+      });
+    }
+  }
+
+  // Planlagt opsparing > cashflow i nogle år
+  const negCashflow = years.filter(
+    (y) => y.age < inp.stopAge && y.flows.cashflowSurplus < 0,
+  );
+  if (negCashflow.length > 0 && inp.savingsLogic === "planned") {
+    out.push({
+      id: "planned-over-cashflow",
+      severity: "warn",
+      title: `Planlagt opsparing overstiger cashflow i ${negCashflow.length} år`,
+      detail: "Med 'Planlagt' logik investeres kun det cashflow tillader. Skift til 'Hybrid' for at se underskud tydeligt.",
+    });
+  }
+
+  // Robusthed afhænger af holding/exit
+  const yEnd = years[years.length - 1];
+  const totalEnd = Math.max(1, yEnd.closing.free + yEnd.closing.pension + yEnd.closing.holding);
+  if (yEnd.closing.holding / totalEnd > 0.5) {
+    out.push({
+      id: "holding-dependency",
+      severity: "warn",
+      title: "Slutformue afhænger kraftigt af holding",
+      detail: `${Math.round((yEnd.closing.holding / totalEnd) * 100)} % af din slutformue ligger i holding. Stress-test 'No Barma' for at se konsekvensen.`,
+    });
+  }
+
+  // Deltid i brutto/år men lille beløb (måske netto/md ved en fejl)
+  const pt = inp.income.partTime;
+  if (pt.mode === "gross_annual" && pt.grossAnnual > 0 && pt.grossAnnual < 50000) {
+    out.push({
+      id: "parttime-low-gross",
+      severity: "warn",
+      title: "Deltidsindtægt virker lav som brutto/år",
+      detail: `${pt.grossAnnual.toLocaleString("da-DK")} kr/år ligner måske et netto/md-beløb. Skift evt. til 'Netto/md'.`,
+    });
+  }
+
+  // Privat pensionsskat info
+  out.push({
+    id: "pension-tax-info",
+    severity: "info",
+    title: "Effektiv skat ved privat pensionsudbetaling påvirker ikke folkepension",
+    detail: "Sats sat under Antagelser bruges kun for privat/arbejdsmarkedspensionsudtræk.",
+  });
+
+  return out;
+}

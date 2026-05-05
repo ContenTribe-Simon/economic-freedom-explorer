@@ -35,8 +35,10 @@ describe("projection", () => {
     const years = project(s, defaultAssumptions);
     const k = deriveKPIs(s, years, defaultAssumptions);
     expect(Number.isFinite(k.capitalAt95)).toBe(true);
-    expect(k.robustnessScore).toBeGreaterThanOrEqual(0);
-    expect(k.robustnessScore).toBeLessThanOrEqual(100);
+    expect(k.financialRobustness).toBeGreaterThanOrEqual(0);
+    expect(k.financialRobustness).toBeLessThanOrEqual(100);
+    expect(k.assumptionRisk).toBeGreaterThanOrEqual(0);
+    expect(k.assumptionRisk).toBeLessThanOrEqual(100);
     expect(k.plannedStopAge).toBe(s.inputs.stopAge);
   });
 });
