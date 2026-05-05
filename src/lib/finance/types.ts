@@ -6,9 +6,14 @@ export interface PersonInputs {
 }
 
 export interface FreeBucketInputs {
+  /** Investerbar/fri kapital — får realafkast og bruges først ved udtræk. */
   balance: number;
   monthlyContribution: number;
   annualExtraContribution: number;
+  /** Kontant buffer — tæller med i nettoformue, men investeres ikke. */
+  cashBuffer: number;
+  /** Hvis true må buffer bruges hvis fri kapital løber tør, før holding/pension. */
+  bufferUsableForShortfall: boolean;
 }
 
 export interface PensionBucketInputs {
@@ -20,36 +25,64 @@ export interface PensionBucketInputs {
 export interface HoldingBucketInputs {
   balance: number;
   expectedExitValue: number;
-  exitYear: number; // calendar year (or 0 = none)
-  annualDistribution: number; // planned dividend
-  /** Modellen må først udlodde fra denne alder. */
+  exitYear: number;
+  annualDistribution: number;
   distributionFromAge: number;
-  /** Hvis true: distributionFromAge følger altid stopAge. */
   startDistributionAtStopAge: boolean;
 }
 
-export interface DebtInputs {
+export type DebtKind = "su" | "private" | "holding" | "personal_liability";
+/** Hvor påvirker gælden cashflow.
+ *  - private: fratrækkes privat cashflow (rente + ydelse)
+ *  - holding: fratrækkes holdings cashflow (reducerer holding-saldo)
+ *  - risk_only: vises i nettoformue/risiko, men påvirker ikke cashflow
+ */
+export type DebtCashflowImpact = "private" | "holding" | "risk_only";
+
+export interface DebtItem {
+  id: string;
+  name: string;
+  kind: DebtKind;
   balance: number;
-  interestRate: number; // nominal real-ish, 0.04 etc
+  interestRate: number;
   monthlyPayment: number;
+  impact: DebtCashflowImpact;
+}
+
+export type PartTimeMode = "gross_annual" | "net_monthly";
+export interface PartTimeInputs {
+  mode: PartTimeMode;
+  grossAnnual: number;
+  netMonthly: number;
+  fromAge: number;
+  untilAge: number;
+}
+
+export type StatePensionMode = "none" | "baseOnly" | "manualNet";
+export interface StatePensionInputs {
+  mode: StatePensionMode;
+  fromAge: number;
+  /** Brutto/år når mode = baseOnly. 2026 grundbeløb ≈ 90.528 kr. */
+  baseGrossAnnual: number;
+  /** Effektiv skat på folkepension (decimal). */
+  effectiveTaxRate: number;
+  /** Manuelt nettobeløb pr. år når mode = manualNet. */
+  manualNetAnnual: number;
 }
 
 export interface IncomeInputs {
-  salaryGross: number; // annual gross salary (before AM, tax)
-  partTimeAnnualGross: number;
-  partTimeFromAge: number;
-  partTimeUntilAge: number;
-  familyFundAnnualNet: number; // tax-free assumption
+  salaryGross: number;
+  partTime: PartTimeInputs;
+  familyFundAnnualNet: number;
   familyFundUntilAge: number;
-  statePensionFromAge: number;
+  statePension: StatePensionInputs;
 }
 
 export interface SpendingInputs {
-  desiredMonthlyNet: number; // in real DKK
+  desiredMonthlyNet: number;
 }
 
 export interface TargetInputs {
-  /** Mindste ønskede nettoformue ved slutalder (levealder). */
   minNetWorthAtEnd: number;
 }
 
@@ -60,34 +93,36 @@ export interface ScenarioInputs {
   free: FreeBucketInputs;
   pension: PensionBucketInputs;
   holding: HoldingBucketInputs;
-  debt: DebtInputs;
+  debts: DebtItem[];
   income: IncomeInputs;
   spending: SpendingInputs;
   target: TargetInputs;
-  stopAge: number; // age fuldtidsstop
-  fullRetireAge: number; // age helt stop (deltid slutter)
-  savingsLogic: SavingsLogic; // hvordan opsparing håndteres før stopalder
+  stopAge: number;
+  fullRetireAge: number;
+  savingsLogic: SavingsLogic;
 }
 
 export interface TaxAssumptions {
-  amBidrag: number; // 0.08
-  laborBottomRate: number; // ~0.37 effective bottom incl. kommune
-  laborTopRate: number; // ~0.52
-  laborTopBracket: number; // DKK gross after AM where top kicks in
-  personalAllowance: number; // DKK personfradrag
-  shareLowRate: number; // 0.27
-  shareHighRate: number; // 0.42
-  shareThreshold: number; // DKK threshold (single)
-  pensionPayoutRate: number; // 0.40 effective
-  corporateRate: number; // 0.22 (info)
+  amBidrag: number;
+  laborBottomRate: number;
+  laborTopRate: number;
+  laborTopBracket: number;
+  personalAllowance: number;
+  shareLowRate: number;
+  shareHighRate: number;
+  shareThreshold: number;
+  /** Effektiv skat ved PRIVAT/arbejdsmarkedspensionsudbetaling. Påvirker IKKE folkepension. */
+  pensionPayoutRate: number;
+  corporateRate: number;
 }
 
 export interface Assumptions {
   realReturn: { free: number; pension: number; holding: number };
-  inflation: number; // info only; we calc in real terms
+  inflation: number;
   tax: TaxAssumptions;
-  statePensionAnnualNet: number; // DKK/yr in real terms
-  withdrawOrder: Bucket[]; // priority for shortfall withdrawals
+  /** @deprecated — bruges som fallback hvis scenarier endnu ikke har statePension-objekt. */
+  statePensionAnnualNet: number;
+  withdrawOrder: Bucket[];
 }
 
 export interface YearFlows {
@@ -96,29 +131,29 @@ export interface YearFlows {
   partTimeNet: number;
   familyFundNet: number;
   statePensionNet: number;
+  statePensionGross: number;
+  statePensionTax: number;
   holdingDistributionNet: number;
   pensionPayoutNet: number;
   employerPensionContribution: number;
   ownPensionContribution: number;
   freeContribution: number;
+  bufferContribution: number;
   spending: number;
   taxes: number;
   debtInterest: number;
   debtPrincipal: number;
-  withdrawals: { free: number; pension: number; holding: number };
-  // Bruttobeløb hævet fra holding/pension (før skat) til at dække udtræk
-  withdrawalsGross: { free: number; pension: number; holding: number };
-  // Hybrid mode: forskel mellem cashflow og planlagt opsparing (kan være negativ)
+  withdrawals: { free: number; pension: number; holding: number; buffer: number };
+  withdrawalsGross: { free: number; pension: number; holding: number; buffer: number };
   cashflowSurplus: number;
-  // Vækst på hver kasse (for audit)
   growth: { free: number; pension: number; holding: number };
 }
 
 export interface YearRow {
   age: number;
   yearIndex: number;
-  opening: { free: number; pension: number; holding: number; debt: number };
-  closing: { free: number; pension: number; holding: number; debt: number };
+  opening: { free: number; pension: number; holding: number; debt: number; buffer: number };
+  closing: { free: number; pension: number; holding: number; debt: number; buffer: number };
   flows: YearFlows;
   totalIncomeNet: number;
   netWorth: number;
@@ -144,5 +179,19 @@ export interface KPIs {
   capitalAt95: number;
   firstShortfallAge: number | null;
   monthlyGapAfterStop: number;
+  /** Finansiel robusthed: 0–100 baseret på shortfall/slutformue. */
+  financialRobustness: number;
+  /** Antagelsesrisiko: 0–100, højere = mere afhængig af optimistiske antagelser. */
+  assumptionRisk: number;
+  /** Bagudkompatibel — alias for financialRobustness. */
   robustnessScore: number;
+  minNetWorthAtEnd: number;
+}
+
+export type SanitySeverity = "info" | "warn" | "error";
+export interface SanityCheck {
+  id: string;
+  severity: SanitySeverity;
+  title: string;
+  detail?: string;
 }
