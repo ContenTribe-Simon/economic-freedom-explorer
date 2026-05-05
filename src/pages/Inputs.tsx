@@ -12,6 +12,7 @@ import {
   DebtCashflowImpact,
   PartTimeMode,
   StatePensionMode,
+  HoldingWithdrawalStrategy,
 } from "@/lib/finance/types";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
@@ -185,6 +186,13 @@ export default function Inputs() {
           suffix="år"
           hint={inp.holding.startDistributionAtStopAge ? `Følger stopalder (${inp.stopAge})` : "Ignoreres når toggle er aktiv"}
         />
+        <NumField
+          label="Pension tilgængelig fra alder"
+          value={inp.holding.pensionAvailableFromAge ?? 60}
+          onChange={(v) => set("holding", { ...inp.holding, pensionAvailableFromAge: v })}
+          suffix="år"
+          hint="Bruges af strategien 'Pension før ekstra holdingudtræk'."
+        />
         <div className="space-y-1.5 flex flex-col justify-end">
           <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
             <input
@@ -194,6 +202,34 @@ export default function Inputs() {
             />
             <span className="text-sm">Start holdingudlodning ved stopalder</span>
           </label>
+        </div>
+        <div className="md:col-span-2 space-y-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Holdingudtræksstrategi</Label>
+          {([
+            { v: "planned_only", t: "Kun planlagt årlig udlodning", d: "Ingen ekstra udtræk fra holding ved shortfall." },
+            { v: "up_to_low_threshold", t: "Udlod op til lav aktieindkomstgrænse", d: "Udlodder automatisk op til lav-sats grænsen pr. år (efter udlodningsalder)." },
+            { v: "allow_extra_on_shortfall", t: "Tillad ekstra holdingudtræk ved shortfall", d: "Holding kan bruges til at dække shortfall ud over planlagt udlodning." },
+            { v: "pension_before_extra_holding", t: "Brug pension før ekstra holdingudtræk", d: "Når pension er tilgængelig, prioriteres pension før ekstra holding." },
+          ] as { v: HoldingWithdrawalStrategy; t: string; d: string }[]).map((opt) => (
+            <label
+              key={opt.v}
+              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
+                (inp.holding.withdrawalStrategy ?? "planned_only") === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="holdingStrategy"
+                checked={(inp.holding.withdrawalStrategy ?? "planned_only") === opt.v}
+                onChange={() => set("holding", { ...inp.holding, withdrawalStrategy: opt.v })}
+                className="mt-1"
+              />
+              <div>
+                <div className="font-medium text-sm">{opt.t}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
+              </div>
+            </label>
+          ))}
         </div>
       </Section>
 
@@ -241,6 +277,32 @@ export default function Inputs() {
                 <NumField label="Restgæld" value={d.balance} onChange={(v) => updateDebt(i, { balance: v })} suffix="kr" step={10000} />
                 <PctField label="Rente" value={d.interestRate} onChange={(v) => updateDebt(i, { interestRate: v })} />
                 <NumField label="Månedlig ydelse" value={d.monthlyPayment} onChange={(v) => updateDebt(i, { monthlyPayment: v })} suffix="kr/md" step={500} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={d.includeInNetWorth ?? (d.impact !== "risk_only")}
+                    onChange={(e) => updateDebt(i, { includeInNetWorth: e.target.checked })}
+                  />
+                  <span>Medregn i nettoformue {d.kind === "personal_liability" && <span className="text-muted-foreground">(default fra for hæftelse)</span>}</span>
+                </label>
+                {d.kind === "personal_liability" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Knyttet til gældspost</Label>
+                    <select
+                      className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full"
+                      value={d.linkedDebtId ?? ""}
+                      onChange={(e) => updateDebt(i, { linkedDebtId: e.target.value || undefined })}
+                    >
+                      <option value="">— Ingen kobling —</option>
+                      {inp.debts.filter((o) => o.id !== d.id && o.kind !== "personal_liability").map((o) => (
+                        <option key={o.id} value={o.id}>{o.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-muted-foreground">Hæftelsessaldo spejler den underliggende gæld.</p>
+                  </div>
+                )}
               </div>
             </div>
           ))}

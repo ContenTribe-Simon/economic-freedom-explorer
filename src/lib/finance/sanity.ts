@@ -74,6 +74,32 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
     });
   }
 
+  // Deltid starter senere end stopalder
+  if (pt.fromAge > inp.stopAge) {
+    const gap = pt.fromAge - inp.stopAge;
+    out.push({
+      id: "parttime-late-start",
+      severity: "warn",
+      title: `Deltidsindtægt starter først ${gap} år efter fuldtidsstop`,
+      detail: `Stopalder er ${inp.stopAge}, men deltid starter ved ${pt.fromAge}. Tjek om dette er bevidst — i mellemtiden er der ingen aktiv indkomst ud over evt. familiefond.`,
+    });
+  }
+
+  // Personlig hæftelse vs holdinggæld — mulig dobbeltregning
+  const liabilities = inp.debts.filter((d) => d.kind === "personal_liability" && d.balance > 0);
+  const holdingDebts = inp.debts.filter((d) => d.kind === "holding" && d.balance > 0);
+  for (const liab of liabilities) {
+    const match = holdingDebts.find((h) => Math.abs(h.balance - liab.balance) < 1000);
+    if (match && liab.linkedDebtId !== match.id) {
+      out.push({
+        id: `liab-double-${liab.id}`,
+        severity: "warn",
+        title: "Personlig hæftelse kan være knyttet til holdinggælden",
+        detail: `"${liab.name}" (${liab.balance.toLocaleString("da-DK")} kr) har samme beløb som "${match.name}". Tjek at beløbet ikke dobbeltregnes — koble evt. hæftelsen til den underliggende gældspost.`,
+      });
+    }
+  }
+
   // Privat pensionsskat info
   out.push({
     id: "pension-tax-info",

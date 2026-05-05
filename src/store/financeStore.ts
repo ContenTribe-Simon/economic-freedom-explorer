@@ -80,7 +80,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 3,
+      version: 4,
       migrate: (state: any) => {
         if (!state) return state;
         if (Array.isArray(state.scenarios)) {
@@ -92,7 +92,10 @@ export const useFinanceStore = create<FinanceState>()(
             const oldHolding = old.holding ?? {};
 
             const debts = Array.isArray(old.debts)
-              ? old.debts
+              ? old.debts.map((d: any) => ({
+                  ...d,
+                  includeInNetWorth: d.includeInNetWorth ?? (d.impact !== "risk_only"),
+                }))
               : oldDebt
                 ? [
                     {
@@ -103,6 +106,7 @@ export const useFinanceStore = create<FinanceState>()(
                       interestRate: oldDebt.interestRate ?? 0.04,
                       monthlyPayment: oldDebt.monthlyPayment ?? 0,
                       impact: "private",
+                      includeInNetWorth: true,
                     },
                   ]
                 : [];
@@ -138,6 +142,8 @@ export const useFinanceStore = create<FinanceState>()(
                 holding: {
                   distributionFromAge: oldHolding.distributionFromAge ?? old.stopAge ?? 55,
                   startDistributionAtStopAge: oldHolding.startDistributionAtStopAge ?? true,
+                  withdrawalStrategy: oldHolding.withdrawalStrategy ?? "planned_only",
+                  pensionAvailableFromAge: oldHolding.pensionAvailableFromAge ?? 60,
                   ...oldHolding,
                 },
                 income: {

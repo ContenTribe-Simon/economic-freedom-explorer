@@ -22,6 +22,13 @@ export interface PensionBucketInputs {
   employerContribution: number; // monthly
 }
 
+/** Hvordan ekstra holdingudtræk håndteres ud over planlagt udlodning. */
+export type HoldingWithdrawalStrategy =
+  | "planned_only"               // kun planlagt årlig udlodning
+  | "up_to_low_threshold"        // udlod automatisk op til lav-sats grænsen (efter distFromAge)
+  | "allow_extra_on_shortfall"   // tillad ekstra holdingudtræk hvis shortfall
+  | "pension_before_extra_holding"; // brug pension før ekstra holding (når pension er tilgængelig)
+
 export interface HoldingBucketInputs {
   balance: number;
   expectedExitValue: number;
@@ -29,6 +36,9 @@ export interface HoldingBucketInputs {
   annualDistribution: number;
   distributionFromAge: number;
   startDistributionAtStopAge: boolean;
+  withdrawalStrategy: HoldingWithdrawalStrategy;
+  /** Pensionsudbetaling antages tilgængelig fra denne alder (bruges af pension_before_extra_holding). */
+  pensionAvailableFromAge: number;
 }
 
 export type DebtKind = "su" | "private" | "holding" | "personal_liability";
@@ -47,6 +57,10 @@ export interface DebtItem {
   interestRate: number;
   monthlyPayment: number;
   impact: DebtCashflowImpact;
+  /** Skal denne post indgå i nettoformuen? Default true for reel gæld, false for risk_only. */
+  includeInNetWorth?: boolean;
+  /** Hvis denne post er en hæftelse koblet til en anden gældspost (typisk holdinggæld). */
+  linkedDebtId?: string;
 }
 
 export type PartTimeMode = "gross_annual" | "net_monthly";
@@ -145,8 +159,27 @@ export interface YearFlows {
   debtPrincipal: number;
   withdrawals: { free: number; pension: number; holding: number; buffer: number };
   withdrawalsGross: { free: number; pension: number; holding: number; buffer: number };
+  /** Planlagt holdingudlodning (brutto/netto/skat) — den faste, frivillige udlodning. */
+  holdingPlanned: { gross: number; net: number; tax: number };
+  /** Ekstra holdingudtræk udløst af shortfall-strategi. */
+  holdingExtra: { gross: number; net: number; tax: number };
+  /** Saldo for hver gældspost ved årets udgang + diagnostiske felter. */
+  debtsDetail: DebtYearDetail[];
   cashflowSurplus: number;
   growth: { free: number; pension: number; holding: number };
+}
+
+export interface DebtYearDetail {
+  id: string;
+  name: string;
+  kind: DebtKind;
+  impact: DebtCashflowImpact;
+  opening: number;
+  interest: number;
+  principal: number;
+  closing: number;
+  includeInNetWorth: boolean;
+  linkedDebtId?: string;
 }
 
 export interface YearRow {

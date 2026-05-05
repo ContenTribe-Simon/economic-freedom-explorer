@@ -31,10 +31,11 @@ export const defaultDebts: DebtItem[] = [
     interestRate: 0.04,
     monthlyPayment: 9000,
     impact: "private",
+    includeInNetWorth: true,
   },
-  { id: id(), name: "SU-lån", kind: "su", balance: 0, interestRate: 0.04, monthlyPayment: 0, impact: "private" },
-  { id: id(), name: "Holdinggæld", kind: "holding", balance: 0, interestRate: 0.05, monthlyPayment: 0, impact: "holding" },
-  { id: id(), name: "Personlig hæftelse", kind: "personal_liability", balance: 0, interestRate: 0, monthlyPayment: 0, impact: "risk_only" },
+  { id: id(), name: "SU-lån", kind: "su", balance: 0, interestRate: 0.04, monthlyPayment: 0, impact: "private", includeInNetWorth: true },
+  { id: id(), name: "Holdinggæld", kind: "holding", balance: 0, interestRate: 0.05, monthlyPayment: 0, impact: "holding", includeInNetWorth: true },
+  { id: id(), name: "Personlig hæftelse", kind: "personal_liability", balance: 0, interestRate: 0, monthlyPayment: 0, impact: "risk_only", includeInNetWorth: false },
 ];
 
 export const defaultInputs: ScenarioInputs = {
@@ -54,6 +55,8 @@ export const defaultInputs: ScenarioInputs = {
     annualDistribution: 0,
     distributionFromAge: 55,
     startDistributionAtStopAge: true,
+    withdrawalStrategy: "planned_only",
+    pensionAvailableFromAge: 60,
   },
   debts: defaultDebts,
   income: {
