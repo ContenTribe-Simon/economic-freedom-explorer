@@ -284,6 +284,44 @@ export function projectWithStopAge(
       bal.holding += inp.holding.expectedExitValue;
     }
 
+    // ---- Ratepension (planlagt udbetaling over fast periode) ----
+    const ratePension = { gross: 0, net: 0, tax: 0, active: false };
+    const ratePayoutFromAge = inp.pension.payoutFromAge ?? 64;
+    const ratePayoutYears = Math.max(1, inp.pension.ratePensionPayoutYears ?? 15);
+    const rateTaxRate = inp.pension.ratePensionEffectiveTaxRate ?? a.tax.pensionPayoutRate;
+    if (
+      ratePensionEnabled &&
+      age >= ratePayoutFromAge &&
+      age < ratePayoutFromAge + ratePayoutYears &&
+      bal.pension > 0
+    ) {
+      const remainingYears = ratePayoutFromAge + ratePayoutYears - age;
+      const grossPlanned = bal.pension / Math.max(1, remainingYears);
+      const grossTake = Math.min(bal.pension, grossPlanned);
+      bal.pension -= grossTake;
+      const tax = grossTake * rateTaxRate;
+      ratePension.gross = grossTake;
+      ratePension.tax = tax;
+      ratePension.net = grossTake - tax;
+      ratePension.active = true;
+    }
+
+    // ---- Livsvarig pension / livrente (stream til levealder) ----
+    const lifeAnnuity = { gross: 0, net: 0, tax: 0, active: false };
+    const la = inp.pension.lifeAnnuity;
+    if (la?.enabled && age >= la.fromAge) {
+      if (la.mode === "gross") {
+        const tax = la.annualGross * (la.effectiveTaxRate ?? a.tax.pensionPayoutRate);
+        lifeAnnuity.gross = la.annualGross;
+        lifeAnnuity.tax = tax;
+        lifeAnnuity.net = la.annualGross - tax;
+      } else {
+        lifeAnnuity.net = la.annualNet;
+        lifeAnnuity.gross = la.annualNet;
+      }
+      lifeAnnuity.active = lifeAnnuity.net > 0;
+    }
+
     const distFromAge = inp.holding.startDistributionAtStopAge
       ? stopAge
       : inp.holding.distributionFromAge;
