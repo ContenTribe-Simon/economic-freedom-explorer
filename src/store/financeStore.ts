@@ -80,7 +80,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 4,
+      version: 5,
       migrate: (state: any) => {
         if (!state) return state;
         if (Array.isArray(state.scenarios)) {
@@ -95,6 +95,7 @@ export const useFinanceStore = create<FinanceState>()(
               ? old.debts.map((d: any) => ({
                   ...d,
                   includeInNetWorth: d.includeInNetWorth ?? (d.impact !== "risk_only"),
+                  holdingFinancing: d.kind === "holding" ? (d.holdingFinancing ?? "holding_capital") : d.holdingFinancing,
                 }))
               : oldDebt
                 ? [
@@ -127,6 +128,8 @@ export const useFinanceStore = create<FinanceState>()(
               manualNetAnnual: state.assumptions?.statePensionAnnualNet ?? 90000,
             };
 
+            const oldPension = old.pension ?? {};
+
             return {
               ...sc,
               inputs: {
@@ -137,6 +140,12 @@ export const useFinanceStore = create<FinanceState>()(
                   annualExtraContribution: oldFree.annualExtraContribution ?? 0,
                   cashBuffer: oldFree.cashBuffer ?? 0,
                   bufferUsableForShortfall: oldFree.bufferUsableForShortfall ?? false,
+                },
+                pension: {
+                  balance: oldPension.balance ?? 0,
+                  monthlyContribution: oldPension.monthlyContribution ?? 0,
+                  employerContribution: oldPension.employerContribution ?? 0,
+                  payoutFromAge: oldPension.payoutFromAge ?? oldHolding.pensionAvailableFromAge ?? 64,
                 },
                 debts,
                 holding: {

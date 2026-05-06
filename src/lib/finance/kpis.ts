@@ -63,6 +63,8 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
 
   const assumptionRisk = Math.round(Math.max(0, Math.min(100, risk)));
 
+  const endShortfallVsTarget = Math.max(0, minRequired - yAt95.netWorth);
+
   return {
     plannedStopAge: stopAge,
     earliestSustainableStopAge: earliest,
@@ -73,7 +75,9 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     monthlyGapAfterStop: avgGap,
     financialRobustness: financial,
     assumptionRisk,
+    assumptionConfidence: 100 - assumptionRisk,
     robustnessScore: financial,
     minNetWorthAtEnd: minRequired,
+    endShortfallVsTarget,
   };
 }

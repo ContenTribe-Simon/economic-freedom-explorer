@@ -61,8 +61,10 @@ export default function Dashboard() {
   }, [scenario, assumptions]);
 
   const finTone = kpis.financialRobustness >= 70 ? "good" : kpis.financialRobustness >= 40 ? "warn" : "bad";
-  const riskTone = kpis.assumptionRisk <= 30 ? "good" : kpis.assumptionRisk <= 60 ? "warn" : "bad";
+  const confidence = kpis.assumptionConfidence;
+  const confTone = confidence >= 70 ? "good" : confidence >= 40 ? "warn" : "bad";
   const spMode = scenario.inputs.income.statePension.mode;
+  const targetMissed = kpis.endShortfallVsTarget > 0;
 
   return (
     <div className="space-y-8">
@@ -81,6 +83,18 @@ export default function Dashboard() {
         </div>
       )}
 
+      {targetMissed && !kpis.firstShortfallAge && (
+        <div className="bg-warning/10 border border-warning/40 rounded-md p-4 text-sm">
+          <strong>Minimumsmål ikke opfyldt</strong> — mangler {formatDKK(kpis.endShortfallVsTarget)} ved alder {scenario.inputs.person.lifeExpectancy}.
+          Modellen har ikke cashflow-shortfall, men slutformuen er under det minimum du har sat.
+        </div>
+      )}
+      {targetMissed && kpis.firstShortfallAge && (
+        <div className="bg-warning/10 border border-warning/40 rounded-md p-4 text-sm">
+          <strong>Minimumsmål ikke opfyldt</strong> — mangler {formatDKK(kpis.endShortfallVsTarget)} ved alder {scenario.inputs.person.lifeExpectancy}.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPI label="Planlagt stopalder" value={`${kpis.plannedStopAge} år`} sub="Som angivet i variabler" />
         <KPI
@@ -92,20 +106,25 @@ export default function Dashboard() {
         />
         <KPI label="Kapital v. stop" value={formatDKK(kpis.capitalAtStopAge, { compact: true })} sub={`Alder ${scenario.inputs.stopAge}`} />
         <KPI label="Kapital v. 65" value={formatDKK(kpis.capitalAt65, { compact: true })} />
-        <KPI label="Kapital v. 95" value={formatDKK(kpis.capitalAt95, { compact: true })} tone={kpis.capitalAt95 > 0 ? "good" : "bad"} />
+        <KPI
+          label="Kapital v. 95"
+          value={formatDKK(kpis.capitalAt95, { compact: true })}
+          sub={`Mål: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}${targetMissed ? ` — mangler ${formatDKK(kpis.endShortfallVsTarget, { compact: true })}` : " ✓"}`}
+          tone={kpis.capitalAt95 > 0 && !targetMissed ? "good" : "bad"}
+        />
         <KPI label="Første shortfall" value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"} tone={kpis.firstShortfallAge ? "bad" : "good"} />
         <KPI
           label="Finansiel robusthed"
           value={`${kpis.financialRobustness} / 100`}
           tone={finTone}
-          tooltip="Baseret på shortfall og slutformue."
+          tooltip="Baseret på shortfall og slutformue. Højere er bedre."
         />
         <KPI
-          label="Antagelsesrisiko"
-          value={`${kpis.assumptionRisk} / 100`}
-          tone={riskTone}
-          sub="Lavere = mindre afhængig af optimistiske antagelser"
-          tooltip="Vurderer afhængighed af holding-exit, folkepension, deltidsindtægt, realafkast og slutmargin."
+          label="Antagelsessikkerhed"
+          value={`${confidence} / 100`}
+          tone={confTone}
+          sub="Højere = mindre afhængig af optimistiske antagelser"
+          tooltip="100 − antagelsesrisiko. Vurderer afhængighed af holding-exit, folkepension, deltidsindtægt, realafkast og slutmargin."
         />
       </div>
 

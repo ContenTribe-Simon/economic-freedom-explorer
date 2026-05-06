@@ -20,6 +20,8 @@ export interface PensionBucketInputs {
   balance: number;
   monthlyContribution: number;
   employerContribution: number; // monthly
+  /** Alder hvor privat/arbejdsmarkedspension kan udbetales. Bruges til ALLE pensionsudtræk. */
+  payoutFromAge: number;
 }
 
 /** Hvordan ekstra holdingudtræk håndteres ud over planlagt udlodning. */
@@ -44,10 +46,18 @@ export interface HoldingBucketInputs {
 export type DebtKind = "su" | "private" | "holding" | "personal_liability";
 /** Hvor påvirker gælden cashflow.
  *  - private: fratrækkes privat cashflow (rente + ydelse)
- *  - holding: fratrækkes holdings cashflow (reducerer holding-saldo)
+ *  - holding: fratrækkes holdings cashflow (reducerer holding-saldo) — se også HoldingDebtFinancing
  *  - risk_only: vises i nettoformue/risiko, men påvirker ikke cashflow
  */
 export type DebtCashflowImpact = "private" | "holding" | "risk_only";
+
+/** Hvordan en holdinggæld finansieres. */
+export type HoldingDebtFinancing =
+  | "holding_capital"   // betales af holdingens eksisterende kapital (kan udløse holding-shortfall)
+  | "private_cashflow"  // betales af privat cashflow (som privat gæld)
+  | "external_company"  // betales af ekstern selskabscashflow uden for modellen — ingen påvirkning
+  | "exit_only"         // afdrages først ved exit — ingen løbende ydelse
+  | "display_only";     // kun visning/risiko — ingen cashflow eller saldoreduktion
 
 export interface DebtItem {
   id: string;
@@ -61,6 +71,8 @@ export interface DebtItem {
   includeInNetWorth?: boolean;
   /** Hvis denne post er en hæftelse koblet til en anden gældspost (typisk holdinggæld). */
   linkedDebtId?: string;
+  /** Kun for kind=holding: hvordan gælden finansieres. Default: holding_capital. */
+  holdingFinancing?: HoldingDebtFinancing;
 }
 
 export type PartTimeMode = "gross_annual" | "net_monthly";
@@ -167,6 +179,8 @@ export interface YearFlows {
   debtsDetail: DebtYearDetail[];
   cashflowSurplus: number;
   growth: { free: number; pension: number; holding: number };
+  /** Manglende dækning af holdinggæld der skulle betales af holdingkapital. */
+  holdingFinancingShortfall: number;
 }
 
 export interface DebtYearDetail {
@@ -219,6 +233,10 @@ export interface KPIs {
   /** Bagudkompatibel — alias for financialRobustness. */
   robustnessScore: number;
   minNetWorthAtEnd: number;
+  /** Mangler ved slutalder ift. minimumsmål (positivt tal hvis under mål). */
+  endShortfallVsTarget: number;
+  /** Antagelsessikkerhed = 100 − antagelsesrisiko. Højere er bedre. */
+  assumptionConfidence: number;
 }
 
 export type SanitySeverity = "info" | "warn" | "error";

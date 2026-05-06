@@ -168,10 +168,21 @@ export default function Inputs() {
         </div>
       </Section>
 
-      <Section title="Pension" description="Bundet kapital — beskattes ved udbetaling efter sats sat under Antagelser.">
+      <Section title="Privat pension" description="Bundet kapital — beskattes ved udbetaling efter sats sat under Antagelser.">
         <NumField label="Nuværende saldo" value={inp.pension.balance} onChange={(v) => set("pension", { ...inp.pension, balance: v })} suffix="kr" step={10000} />
         <NumField label="Egen indbetaling" value={inp.pension.monthlyContribution} onChange={(v) => set("pension", { ...inp.pension, monthlyContribution: v })} suffix="kr/md" step={500} />
         <NumField label="Arbejdsgiverbidrag" value={inp.pension.employerContribution} onChange={(v) => set("pension", { ...inp.pension, employerContribution: v })} suffix="kr/md" step={500} />
+        <NumField
+          label="Pension tilgængelig fra alder"
+          value={inp.pension.payoutFromAge ?? 64}
+          onChange={(v) => set("pension", { ...inp.pension, payoutFromAge: v })}
+          suffix="år"
+          hint="Bruges til ALLE pensionsudtræk. For nye ordninger er udbetalingsalderen typisk knyttet til folkepensionsalderen — brug fx folkepensionsalder − 3 år som forsigtig antagelse."
+        />
+        <p className="md:col-span-2 text-xs text-muted-foreground">
+          Privat pension modelleres som <strong>én fleksibel kapitalpulje</strong> med effektiv skat ved udbetaling.
+          Ratepension, livrente og aldersopsparing er ikke særskilt modelleret endnu.
+        </p>
       </Section>
 
       <Section title="Holding" description="Selskabskapital. Udlodning beskattes som aktieindkomst.">
@@ -186,13 +197,7 @@ export default function Inputs() {
           suffix="år"
           hint={inp.holding.startDistributionAtStopAge ? `Følger stopalder (${inp.stopAge})` : "Ignoreres når toggle er aktiv"}
         />
-        <NumField
-          label="Pension tilgængelig fra alder"
-          value={inp.holding.pensionAvailableFromAge ?? 60}
-          onChange={(v) => set("holding", { ...inp.holding, pensionAvailableFromAge: v })}
-          suffix="år"
-          hint="Bruges af strategien 'Pension før ekstra holdingudtræk'."
-        />
+        {/* "Pension tilgængelig fra alder" er flyttet til Privat pension-sektionen */}
         <div className="space-y-1.5 flex flex-col justify-end">
           <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
             <input
@@ -278,6 +283,23 @@ export default function Inputs() {
                 <PctField label="Rente" value={d.interestRate} onChange={(v) => updateDebt(i, { interestRate: v })} />
                 <NumField label="Månedlig ydelse" value={d.monthlyPayment} onChange={(v) => updateDebt(i, { monthlyPayment: v })} suffix="kr/md" step={500} />
               </div>
+              {d.kind === "holding" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Holdinggæld – finansiering</Label>
+                  <select
+                    className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full"
+                    value={d.holdingFinancing ?? "holding_capital"}
+                    onChange={(e) => updateDebt(i, { holdingFinancing: e.target.value as any })}
+                  >
+                    <option value="holding_capital">Betales af holdingens eksisterende kapital</option>
+                    <option value="private_cashflow">Betales af privat cashflow</option>
+                    <option value="external_company">Betales af ekstern selskabscashflow (uden for modellen)</option>
+                    <option value="exit_only">Afdrages først ved exit</option>
+                    <option value="display_only">Kun visning/risiko</option>
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">Hvis holdingkapital er for lille til at dække ydelsen, vises shortfall i sanity check.</p>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40 text-sm">
                   <input
@@ -364,13 +386,6 @@ export default function Inputs() {
           onChange={(v) => set("income", { ...inp.income, partTime: { ...inp.income.partTime, untilAge: v } })}
           suffix="år"
         />
-      </Section>
-
-      <Section title="Privat pension" description="Arbejdsmarkeds-/private pensionsudtræk. Skattesatsen sættes under Antagelser.">
-        <p className="md:col-span-2 text-sm text-muted-foreground -mt-2">
-          Effektiv skat ved privat pensionsudbetaling bruges <strong>kun</strong> til privat/arbejdsmarkedspension —
-          <em> ikke folkepension</em>. Justér satsen under <strong>Antagelser → Privat pension</strong>.
-        </p>
       </Section>
 
       <Section title="Folkepension" description="Vælg metode. Folkepension beskattes ikke med privat pensions-sats.">

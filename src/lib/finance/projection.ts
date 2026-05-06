@@ -69,10 +69,12 @@ interface DebtTotals {
   holdingPayment: number;
   /** Saldo der tæller med i nettoformuen. */
   totalBalanceNW: number;
+  /** Holding-shortfall: forsøgt afdrag mod tom holdingkapital. */
+  holdingFinancingShortfall: number;
   detail: DebtYearDetail[];
 }
 
-function processDebts(debts: DebtItem[]): DebtTotals {
+function processDebts(debts: DebtItem[], holdingBalance: number): DebtTotals {
   const t: DebtTotals = {
     privateInterest: 0,
     privatePrincipal: 0,
@@ -81,53 +83,61 @@ function processDebts(debts: DebtItem[]): DebtTotals {
     holdingPrincipal: 0,
     holdingPayment: 0,
     totalBalanceNW: 0,
+    holdingFinancingShortfall: 0,
     detail: [],
   };
+  let availableHolding = holdingBalance;
   for (const d of debts) {
     if (!d) continue;
     const opening = d.balance;
     const includeInNW = d.includeInNetWorth ?? (d.impact !== "risk_only");
     if (d.balance <= 0) {
       t.detail.push({
-        id: d.id,
-        name: d.name,
-        kind: d.kind,
-        impact: d.impact,
-        opening: 0,
-        interest: 0,
-        principal: 0,
-        closing: 0,
-        includeInNetWorth: includeInNW,
-        linkedDebtId: d.linkedDebtId,
+        id: d.id, name: d.name, kind: d.kind, impact: d.impact,
+        opening: 0, interest: 0, principal: 0, closing: 0,
+        includeInNetWorth: includeInNW, linkedDebtId: d.linkedDebtId,
       });
       continue;
     }
+
+    const financing = d.kind === "holding" ? (d.holdingFinancing ?? "holding_capital") : undefined;
+    // Display-only / exit-only / external_company / risk_only: ingen løbende cashflow eller saldoreduktion
+    const noCashflow =
+      d.impact === "risk_only" ||
+      financing === "display_only" ||
+      financing === "external_company" ||
+      financing === "exit_only";
+
     const interest = d.balance * (d.interestRate ?? 0);
     const wantPay = (d.monthlyPayment ?? 0) * 12;
-    const pay = d.impact === "risk_only" ? 0 : Math.min(d.balance + interest, wantPay);
+    const pay = noCashflow ? 0 : Math.min(d.balance + interest, wantPay);
     const principal = Math.max(0, pay - interest);
-    d.balance = Math.max(0, d.balance + (d.impact === "risk_only" ? 0 : interest) - pay);
-    if (d.impact === "private") {
+
+    if (d.impact === "private" || (d.kind === "holding" && financing === "private_cashflow")) {
       t.privateInterest += interest;
       t.privatePrincipal += principal;
       t.privatePayment += pay;
+    } else if (d.kind === "holding" && financing === "holding_capital") {
+      // Træk fra holdingkapital — registrér shortfall hvis utilstrækkelig
+      const cover = Math.min(availableHolding, pay);
+      availableHolding -= cover;
+      t.holdingFinancingShortfall += pay - cover;
+      t.holdingInterest += interest;
+      t.holdingPrincipal += principal;
+      t.holdingPayment += cover;
     } else if (d.impact === "holding") {
+      // fallback for holding-impact uden specifik financing
       t.holdingInterest += interest;
       t.holdingPrincipal += principal;
       t.holdingPayment += pay;
     }
+
+    d.balance = Math.max(0, d.balance + (noCashflow ? 0 : interest) - pay);
     if (includeInNW) t.totalBalanceNW += d.balance;
     t.detail.push({
-      id: d.id,
-      name: d.name,
-      kind: d.kind,
-      impact: d.impact,
-      opening,
-      interest,
-      principal,
-      closing: d.balance,
-      includeInNetWorth: includeInNW,
-      linkedDebtId: d.linkedDebtId,
+      id: d.id, name: d.name, kind: d.kind, impact: d.impact,
+      opening, interest, principal, closing: d.balance,
+      includeInNetWorth: includeInNW, linkedDebtId: d.linkedDebtId,
     });
   }
   return t;
@@ -157,7 +167,7 @@ export function projectWithStopAge(
   const years: YearRow[] = [];
   const savingsLogic = inp.savingsLogic ?? "planned";
   const holdingStrategy = inp.holding.withdrawalStrategy ?? "planned_only";
-  const pensionAvailableFromAge = inp.holding.pensionAvailableFromAge ?? 60;
+  const pensionAvailableFromAge = inp.pension.payoutFromAge ?? inp.holding.pensionAvailableFromAge ?? 60;
 
   const debts: DebtItem[] = (inp.debts ?? []).map((d) => ({ ...d }));
 
@@ -253,7 +263,7 @@ export function projectWithStopAge(
 
     // Gæld
     syncLinkedLiabilities(debts);
-    const dt = processDebts(debts);
+    const dt = processDebts(debts, bal.holding);
     bal.debt = dt.totalBalanceNW;
     bal.holding = Math.max(0, bal.holding - dt.holdingPayment);
 
@@ -409,6 +419,7 @@ export function projectWithStopAge(
         debtsDetail: dt.detail,
         cashflowSurplus,
         growth,
+        holdingFinancingShortfall: dt.holdingFinancingShortfall,
       },
       totalIncomeNet: incomeNet,
       netWorth,

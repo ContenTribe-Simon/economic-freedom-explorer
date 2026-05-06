@@ -34,7 +34,7 @@ export const defaultDebts: DebtItem[] = [
     includeInNetWorth: true,
   },
   { id: id(), name: "SU-lån", kind: "su", balance: 0, interestRate: 0.04, monthlyPayment: 0, impact: "private", includeInNetWorth: true },
-  { id: id(), name: "Holdinggæld", kind: "holding", balance: 0, interestRate: 0.05, monthlyPayment: 0, impact: "holding", includeInNetWorth: true },
+  { id: id(), name: "Holdinggæld", kind: "holding", balance: 0, interestRate: 0.05, monthlyPayment: 0, impact: "holding", includeInNetWorth: true, holdingFinancing: "holding_capital" },
   { id: id(), name: "Personlig hæftelse", kind: "personal_liability", balance: 0, interestRate: 0, monthlyPayment: 0, impact: "risk_only", includeInNetWorth: false },
 ];
 
@@ -47,7 +47,7 @@ export const defaultInputs: ScenarioInputs = {
     cashBuffer: 100000,
     bufferUsableForShortfall: false,
   },
-  pension: { balance: 800000, monthlyContribution: 4000, employerContribution: 6000 },
+  pension: { balance: 800000, monthlyContribution: 4000, employerContribution: 6000, payoutFromAge: 64 },
   holding: {
     balance: 1000000,
     expectedExitValue: 3000000,
