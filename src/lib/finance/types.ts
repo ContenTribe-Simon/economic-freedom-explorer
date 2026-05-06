@@ -16,12 +16,39 @@ export interface FreeBucketInputs {
   bufferUsableForShortfall: boolean;
 }
 
+export type LifeAnnuityMode = "gross" | "net";
+
+export interface LifeAnnuityInputs {
+  enabled: boolean;
+  mode: LifeAnnuityMode;
+  /** Forventet brutto/år (når mode = gross). */
+  annualGross: number;
+  /** Forventet netto/år (når mode = net). Bruges direkte uden yderligere skat. */
+  annualNet: number;
+  fromAge: number;
+  /** Effektiv pensionsskat når mode = gross. */
+  effectiveTaxRate: number;
+}
+
 export interface PensionBucketInputs {
+  /** RATEPENSION (kapitalpulje med fast udbetalingsperiode) */
+  /** Bagudkompatibel: ratepensionens nuværende saldo. */
   balance: number;
+  /** Egen månedlig indbetaling til ratepension. */
   monthlyContribution: number;
-  employerContribution: number; // monthly
-  /** Alder hvor privat/arbejdsmarkedspension kan udbetales. Bruges til ALLE pensionsudtræk. */
+  /** Arbejdsgiverbidrag til ratepension (månedligt). */
+  employerContribution: number;
+  /** Alder hvor ratepension begynder at udbetale. */
   payoutFromAge: number;
+  /** Skal ratepension regnes med? */
+  ratePensionEnabled: boolean;
+  /** Udbetalingsperiode i år (typisk 10/15/20/25/30). */
+  ratePensionPayoutYears: number;
+  /** Effektiv skat ved ratepensionsudbetaling. */
+  ratePensionEffectiveTaxRate: number;
+
+  /** LIVSVARIG PENSION / LIVRENTE — stream uden kapitalpulje */
+  lifeAnnuity: LifeAnnuityInputs;
 }
 
 /** Hvordan ekstra holdingudtræk håndteres ud over planlagt udlodning. */
