@@ -42,3 +42,20 @@ describe("projection", () => {
     expect(k.plannedStopAge).toBe(s.inputs.stopAge);
   });
 });
+
+describe("scenario active selection", () => {
+  it("repeated setActive on same id is a no-op (count, order, active)", async () => {
+    const { useFinanceStore } = await import("@/store/financeStore");
+    const before = useFinanceStore.getState();
+    const id = before.activeScenarioId;
+    const countBefore = before.scenarios.length;
+    const orderBefore = before.scenarios.map((s) => s.id).join(",");
+    before.setActive(id);
+    before.setActive(id);
+    before.setActive(id);
+    const after = useFinanceStore.getState();
+    expect(after.activeScenarioId).toBe(id);
+    expect(after.scenarios.length).toBe(countBefore);
+    expect(after.scenarios.map((s) => s.id).join(",")).toBe(orderBefore);
+  });
+});
