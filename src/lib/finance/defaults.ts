@@ -105,6 +105,7 @@ export function makeBaseScenario(): Scenario {
     id: id(),
     name: "Base case",
     createdAt: Date.now(),
+    modifiers: {},
     inputs: structuredClone(defaultInputs),
   };
 }
