@@ -55,23 +55,23 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
               <Row label="  – skat" value={-f.statePensionTax} indent />
             </>
           )}
-          {f.ratePension?.active && (
+          {f.ratePension?.active ? (
             <>
+              <Row label="Ratepension brutto" value={f.ratePension.gross} indent />
+              <Row label={`Ratepension skat (${f.ratePension.gross > 0 ? Math.round((f.ratePension.tax / f.ratePension.gross) * 100) : 0} %)`} value={-f.ratePension.tax} indent />
               <Row label="Ratepension netto" value={f.ratePension.net} indent />
-              <Row label="  – brutto" value={f.ratePension.gross} indent />
-              <Row label="  – skat" value={-f.ratePension.tax} indent />
             </>
+          ) : (
+            <Row label="Ratepension" value="deaktiveret / ikke aktiv i år" indent />
           )}
-          {f.lifeAnnuity?.active && (
+          {f.lifeAnnuity?.active ? (
             <>
+              <Row label="Livsvarig pension brutto" value={f.lifeAnnuity.gross} indent />
+              <Row label={`Livsvarig pension skat (${f.lifeAnnuity.gross > 0 ? Math.round((f.lifeAnnuity.tax / f.lifeAnnuity.gross) * 100) : 0} %)`} value={-f.lifeAnnuity.tax} indent />
               <Row label="Livsvarig pension netto" value={f.lifeAnnuity.net} indent />
-              {f.lifeAnnuity.tax > 0 && (
-                <>
-                  <Row label="  – brutto" value={f.lifeAnnuity.gross} indent />
-                  <Row label="  – skat" value={-f.lifeAnnuity.tax} indent />
-                </>
-              )}
             </>
+          ) : (
+            <Row label="Livsvarig pension" value="deaktiveret / ikke aktiv i år" indent />
           )}
           {f.holdingDistributionNet > 0 && <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />}
           <Row label="Indkomst i alt" value={incomeTotal} strong />

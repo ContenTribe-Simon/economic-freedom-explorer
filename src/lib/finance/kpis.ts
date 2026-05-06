@@ -134,7 +134,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     modelStatusReason = `Scenariet har ugyldige antagelser eller ufinansierede betalinger: ${reasons.join("; ")}.`;
   } else if (endShortfallVsTarget > 0.5) {
     modelStatus = "target_missed";
-    modelStatusReason = `Scenariet holder, men minimumsmål er ikke opfyldt — mangler ${Math.round(endShortfallVsTarget).toLocaleString("da-DK")} kr ved slutalder.`;
+    modelStatusReason = `Scenariet er gyldigt, men minimumsmålet er ikke opfyldt — mangler ${Math.round(endShortfallVsTarget).toLocaleString("da-DK")} kr ved slutalder.`;
   }
 
   return {

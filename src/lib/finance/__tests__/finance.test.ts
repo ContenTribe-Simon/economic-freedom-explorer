@@ -19,7 +19,7 @@ describe("tax", () => {
     expect(high.tax).toBeGreaterThan(low.tax);
   });
   it("pension payout flat", () => {
-    const r = pensionPayoutTax(100000, defaultAssumptions.tax);
+    const r = pensionPayoutTax(100000, 0.4);
     expect(r.tax).toBeCloseTo(40000);
   });
 });
@@ -40,5 +40,22 @@ describe("projection", () => {
     expect(k.assumptionRisk).toBeGreaterThanOrEqual(0);
     expect(k.assumptionRisk).toBeLessThanOrEqual(100);
     expect(k.plannedStopAge).toBe(s.inputs.stopAge);
+  });
+});
+
+describe("scenario active selection", () => {
+  it("repeated setActive on same id is a no-op (count, order, active)", async () => {
+    const { useFinanceStore } = await import("@/store/financeStore");
+    const before = useFinanceStore.getState();
+    const id = before.activeScenarioId;
+    const countBefore = before.scenarios.length;
+    const orderBefore = before.scenarios.map((s) => s.id).join(",");
+    before.setActive(id);
+    before.setActive(id);
+    before.setActive(id);
+    const after = useFinanceStore.getState();
+    expect(after.activeScenarioId).toBe(id);
+    expect(after.scenarios.length).toBe(countBefore);
+    expect(after.scenarios.map((s) => s.id).join(",")).toBe(orderBefore);
   });
 });

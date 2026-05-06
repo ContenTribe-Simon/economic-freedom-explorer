@@ -27,7 +27,12 @@ export const useFinanceStore = create<FinanceState>()(
       scenarios: [seed],
       activeScenarioId: seed.id,
       assumptions: defaultAssumptions,
-      setActive: (id) => set({ activeScenarioId: id }),
+      setActive: (id) => {
+        const cur = get().activeScenarioId;
+        if (cur === id) return; // no-op when same scenario clicked
+        if (!get().scenarios.some((s) => s.id === id)) return;
+        set({ activeScenarioId: id });
+      },
       updateScenario: (id, updater) =>
         set((s) => ({
           scenarios: s.scenarios.map((sc) => (sc.id === id ? updater(sc) : sc)),
@@ -80,9 +85,13 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 6,
+      version: 7,
       migrate: (state: any) => {
         if (!state) return state;
+        // v7: fjern global pensionPayoutRate fra assumptions
+        if (state.assumptions?.tax && "pensionPayoutRate" in state.assumptions.tax) {
+          delete state.assumptions.tax.pensionPayoutRate;
+        }
         if (Array.isArray(state.scenarios)) {
           state.scenarios = state.scenarios.map((sc: any) => {
             const old = sc.inputs ?? {};
@@ -148,7 +157,7 @@ export const useFinanceStore = create<FinanceState>()(
                   payoutFromAge: oldPension.payoutFromAge ?? oldHolding.pensionAvailableFromAge ?? 64,
                   ratePensionEnabled: oldPension.ratePensionEnabled ?? true,
                   ratePensionPayoutYears: oldPension.ratePensionPayoutYears ?? 15,
-                  ratePensionEffectiveTaxRate: oldPension.ratePensionEffectiveTaxRate ?? state.assumptions?.tax?.pensionPayoutRate ?? 0.4,
+                  ratePensionEffectiveTaxRate: oldPension.ratePensionEffectiveTaxRate ?? 0.4,
                   lifeAnnuity: oldPension.lifeAnnuity ?? {
                     enabled: false,
                     mode: "gross",

@@ -97,12 +97,11 @@ export default function Assumptions() {
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Privat pension</h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          <PctField label="Effektiv skat ved privat pensionsudbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Skat på privat pension styres lokalt på hvert pensionsspor (ratepension og livsvarig pension/livrente) under <em>Variabler</em>. Der findes ingen global pensionsskattesats.
+        </p>
         <div className="mt-3 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground space-y-1">
-          <div><strong>Modelnote:</strong> Privat pension er nu opdelt i to spor pr. scenarie: <strong>ratepension</strong> (kapitalpulje med fast udbetalingsperiode) og <strong>livsvarig pension/livrente</strong> (stream til levealder). Begge spor kan være aktive samtidig og konfigureres under <em>Variabler</em>.</div>
-          <div>Satsen her er default. Hvert spor har sin egen effektive skat pr. scenarie.</div>
+          <div><strong>Modelnote:</strong> Privat pension er opdelt i to spor pr. scenarie: <strong>ratepension</strong> (kapitalpulje med fast udbetalingsperiode) og <strong>livsvarig pension/livrente</strong> (stream til levealder). Begge spor kan være aktive samtidig og konfigureres under <em>Variabler</em> — inkl. egen effektiv skat.</div>
           <div>Folkepension behandles separat — se <em>Variabler → Folkepension</em>.</div>
         </div>
       </Card>
@@ -119,7 +118,7 @@ export default function Assumptions() {
         <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
           <li>Alle beløb er i nutidskroner – realafkast bruges, så inflation ikke skal tilføjes oven i.</li>
           <li>Lønskat bruger AM-bidrag + bund/top med personfradrag. Kirkeskat, fagforening, befordring mv. er ikke inkluderet.</li>
-          <li>Pensionsudbetaling er forsimplet til én flad afgift (40 %). Ratepension/livrente skelnes ikke.</li>
+          <li>Pensionsudbetaling beskattes med en effektiv sats sat lokalt pr. pensionsspor (default 40 %).</li>
           <li>Holding-exit antages netto efter selskabsskat. Udlodning beskattes derefter som aktieindkomst.</li>
           <li>Folkepensionens samspil med private pensioner er ikke modelleret – juster nettotallet manuelt.</li>
           <li>Udtræk sker i prioritetsrækkefølge: fri kapital → holding-udlodning → pension.</li>

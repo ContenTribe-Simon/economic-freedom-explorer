@@ -172,62 +172,74 @@ export default function Scenarios() {
         </div>
       </Card>
 
-      <Card className="p-0 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left p-4 text-xs uppercase tracking-wider text-muted-foreground">Nøgletal</th>
-              {rows.map(({ scenario }) => (
-                <th key={scenario.id} className="text-right p-4 min-w-[180px]">
-                  <button
-                    className={`block w-full text-right ${scenario.id === activeId ? "text-accent" : ""}`}
-                    onClick={() => setActive(scenario.id)}
-                  >
-                    <div className="font-display text-base font-semibold truncate">{scenario.name}</div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
-                      {scenario.id === activeId ? "Aktiv" : "Klik for aktiver"}
-                    </div>
-                  </button>
-                  <div className="flex justify-end gap-1 mt-2">
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => duplicate(scenario.id)}>Dupliker</Button>
-                    <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => del(scenario.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+      <Card className="p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-separate border-spacing-0">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left p-4 text-xs uppercase tracking-wider text-muted-foreground sticky left-0 bg-muted/95 backdrop-blur z-10 min-w-[180px] border-b border-border">
+                  Nøgletal
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {metrics.map((m) => {
-              const bestVal = best(m);
-              return (
-                <tr key={m.key} className="border-t border-border">
-                  <td className="p-4 text-muted-foreground">{m.label}</td>
-                  {rows.map(({ scenario, kpis }) => {
-                    const rawVal = m.raw ? m.raw(kpis) : (kpis as any)[m.key];
-                    const isBest = bestVal !== null && rawVal === bestVal && rows.length > 1;
-                    return (
-                      <td key={scenario.id} className={`p-4 text-right num ${isBest ? "text-accent font-semibold" : ""}`}>
-                        {m.fmt((kpis as any)[m.key], kpis)}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-            <tr className="border-t border-border bg-muted/30">
-              <td className="p-4 text-muted-foreground text-xs">Forudsætninger</td>
-              {rows.map(({ scenario }) => (
-                <td key={scenario.id} className="p-4 text-right text-xs text-muted-foreground">
-                  Alder {scenario.inputs.person.currentAge} → stop {scenario.inputs.stopAge}
-                  <br />
-                  Forbrug {formatDKK(scenario.inputs.spending.desiredMonthlyNet, { compact: true })}/md
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+                {rows.map(({ scenario }) => (
+                  <th
+                    key={scenario.id}
+                    className={`text-right p-4 min-w-[200px] max-w-[240px] border-b border-border ${scenario.id === activeId ? "bg-accent/5" : ""}`}
+                  >
+                    <button
+                      className={`block w-full text-right ${scenario.id === activeId ? "text-accent" : ""}`}
+                      onClick={() => scenario.id !== activeId && setActive(scenario.id)}
+                    >
+                      <div className="font-display text-base font-semibold truncate" title={scenario.name}>
+                        {scenario.name}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                        {scenario.id === activeId ? "Aktiv" : "Klik for aktiver"}
+                      </div>
+                    </button>
+                    <div className="flex justify-end gap-1 mt-2">
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => duplicate(scenario.id)}>Dupliker</Button>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => del(scenario.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {metrics.map((m) => {
+                const bestVal = best(m);
+                return (
+                  <tr key={m.key}>
+                    <td className="p-4 text-muted-foreground sticky left-0 bg-card z-10 border-t border-border">{m.label}</td>
+                    {rows.map(({ scenario, kpis }) => {
+                      const rawVal = m.raw ? m.raw(kpis) : (kpis as any)[m.key];
+                      const isBest = bestVal !== null && rawVal === bestVal && rows.length > 1;
+                      return (
+                        <td
+                          key={scenario.id}
+                          className={`p-4 text-right num border-t border-border ${isBest ? "text-accent font-semibold" : ""} ${scenario.id === activeId ? "bg-accent/5" : ""}`}
+                        >
+                          {m.fmt((kpis as any)[m.key], kpis)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+              <tr>
+                <td className="p-4 text-muted-foreground text-xs sticky left-0 bg-muted/30 z-10 border-t border-border">Forudsætninger</td>
+                {rows.map(({ scenario }) => (
+                  <td key={scenario.id} className={`p-4 text-right text-xs text-muted-foreground border-t border-border bg-muted/30 ${scenario.id === activeId ? "bg-accent/5" : ""}`}>
+                    Alder {scenario.inputs.person.currentAge} → stop {scenario.inputs.stopAge}
+                    <br />
+                    Forbrug {formatDKK(scenario.inputs.spending.desiredMonthlyNet, { compact: true })}/md
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );
