@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Assumptions, Scenario } from "@/lib/finance/types";
+import { Assumptions, Scenario, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 
 interface FinanceState {
@@ -85,7 +85,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 7,
+      version: 8,
       migrate: (state: any) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -93,6 +93,14 @@ export const useFinanceStore = create<FinanceState>()(
           delete state.assumptions.tax.pensionPayoutRate;
         }
         if (Array.isArray(state.scenarios)) {
+          const stressLabels: Record<StressModifierKey, string> = {
+            noBarma: "uden Barma",
+            noPartTime: "uden deltid",
+            lowReturn: "lavt afkast",
+            higherSpending: "højere forbrug",
+            noFolkepension: "uden folkepension",
+          };
+          const stressKeys = Object.keys(stressLabels) as StressModifierKey[];
           state.scenarios = state.scenarios.map((sc: any) => {
             const old = sc.inputs ?? {};
             const oldFree = old.free ?? {};
@@ -139,8 +147,17 @@ export const useFinanceStore = create<FinanceState>()(
 
             const oldPension = old.pension ?? {};
 
+            const existingModifiers = sc.modifiers ?? {};
+            const inferredModifierKeys = stressKeys.filter((key) => existingModifiers[key] || String(sc.name ?? "").includes(stressLabels[key]));
+            const baseScenarioName = sc.baseScenarioName ?? String(sc.name ?? "Base case").split(" – ")[0];
+            const cleanName = [baseScenarioName, ...inferredModifierKeys.map((key) => stressLabels[key])].join(" – ");
+
             return {
               ...sc,
+              name: inferredModifierKeys.length > 0 ? cleanName : sc.name,
+              modifiers: inferredModifierKeys.reduce((acc, key) => ({ ...acc, [key]: true }), {}),
+              baseScenarioId: sc.baseScenarioId,
+              baseScenarioName: inferredModifierKeys.length > 0 ? baseScenarioName : sc.baseScenarioName,
               inputs: {
                 ...old,
                 free: {
