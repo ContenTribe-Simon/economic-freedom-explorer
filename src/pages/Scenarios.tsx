@@ -16,12 +16,12 @@ export default function Scenarios() {
   const duplicate = useFinanceStore((s) => s.duplicateScenario);
   const del = useFinanceStore((s) => s.deleteScenario);
   const add = useFinanceStore((s) => s.addScenario);
+  const applyStressModifier = useFinanceStore((s) => s.applyStressModifier);
 
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
     if (!test) return;
-    const next = applyStressModifierToState(scenarios, activeId, test.key);
-    useFinanceStore.setState(next);
+    applyStressModifier(test.key);
   };
 
   const activeScenario = scenarios.find((s) => s.id === activeId);
