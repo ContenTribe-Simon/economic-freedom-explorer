@@ -335,7 +335,7 @@ export default function Inputs() {
       <Section title="Indkomst (løn & familie)">
         <NumField label="Bruttoløn (årlig)" value={inp.income.salaryGross} onChange={(v) => set("income", { ...inp.income, salaryGross: v })} suffix="kr/år" step={10000} hint="Skat beregnes automatisk" />
         <NumField label="Familiefond (netto/år)" value={inp.income.familyFundAnnualNet} onChange={(v) => set("income", { ...inp.income, familyFundAnnualNet: v })} suffix="kr/år" step={5000} />
-        <NumField label="Familiefond indtil alder" value={inp.income.familyFundUntilAge} onChange={(v) => set("income", { ...inp.income, familyFundUntilAge: v })} suffix="år" />
+        <NumField label="Familiefond stopper før alder" value={inp.income.familyFundUntilAge} onChange={(v) => set("income", { ...inp.income, familyFundUntilAge: v })} suffix="år" hint="Sidste udbetaling sker året før denne alder." />
       </Section>
 
       <Section title="Deltidsindtægt" description="Vælg om beløbet er angivet som brutto/år (skat beregnes) eller netto/md (bruges direkte).">
