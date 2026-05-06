@@ -98,8 +98,14 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
           <Row label="Ekstra holdingudtræk (skat)" value={-f.holdingExtra.tax} indent />
           <Row label="Ekstra holdingudtræk (netto)" value={f.holdingExtra.net} indent />
           <Row label="Holding-saldo efter udtræk" value={y.closing.holding - f.growth.holding} indent />
-          <Row label="Udtræk pension (brutto)" value={-f.withdrawalsGross.pension} />
-          <Row label="Udtræk pension (netto)" value={f.withdrawals.pension} indent />
+          {f.pensionExtra && f.pensionExtra.gross > 0 && (
+            <>
+              <Row label="Ekstra ratepensionsudtræk (brutto)" value={-f.pensionExtra.gross} indent />
+              <Row label="Ekstra ratepensionsudtræk (skat)" value={-f.pensionExtra.tax} indent />
+              <Row label="Ekstra ratepensionsudtræk (netto)" value={f.pensionExtra.net} indent />
+            </>
+          )}
+          <Row label="Pensionsindkomst i alt (netto)" value={f.pensionPayoutNet} indent />
           {f.withdrawals.buffer > 0 && <Row label="Udtræk fra buffer" value={-f.withdrawals.buffer} />}
           {f.cashflowSurplus !== 0 && (
             <Row label="Cashflow vs. planlagt opsparing" value={f.cashflowSurplus} indent />
