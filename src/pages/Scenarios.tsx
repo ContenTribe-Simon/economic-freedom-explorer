@@ -97,15 +97,28 @@ export default function Scenarios() {
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
     if (!test) return;
-    const sourceId = activeId;
-    const sourceName = scenarios.find((s) => s.id === sourceId)?.name ?? "Base";
-    const newId = add(`${sourceName} – ${test.mod.suffix}`, sourceId);
+    const source = scenarios.find((s) => s.id === activeId);
+    if (!source || source.modifiers?.[test.key]) return;
+    const newKeys = [...activeModifierKeys(source), test.key];
+    const existing = findStressScenario(scenarios, source, newKeys);
+    if (existing) {
+      setActive(existing.id);
+      return;
+    }
+    const scenarioName = stressScenarioName(source, newKeys);
+    const newId = add(scenarioName, source.id);
     updateScenario(newId, (s) => {
       const copy = structuredClone(s);
-      test.mod.apply(copy);
+      copy.name = scenarioName;
+      copy.baseScenarioId = baseIdentity(source);
+      copy.baseScenarioName = baseName(source);
+      copy.modifiers = newKeys.reduce<Scenario["modifiers"]>((acc, modifierKey) => ({ ...acc, [modifierKey]: true }), {});
+      test.apply(copy);
       return copy;
     });
   };
+
+  const activeScenario = scenarios.find((s) => s.id === activeId);
 
   const rows = useMemo(
     () =>
@@ -179,8 +192,14 @@ export default function Scenarios() {
         </p>
         <div className="flex flex-wrap gap-2">
           {STRESS_TESTS.map((t) => (
-            <Button key={t.key} size="sm" variant="outline" onClick={() => runStress(t.key)}>
-              {t.label}
+            <Button
+              key={t.key}
+              size="sm"
+              variant={activeScenario?.modifiers?.[t.key] ? "secondary" : "outline"}
+              disabled={Boolean(activeScenario?.modifiers?.[t.key])}
+              onClick={() => runStress(t.key)}
+            >
+              {activeScenario?.modifiers?.[t.key] ? `${t.label} · aktiv` : t.label}
             </Button>
           ))}
         </div>
