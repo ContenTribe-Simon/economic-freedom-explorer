@@ -167,7 +167,7 @@ export function projectWithStopAge(
   const years: YearRow[] = [];
   const savingsLogic = inp.savingsLogic ?? "planned";
   const holdingStrategy = inp.holding.withdrawalStrategy ?? "planned_only";
-  const pensionAvailableFromAge = inp.holding.pensionAvailableFromAge ?? 60;
+  const pensionAvailableFromAge = inp.pension.payoutFromAge ?? inp.holding.pensionAvailableFromAge ?? 60;
 
   const debts: DebtItem[] = (inp.debts ?? []).map((d) => ({ ...d }));
 
