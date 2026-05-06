@@ -200,16 +200,16 @@ export default function Scenarios() {
           </thead>
           <tbody>
             {metrics.map((m) => {
-              const bestVal = best(m.key, m.better as any);
+              const bestVal = best(m);
               return (
                 <tr key={m.key} className="border-t border-border">
                   <td className="p-4 text-muted-foreground">{m.label}</td>
                   {rows.map(({ scenario, kpis }) => {
-                    const v = (kpis as any)[m.key];
-                    const isBest = bestVal !== null && v === bestVal && rows.length > 1;
+                    const rawVal = m.raw ? m.raw(kpis) : (kpis as any)[m.key];
+                    const isBest = bestVal !== null && rawVal === bestVal && rows.length > 1;
                     return (
                       <td key={scenario.id} className={`p-4 text-right num ${isBest ? "text-accent font-semibold" : ""}`}>
-                        {m.fmt(v as never)}
+                        {m.fmt((kpis as any)[m.key], kpis)}
                       </td>
                     );
                   })}
