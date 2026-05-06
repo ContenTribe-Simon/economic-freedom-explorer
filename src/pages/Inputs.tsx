@@ -381,10 +381,11 @@ export default function Inputs() {
           suffix="år"
         />
         <NumField
-          label="Deltid indtil alder"
+          label="Deltid stopper før alder"
           value={inp.income.partTime.untilAge}
           onChange={(v) => set("income", { ...inp.income, partTime: { ...inp.income.partTime, untilAge: v } })}
           suffix="år"
+          hint="Sidste år med deltidsindtægt er året før denne alder."
         />
       </Section>
 
