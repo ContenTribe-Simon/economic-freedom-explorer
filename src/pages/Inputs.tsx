@@ -186,13 +186,7 @@ export default function Inputs() {
           suffix="år"
           hint={inp.holding.startDistributionAtStopAge ? `Følger stopalder (${inp.stopAge})` : "Ignoreres når toggle er aktiv"}
         />
-        <NumField
-          label="Pension tilgængelig fra alder"
-          value={inp.holding.pensionAvailableFromAge ?? 60}
-          onChange={(v) => set("holding", { ...inp.holding, pensionAvailableFromAge: v })}
-          suffix="år"
-          hint="Bruges af strategien 'Pension før ekstra holdingudtræk'."
-        />
+        {/* "Pension tilgængelig fra alder" er flyttet til Privat pension-sektionen */}
         <div className="space-y-1.5 flex flex-col justify-end">
           <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
             <input
