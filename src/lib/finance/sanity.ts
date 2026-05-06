@@ -108,7 +108,7 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
       id: "holding-financing-short",
       severity: "error",
       title: "Holdinggæld kan ikke betales af holdingkapital",
-      detail: `I ${hsYears.length} år forsøges afdrag på holdinggæld via holdingkapital uden tilstrækkelig dækning (i alt ${total.toLocaleString("da-DK")} kr). Vælg en anden finansieringskilde for holdinggælden, eller tilføj kapital.`,
+      detail: `I ${hsYears.length} år forsøges afdrag på holdinggæld via holdingkapital uden tilstrækkelig dækning (i alt ${total.toLocaleString("da-DK")} kr). Modellen lader gælden stå indtil der er dækning. Scenariet er ikke fuldt validt, før finansiering af holdinggæld er afklaret — vælg fx "Privat cashflow", "Ekstern selskabscashflow" eller "Afdrages ved exit".`,
     });
   }
 
