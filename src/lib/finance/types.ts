@@ -179,6 +179,8 @@ export interface YearFlows {
   debtsDetail: DebtYearDetail[];
   cashflowSurplus: number;
   growth: { free: number; pension: number; holding: number };
+  /** Manglende dækning af holdinggæld der skulle betales af holdingkapital. */
+  holdingFinancingShortfall: number;
 }
 
 export interface DebtYearDetail {
