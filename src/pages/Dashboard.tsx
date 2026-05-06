@@ -76,24 +76,37 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {kpis.firstShortfallAge !== null && (
-        <div className="bg-destructive/10 border border-destructive/30 text-destructive-foreground/90 rounded-md p-4 text-sm">
-          <strong className="text-destructive">Shortfall ved alder {kpis.firstShortfallAge}.</strong>{" "}
-          Justér stopalder, forbrug, afkast eller indbetalinger.
-        </div>
-      )}
-
-      {targetMissed && !kpis.firstShortfallAge && (
-        <div className="bg-warning/10 border border-warning/40 rounded-md p-4 text-sm">
-          <strong>Minimumsmål ikke opfyldt</strong> — mangler {formatDKK(kpis.endShortfallVsTarget)} ved alder {scenario.inputs.person.lifeExpectancy}.
-          Modellen har ikke cashflow-shortfall, men slutformuen er under det minimum du har sat.
-        </div>
-      )}
-      {targetMissed && kpis.firstShortfallAge && (
-        <div className="bg-warning/10 border border-warning/40 rounded-md p-4 text-sm">
-          <strong>Minimumsmål ikke opfyldt</strong> — mangler {formatDKK(kpis.endShortfallVsTarget)} ved alder {scenario.inputs.person.lifeExpectancy}.
-        </div>
-      )}
+      {(() => {
+        const s = kpis.modelStatus;
+        const cls =
+          s === "valid"
+            ? "bg-success/10 border-success/40 text-success"
+            : s === "target_missed"
+              ? "bg-warning/10 border-warning/50"
+              : "bg-destructive/10 border-destructive/40 text-destructive";
+        const dot =
+          s === "valid" ? "bg-success" : s === "target_missed" ? "bg-warning" : "bg-destructive";
+        const label =
+          s === "valid"
+            ? "Modelstatus: validt"
+            : s === "target_missed"
+              ? "Modelstatus: holder, men minimumsmål ikke opfyldt"
+              : "Modelstatus: ugyldigt";
+        return (
+          <div className={`border rounded-md p-4 text-sm flex items-start gap-3 ${cls}`}>
+            <span className={`mt-1.5 inline-block w-2.5 h-2.5 rounded-full ${dot}`} />
+            <div>
+              <div className="font-semibold">{label}</div>
+              <div className="text-xs opacity-90 mt-1">{kpis.modelStatusReason}</div>
+              {kpis.unfinancedHoldingDebt > 0.5 && (
+                <div className="text-xs mt-1">
+                  Ufinansieret holdinggæld i {kpis.unfinancedHoldingYears} år — i alt {formatDKK(kpis.unfinancedHoldingDebt)}.
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPI label="Planlagt stopalder" value={`${kpis.plannedStopAge} år`} sub="Som angivet i variabler" />

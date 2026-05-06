@@ -44,17 +44,17 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Indkomst (netto)</div>
-          <Row label="Løn netto" value={f.salaryNet} indent />
-          <Row label="Deltid netto" value={f.partTimeNet} indent />
-          <Row label="Familiefond" value={f.familyFundNet} indent />
-          <Row label="Folkepension netto" value={f.statePensionNet} indent />
+          {f.salaryNet > 0 && <Row label="Løn netto" value={f.salaryNet} indent />}
+          {f.partTimeNet > 0 && <Row label="Deltid netto" value={f.partTimeNet} indent />}
+          {f.familyFundNet > 0 && <Row label="Familiefond" value={f.familyFundNet} indent />}
+          {f.statePensionNet > 0 && <Row label="Folkepension netto" value={f.statePensionNet} indent />}
           {f.statePensionGross > 0 && (
             <>
               <Row label="  – brutto" value={f.statePensionGross} indent />
               <Row label="  – skat" value={-f.statePensionTax} indent />
             </>
           )}
-          <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />
+          {f.holdingDistributionNet > 0 && <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />}
           <Row label="Indkomst i alt" value={incomeTotal} strong />
           <Row label="Skat i alt (løn + aktie + folkepension)" value={-f.taxes} indent />
         </section>
@@ -91,23 +91,34 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
           <section>
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Gældsposter</div>
             <div className="space-y-2">
-              {f.debtsDetail.map((d) => (
-                <div key={d.id} className="border border-border rounded-md p-2 text-xs">
-                  <div className="flex justify-between font-medium">
-                    <span>{d.name}</span>
-                    <span className="text-muted-foreground">
-                      {d.impact === "private" ? "Privat" : d.impact === "holding" ? "Holding" : "Risiko"}
-                      {d.includeInNetWorth ? " · i NW" : " · ej i NW"}
-                    </span>
+              {f.debtsDetail.map((d) => {
+                const linkedParent = d.linkedDebtId ? f.debtsDetail.find((p) => p.id === d.linkedDebtId) : null;
+                return (
+                  <div key={d.id} className="border border-border rounded-md p-2 text-xs">
+                    <div className="flex justify-between font-medium">
+                      <span>{d.name}</span>
+                      <span className="text-muted-foreground">
+                        {d.impact === "private" ? "Privat" : d.impact === "holding" ? "Holding" : "Risiko"}
+                        {d.includeInNetWorth ? " · i NW" : " · kun risiko (ej i NW)"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1 mt-1 text-muted-foreground">
+                      <div>Start<div className="num text-foreground">{formatDKK(d.opening, { compact: true })}</div></div>
+                      <div>Rente<div className="num text-foreground">{formatDKK(d.interest, { compact: true })}</div></div>
+                      <div>Afdrag<div className="num text-foreground">{formatDKK(d.principal, { compact: true })}</div></div>
+                      <div>Slut<div className="num text-foreground">{formatDKK(d.closing, { compact: true })}</div></div>
+                    </div>
+                    {d.financingNote && (
+                      <div className="mt-1 text-[11px] text-muted-foreground italic">{d.financingNote}</div>
+                    )}
+                    {linkedParent && (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        Hæftelse koblet til <strong className="text-foreground">{linkedParent.name}</strong> · underliggende saldo {formatDKK(linkedParent.closing, { compact: true })} · hæftelsesbeløb {formatDKK(d.closing, { compact: true })} · {d.includeInNetWorth ? "indgår i nettoformue" : "vises kun som risiko"}
+                      </div>
+                    )}
                   </div>
-                  <div className="grid grid-cols-4 gap-1 mt-1 text-muted-foreground">
-                    <div>Start<div className="num text-foreground">{formatDKK(d.opening, { compact: true })}</div></div>
-                    <div>Rente<div className="num text-foreground">{formatDKK(d.interest, { compact: true })}</div></div>
-                    <div>Afdrag<div className="num text-foreground">{formatDKK(d.principal, { compact: true })}</div></div>
-                    <div>Slut<div className="num text-foreground">{formatDKK(d.closing, { compact: true })}</div></div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

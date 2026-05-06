@@ -67,6 +67,8 @@ interface DebtTotals {
   holdingInterest: number;
   holdingPrincipal: number;
   holdingPayment: number;
+  /** Betalinger der sker uden for modellen (ekstern selskabscashflow). */
+  externalPayment: number;
   /** Saldo der tæller med i nettoformuen. */
   totalBalanceNW: number;
   /** Holding-shortfall: forsøgt afdrag mod tom holdingkapital. */
@@ -74,7 +76,12 @@ interface DebtTotals {
   detail: DebtYearDetail[];
 }
 
-function processDebts(debts: DebtItem[], holdingBalance: number): DebtTotals {
+function processDebts(
+  debts: DebtItem[],
+  holdingBalance: number,
+  calYear: number,
+  exitYear: number,
+): DebtTotals {
   const t: DebtTotals = {
     privateInterest: 0,
     privatePrincipal: 0,
@@ -82,6 +89,7 @@ function processDebts(debts: DebtItem[], holdingBalance: number): DebtTotals {
     holdingInterest: 0,
     holdingPrincipal: 0,
     holdingPayment: 0,
+    externalPayment: 0,
     totalBalanceNW: 0,
     holdingFinancingShortfall: 0,
     detail: [],
@@ -96,48 +104,84 @@ function processDebts(debts: DebtItem[], holdingBalance: number): DebtTotals {
         id: d.id, name: d.name, kind: d.kind, impact: d.impact,
         opening: 0, interest: 0, principal: 0, closing: 0,
         includeInNetWorth: includeInNW, linkedDebtId: d.linkedDebtId,
+        financingNote: undefined,
       });
       continue;
     }
 
     const financing = d.kind === "holding" ? (d.holdingFinancing ?? "holding_capital") : undefined;
-    // Display-only / exit-only / external_company / risk_only: ingen løbende cashflow eller saldoreduktion
-    const noCashflow =
-      d.impact === "risk_only" ||
-      financing === "display_only" ||
-      financing === "external_company" ||
-      financing === "exit_only";
-
-    const interest = d.balance * (d.interestRate ?? 0);
+    // Renter påløber for alle reelle gældsposter (ikke display_only / risk_only)
+    const accrueInterest = !(d.impact === "risk_only" || financing === "display_only");
+    const interest = accrueInterest ? d.balance * (d.interestRate ?? 0) : 0;
     const wantPay = (d.monthlyPayment ?? 0) * 12;
-    const pay = noCashflow ? 0 : Math.min(d.balance + interest, wantPay);
-    const principal = Math.max(0, pay - interest);
 
-    if (d.impact === "private" || (d.kind === "holding" && financing === "private_cashflow")) {
-      t.privateInterest += interest;
-      t.privatePrincipal += principal;
-      t.privatePayment += pay;
-    } else if (d.kind === "holding" && financing === "holding_capital") {
-      // Træk fra holdingkapital — registrér shortfall hvis utilstrækkelig
-      const cover = Math.min(availableHolding, pay);
+    let interestPaid = 0;
+    let principalPaid = 0;
+    let paid = 0;
+    let financingNote: string | undefined;
+    let unfinanced = 0;
+
+    if (d.impact === "risk_only" || financing === "display_only") {
+      financingNote = "Kun visning/risiko";
+    } else if (financing === "exit_only") {
+      if (calYear >= exitYear) {
+        // Afdrag ved exit — træk fra holdingkapital
+        const due = d.balance + interest;
+        const cover = Math.min(availableHolding, due);
+        availableHolding -= cover;
+        unfinanced = due - cover;
+        interestPaid = Math.min(interest, cover);
+        principalPaid = Math.max(0, cover - interestPaid);
+        paid = cover;
+        t.holdingInterest += interestPaid;
+        t.holdingPrincipal += principalPaid;
+        t.holdingPayment += paid;
+        t.holdingFinancingShortfall += unfinanced;
+        financingNote = unfinanced > 0
+          ? "Exit-afdrag — utilstrækkelig holdingkapital"
+          : "Afdraget ved exit fra holdingkapital";
+      } else {
+        financingNote = `Afdrages først ved exit (${exitYear})`;
+      }
+    } else if (d.impact === "private" || financing === "private_cashflow") {
+      paid = Math.min(d.balance + interest, wantPay);
+      interestPaid = Math.min(interest, paid);
+      principalPaid = Math.max(0, paid - interestPaid);
+      t.privateInterest += interestPaid;
+      t.privatePrincipal += principalPaid;
+      t.privatePayment += paid;
+      if (financing === "private_cashflow") financingNote = "Holdinggæld betales af privat cashflow";
+    } else if (financing === "external_company") {
+      // Betales af ekstern selskabscashflow uden for modellen — saldo nedbringes uden at trække fra modellen
+      paid = Math.min(d.balance + interest, wantPay);
+      interestPaid = Math.min(interest, paid);
+      principalPaid = Math.max(0, paid - interestPaid);
+      t.externalPayment += paid;
+      financingNote = "Betales eksternt — uden for modellen";
+    } else if (financing === "holding_capital" || d.impact === "holding") {
+      // Træk fra holdingkapital — kun hvad der er dækning for
+      const want = Math.min(d.balance + interest, wantPay);
+      const cover = Math.min(availableHolding, want);
       availableHolding -= cover;
-      t.holdingFinancingShortfall += pay - cover;
-      t.holdingInterest += interest;
-      t.holdingPrincipal += principal;
-      t.holdingPayment += cover;
-    } else if (d.impact === "holding") {
-      // fallback for holding-impact uden specifik financing
-      t.holdingInterest += interest;
-      t.holdingPrincipal += principal;
-      t.holdingPayment += pay;
+      unfinanced = want - cover;
+      interestPaid = Math.min(interest, cover);
+      principalPaid = Math.max(0, cover - interestPaid);
+      paid = cover;
+      t.holdingInterest += interestPaid;
+      t.holdingPrincipal += principalPaid;
+      t.holdingPayment += paid;
+      t.holdingFinancingShortfall += unfinanced;
+      if (unfinanced > 0) financingNote = `Holdingkapital utilstrækkelig — ${Math.round(unfinanced).toLocaleString("da-DK")} kr ufinansieret`;
     }
 
-    d.balance = Math.max(0, d.balance + (noCashflow ? 0 : interest) - pay);
+    // Saldo: tilføj renter (hvis påløbet), træk det faktisk betalte
+    d.balance = Math.max(0, d.balance + interest - paid);
     if (includeInNW) t.totalBalanceNW += d.balance;
     t.detail.push({
       id: d.id, name: d.name, kind: d.kind, impact: d.impact,
-      opening, interest, principal, closing: d.balance,
+      opening, interest, principal: principalPaid, closing: d.balance,
       includeInNetWorth: includeInNW, linkedDebtId: d.linkedDebtId,
+      financingNote,
     });
   }
   return t;
@@ -263,7 +307,7 @@ export function projectWithStopAge(
 
     // Gæld
     syncLinkedLiabilities(debts);
-    const dt = processDebts(debts, bal.holding);
+    const dt = processDebts(debts, bal.holding, calYear, inp.holding.exitYear);
     bal.debt = dt.totalBalanceNW;
     bal.holding = Math.max(0, bal.holding - dt.holdingPayment);
 
