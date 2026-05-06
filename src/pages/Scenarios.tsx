@@ -6,69 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
 import { Trash2 } from "lucide-react";
-import { Scenario } from "@/lib/finance/types";
-
-type StressMod = { suffix: string; apply: (s: Scenario) => void };
-
-const STRESS_TESTS: { key: string; label: string; mod: StressMod }[] = [
-  {
-    key: "no-barma",
-    label: "No Barma",
-    mod: {
-      suffix: "uden Barma",
-      apply: (s) => {
-        s.inputs.holding.balance = 0;
-        s.inputs.holding.expectedExitValue = 0;
-        s.inputs.holding.annualDistribution = 0;
-      },
-    },
-  },
-  {
-    key: "no-parttime",
-    label: "No part-time",
-    mod: {
-      suffix: "uden deltid",
-      apply: (s) => {
-        s.inputs.income.partTime.grossAnnual = 0;
-        s.inputs.income.partTime.netMonthly = 0;
-        s.inputs.fullRetireAge = s.inputs.stopAge;
-      },
-    },
-  },
-  {
-    key: "low-return",
-    label: "Low return",
-    mod: {
-      suffix: "lavt afkast",
-      apply: (s) => {
-        s.assumptionsOverride = {
-          ...(s.assumptionsOverride ?? {}),
-          realReturn: { free: 0.02, pension: 0.02, holding: 0.01 },
-        };
-      },
-    },
-  },
-  {
-    key: "higher-spending",
-    label: "Higher spending",
-    mod: {
-      suffix: "højere forbrug",
-      apply: (s) => {
-        s.inputs.spending.desiredMonthlyNet = Math.round(s.inputs.spending.desiredMonthlyNet * 1.25);
-      },
-    },
-  },
-  {
-    key: "no-folkepension",
-    label: "No folkepension",
-    mod: {
-      suffix: "uden folkepension",
-      apply: (s) => {
-        s.inputs.income.statePension.mode = "none";
-      },
-    },
-  },
-];
+import { STRESS_TESTS } from "@/lib/finance/stress";
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
@@ -78,20 +16,15 @@ export default function Scenarios() {
   const duplicate = useFinanceStore((s) => s.duplicateScenario);
   const del = useFinanceStore((s) => s.deleteScenario);
   const add = useFinanceStore((s) => s.addScenario);
-  const updateScenario = useFinanceStore((s) => s.updateScenario);
+  const applyStressModifier = useFinanceStore((s) => s.applyStressModifier);
 
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
     if (!test) return;
-    const sourceId = activeId;
-    const sourceName = scenarios.find((s) => s.id === sourceId)?.name ?? "Base";
-    const newId = add(`${sourceName} – ${test.mod.suffix}`, sourceId);
-    updateScenario(newId, (s) => {
-      const copy = structuredClone(s);
-      test.mod.apply(copy);
-      return copy;
-    });
+    applyStressModifier(test.key);
   };
+
+  const activeScenario = scenarios.find((s) => s.id === activeId);
 
   const rows = useMemo(
     () =>
@@ -165,8 +98,14 @@ export default function Scenarios() {
         </p>
         <div className="flex flex-wrap gap-2">
           {STRESS_TESTS.map((t) => (
-            <Button key={t.key} size="sm" variant="outline" onClick={() => runStress(t.key)}>
-              {t.label}
+            <Button
+              key={t.key}
+              size="sm"
+              variant={activeScenario?.modifiers?.[t.key] ? "secondary" : "outline"}
+              disabled={Boolean(activeScenario?.modifiers?.[t.key])}
+              onClick={() => runStress(t.key)}
+            >
+              {activeScenario?.modifiers?.[t.key] ? `${t.label} · aktiv` : t.label}
             </Button>
           ))}
         </div>

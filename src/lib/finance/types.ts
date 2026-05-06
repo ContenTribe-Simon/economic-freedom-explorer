@@ -155,6 +155,9 @@ export interface ScenarioInputs {
   savingsLogic: SavingsLogic;
 }
 
+export type StressModifierKey = "noBarma" | "noPartTime" | "lowReturn" | "higherSpending" | "noFolkepension";
+export type ScenarioModifiers = Record<StressModifierKey, boolean>;
+
 export interface TaxAssumptions {
   amBidrag: number;
   laborBottomRate: number;
@@ -248,6 +251,11 @@ export interface Scenario {
   name: string;
   createdAt: number;
   notes?: string;
+  /** Unikke stress-test modifiers anvendt på scenariet. */
+  modifiers?: Partial<ScenarioModifiers>;
+  /** Oprindeligt scenarie for modifier-kombinationen, når det kan spores. */
+  baseScenarioId?: string;
+  baseScenarioName?: string;
   inputs: ScenarioInputs;
   assumptionsOverride?: Partial<Assumptions>;
 }

@@ -3,6 +3,7 @@ import { defaultAssumptions, makeBaseScenario } from "../defaults";
 import { project } from "../projection";
 import { deriveKPIs } from "../kpis";
 import { laborTax, shareTax, pensionPayoutTax } from "../tax";
+import { applyStressModifierToState } from "../stress";
 
 describe("tax", () => {
   it("labor tax non-negative", () => {
@@ -57,5 +58,39 @@ describe("scenario active selection", () => {
     expect(after.activeScenarioId).toBe(id);
     expect(after.scenarios.length).toBe(countBefore);
     expect(after.scenarios.map((s) => s.id).join(",")).toBe(orderBefore);
+  });
+});
+
+describe("stress-test modifiers", () => {
+  it("applies No Barma once and makes repeated clicks a no-op", () => {
+    const base = makeBaseScenario();
+    const first = applyStressModifierToState([base], base.id, "noBarma");
+    const stressed = first.scenarios.find((s) => s.id === first.activeScenarioId)!;
+    const snapshot = JSON.stringify(stressed);
+
+    expect(first.scenarios.length).toBe(2);
+    expect(stressed.name).toBe("Base case – uden Barma");
+    expect(stressed.modifiers?.noBarma).toBe(true);
+
+    const second = applyStressModifierToState(first.scenarios, first.activeScenarioId, "noBarma");
+    const after = second.scenarios.find((s) => s.id === second.activeScenarioId)!;
+
+    expect(second.scenarios.length).toBe(first.scenarios.length);
+    expect(after.name).toBe(stressed.name);
+    expect(JSON.stringify(after)).toBe(snapshot);
+  });
+
+  it("activates an existing modifier combination instead of creating a duplicate", () => {
+    const base = makeBaseScenario();
+    const noBarma = applyStressModifierToState([base], base.id, "noBarma");
+    const combined = applyStressModifierToState(noBarma.scenarios, noBarma.activeScenarioId, "noPartTime");
+    const combinedId = combined.activeScenarioId;
+    const withNoPartTime = applyStressModifierToState(combined.scenarios, base.id, "noPartTime");
+
+    const result = applyStressModifierToState(withNoPartTime.scenarios, withNoPartTime.activeScenarioId, "noBarma");
+
+    expect(result.scenarios.length).toBe(withNoPartTime.scenarios.length);
+    expect(result.activeScenarioId).toBe(combinedId);
+    expect(result.scenarios.find((s) => s.id === combinedId)?.name).toBe("Base case – uden Barma – uden deltid");
   });
 });
