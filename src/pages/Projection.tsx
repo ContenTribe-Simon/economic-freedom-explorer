@@ -83,24 +83,32 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
               <Row label="  – skat" value={-f.statePensionTax} indent />
             </>
           )}
-          {f.ratePension?.active ? (
-            <>
-              <Row label="Ratepension brutto" value={f.ratePension.gross} indent />
-              <Row label={`Ratepension skat (${f.ratePension.gross > 0 ? Math.round((f.ratePension.tax / f.ratePension.gross) * 100) : 0} %)`} value={-f.ratePension.tax} indent />
-              <Row label="Ratepension netto" value={f.ratePension.net} indent />
-            </>
-          ) : (
-            <Row label="Ratepension" value="deaktiveret / ikke aktiv i år" indent />
-          )}
-          {f.lifeAnnuity?.active ? (
-            <>
-              <Row label="Livsvarig pension brutto" value={f.lifeAnnuity.gross} indent />
-              <Row label={`Livsvarig pension skat (${f.lifeAnnuity.gross > 0 ? Math.round((f.lifeAnnuity.tax / f.lifeAnnuity.gross) * 100) : 0} %)`} value={-f.lifeAnnuity.tax} indent />
-              <Row label="Livsvarig pension netto" value={f.lifeAnnuity.net} indent />
-            </>
-          ) : (
-            <Row label="Livsvarig pension" value="deaktiveret / ikke aktiv i år" indent />
-          )}
+          {(() => {
+            const status = ratePensionStatusText(y.age, inputs, !!f.ratePension?.active);
+            if (status.kind === "payout") {
+              return (
+                <>
+                  <Row label="Ratepension brutto" value={f.ratePension.gross} indent />
+                  <Row label={`Ratepension skat (${f.ratePension.gross > 0 ? Math.round((f.ratePension.tax / f.ratePension.gross) * 100) : 0} %)`} value={-f.ratePension.tax} indent />
+                  <Row label="Ratepension netto (til cashflow)" value={f.ratePension.net} indent />
+                </>
+              );
+            }
+            return <Row label="Ratepension" value={status.text} indent />;
+          })()}
+          {(() => {
+            const status = lifeAnnuityStatusText(y.age, inputs, !!f.lifeAnnuity?.active);
+            if (status.kind === "payout") {
+              return (
+                <>
+                  <Row label="Livsvarig pension brutto" value={f.lifeAnnuity.gross} indent />
+                  <Row label={`Livsvarig pension skat (${f.lifeAnnuity.gross > 0 ? Math.round((f.lifeAnnuity.tax / f.lifeAnnuity.gross) * 100) : 0} %)`} value={-f.lifeAnnuity.tax} indent />
+                  <Row label="Livsvarig pension netto (til cashflow)" value={f.lifeAnnuity.net} indent />
+                </>
+              );
+            }
+            return <Row label="Livsvarig pension" value={status.text} indent />;
+          })()}
           {f.holdingDistributionNet > 0 && <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />}
           <Row label="Indkomst i alt" value={incomeTotal} strong />
           <Row label="Skat i alt" value={-f.taxes} indent />
