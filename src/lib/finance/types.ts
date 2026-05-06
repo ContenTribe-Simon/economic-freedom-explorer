@@ -187,7 +187,14 @@ export interface YearFlows {
   statePensionGross: number;
   statePensionTax: number;
   holdingDistributionNet: number;
+  /** Samlet pensionsindkomst netto (rate + livrente + ekstra pensionsudtræk). */
   pensionPayoutNet: number;
+  /** Ratepension – planlagt årlig udbetaling (brutto/netto/skat). */
+  ratePension: { gross: number; net: number; tax: number; active: boolean };
+  /** Livsvarig pension/livrente – årlig udbetaling (brutto/netto/skat). */
+  lifeAnnuity: { gross: number; net: number; tax: number; active: boolean };
+  /** Ekstra pensionsudtræk fra ratepension-saldoen ud over planlagt udbetaling (shortfall). */
+  pensionExtra: { gross: number; net: number; tax: number };
   employerPensionContribution: number;
   ownPensionContribution: number;
   freeContribution: number;
