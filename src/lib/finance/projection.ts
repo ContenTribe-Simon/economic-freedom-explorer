@@ -67,6 +67,8 @@ interface DebtTotals {
   holdingInterest: number;
   holdingPrincipal: number;
   holdingPayment: number;
+  /** Betalinger der sker uden for modellen (ekstern selskabscashflow). */
+  externalPayment: number;
   /** Saldo der tæller med i nettoformuen. */
   totalBalanceNW: number;
   /** Holding-shortfall: forsøgt afdrag mod tom holdingkapital. */
