@@ -388,13 +388,6 @@ export default function Inputs() {
         />
       </Section>
 
-      <Section title="Privat pension" description="Arbejdsmarkeds-/private pensionsudtræk. Skattesatsen sættes under Antagelser.">
-        <p className="md:col-span-2 text-sm text-muted-foreground -mt-2">
-          Effektiv skat ved privat pensionsudbetaling bruges <strong>kun</strong> til privat/arbejdsmarkedspension —
-          <em> ikke folkepension</em>. Justér satsen under <strong>Antagelser → Privat pension</strong>.
-        </p>
-      </Section>
-
       <Section title="Folkepension" description="Vælg metode. Folkepension beskattes ikke med privat pensions-sats.">
         <div className="md:col-span-2 space-y-2">
           {([
