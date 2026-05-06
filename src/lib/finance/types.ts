@@ -194,6 +194,8 @@ export interface DebtYearDetail {
   closing: number;
   includeInNetWorth: boolean;
   linkedDebtId?: string;
+  /** Kort note om finansieringskilde / status for året. */
+  financingNote?: string;
 }
 
 export interface YearRow {
