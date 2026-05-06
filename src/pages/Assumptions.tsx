@@ -118,7 +118,7 @@ export default function Assumptions() {
         <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
           <li>Alle beløb er i nutidskroner – realafkast bruges, så inflation ikke skal tilføjes oven i.</li>
           <li>Lønskat bruger AM-bidrag + bund/top med personfradrag. Kirkeskat, fagforening, befordring mv. er ikke inkluderet.</li>
-          <li>Pensionsudbetaling er forsimplet til én flad afgift (40 %). Ratepension/livrente skelnes ikke.</li>
+          <li>Pensionsudbetaling beskattes med en effektiv sats sat lokalt pr. pensionsspor (default 40 %).</li>
           <li>Holding-exit antages netto efter selskabsskat. Udlodning beskattes derefter som aktieindkomst.</li>
           <li>Folkepensionens samspil med private pensioner er ikke modelleret – juster nettotallet manuelt.</li>
           <li>Udtræk sker i prioritetsrækkefølge: fri kapital → holding-udlodning → pension.</li>
