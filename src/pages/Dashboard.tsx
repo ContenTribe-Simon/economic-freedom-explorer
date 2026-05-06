@@ -90,7 +90,7 @@ export default function Dashboard() {
           s === "valid"
             ? "Modelstatus: validt"
             : s === "target_missed"
-              ? "Modelstatus: holder, men minimumsmål ikke opfyldt"
+              ? "Scenariet er gyldigt, men minimumsmålet er ikke opfyldt"
               : "Modelstatus: ugyldigt";
         return (
           <div className={`border rounded-md p-4 text-sm flex items-start gap-3 ${cls}`}>
