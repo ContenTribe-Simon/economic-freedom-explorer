@@ -4,7 +4,7 @@ import { project } from "@/lib/finance/projection";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDKK } from "@/lib/format";
-import { YearRow } from "@/lib/finance/types";
+import { ScenarioInputs, YearRow } from "@/lib/finance/types";
 import { X } from "lucide-react";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
@@ -16,7 +16,35 @@ function Row({ label, value, strong, indent }: { label: string; value: number | 
   );
 }
 
-function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
+export function ratePensionStatusText(
+  age: number,
+  inputs: ScenarioInputs,
+  active: boolean,
+): { kind: "payout" | "info"; text: string } {
+  const enabled = inputs.pension.ratePensionEnabled ?? true;
+  if (!enabled) return { kind: "info", text: "Deaktiveret" };
+  if (active) return { kind: "payout", text: "udbetales i år" };
+  const fromAge = inputs.pension.payoutFromAge;
+  const years = Math.max(1, inputs.pension.ratePensionPayoutYears ?? 15);
+  if (age < fromAge) return { kind: "info", text: `Aktiv – starter fra alder ${fromAge}` };
+  if (age >= fromAge + years) return { kind: "info", text: "Aktiv – udbetalingsperiode afsluttet" };
+  return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
+}
+
+export function lifeAnnuityStatusText(
+  age: number,
+  inputs: ScenarioInputs,
+  active: boolean,
+): { kind: "payout" | "info"; text: string } {
+  const la = inputs.pension.lifeAnnuity;
+  if (!la?.enabled) return { kind: "info", text: "Deaktiveret" };
+  if (active) return { kind: "payout", text: "udbetales i år" };
+  if (age < la.fromAge) return { kind: "info", text: `Aktiv – starter fra alder ${la.fromAge}` };
+  if (age > inputs.person.lifeExpectancy) return { kind: "info", text: "Aktiv – udbetalingsperiode afsluttet" };
+  return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
+}
+
+function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs; onClose: () => void }) {
   const f = y.flows;
   const incomeTotal =
     f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
@@ -55,24 +83,32 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
               <Row label="  – skat" value={-f.statePensionTax} indent />
             </>
           )}
-          {f.ratePension?.active ? (
-            <>
-              <Row label="Ratepension brutto" value={f.ratePension.gross} indent />
-              <Row label={`Ratepension skat (${f.ratePension.gross > 0 ? Math.round((f.ratePension.tax / f.ratePension.gross) * 100) : 0} %)`} value={-f.ratePension.tax} indent />
-              <Row label="Ratepension netto" value={f.ratePension.net} indent />
-            </>
-          ) : (
-            <Row label="Ratepension" value="deaktiveret / ikke aktiv i år" indent />
-          )}
-          {f.lifeAnnuity?.active ? (
-            <>
-              <Row label="Livsvarig pension brutto" value={f.lifeAnnuity.gross} indent />
-              <Row label={`Livsvarig pension skat (${f.lifeAnnuity.gross > 0 ? Math.round((f.lifeAnnuity.tax / f.lifeAnnuity.gross) * 100) : 0} %)`} value={-f.lifeAnnuity.tax} indent />
-              <Row label="Livsvarig pension netto" value={f.lifeAnnuity.net} indent />
-            </>
-          ) : (
-            <Row label="Livsvarig pension" value="deaktiveret / ikke aktiv i år" indent />
-          )}
+          {(() => {
+            const status = ratePensionStatusText(y.age, inputs, !!f.ratePension?.active);
+            if (status.kind === "payout") {
+              return (
+                <>
+                  <Row label="Ratepension brutto" value={f.ratePension.gross} indent />
+                  <Row label={`Ratepension skat (${f.ratePension.gross > 0 ? Math.round((f.ratePension.tax / f.ratePension.gross) * 100) : 0} %)`} value={-f.ratePension.tax} indent />
+                  <Row label="Ratepension netto (til cashflow)" value={f.ratePension.net} indent />
+                </>
+              );
+            }
+            return <Row label="Ratepension" value={status.text} indent />;
+          })()}
+          {(() => {
+            const status = lifeAnnuityStatusText(y.age, inputs, !!f.lifeAnnuity?.active);
+            if (status.kind === "payout") {
+              return (
+                <>
+                  <Row label="Livsvarig pension brutto" value={f.lifeAnnuity.gross} indent />
+                  <Row label={`Livsvarig pension skat (${f.lifeAnnuity.gross > 0 ? Math.round((f.lifeAnnuity.tax / f.lifeAnnuity.gross) * 100) : 0} %)`} value={-f.lifeAnnuity.tax} indent />
+                  <Row label="Livsvarig pension netto (til cashflow)" value={f.lifeAnnuity.net} indent />
+                </>
+              );
+            }
+            return <Row label="Livsvarig pension" value={status.text} indent />;
+          })()}
           {f.holdingDistributionNet > 0 && <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />}
           <Row label="Indkomst i alt" value={incomeTotal} strong />
           <Row label="Skat i alt" value={-f.taxes} indent />
@@ -100,12 +136,12 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
           <Row label="Holding-saldo efter udtræk" value={y.closing.holding - f.growth.holding} indent />
           {f.pensionExtra && f.pensionExtra.gross > 0 && (
             <>
-              <Row label="Ekstra ratepensionsudtræk (brutto)" value={-f.pensionExtra.gross} indent />
-              <Row label="Ekstra ratepensionsudtræk (skat)" value={-f.pensionExtra.tax} indent />
-              <Row label="Ekstra ratepensionsudtræk (netto)" value={f.pensionExtra.net} indent />
+              <Row label="Ekstra bruttoudtræk fra ratepensionsdepot" value={-f.pensionExtra.gross} indent />
+              <Row label="  – skat" value={-f.pensionExtra.tax} indent />
+              <Row label="  – netto til cashflow" value={f.pensionExtra.net} indent />
             </>
           )}
-          <Row label="Pensionsindkomst i alt (netto)" value={f.pensionPayoutNet} indent />
+          <Row label="Pensionsindkomst i alt (netto, sum af ovenstående)" value={f.pensionPayoutNet} indent />
           {f.withdrawals.buffer > 0 && <Row label="Udtræk fra buffer" value={-f.withdrawals.buffer} />}
           {f.cashflowSurplus !== 0 && (
             <Row label="Cashflow vs. planlagt opsparing" value={f.cashflowSurplus} indent />
@@ -234,7 +270,7 @@ export default function Projection() {
 
         {selected && (
           <div>
-            <AuditPanel y={selected} onClose={() => setSelectedAge(null)} />
+            <AuditPanel y={selected} inputs={scenario.inputs} onClose={() => setSelectedAge(null)} />
           </div>
         )}
       </div>
