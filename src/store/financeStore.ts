@@ -80,7 +80,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 5,
+      version: 6,
       migrate: (state: any) => {
         if (!state) return state;
         if (Array.isArray(state.scenarios)) {
