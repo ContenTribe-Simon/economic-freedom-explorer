@@ -112,14 +112,22 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
     });
   }
 
-  // Privat pension info
+  // Pension – status pr. spor
   const la = inp.pension.lifeAnnuity;
   const rateOn = inp.pension.ratePensionEnabled ?? true;
+  const rateLine = rateOn
+    ? `Ratepension aktiv – udbetales over ${inp.pension.ratePensionPayoutYears ?? 15} år fra alder ${inp.pension.payoutFromAge} (skat ${Math.round((inp.pension.ratePensionEffectiveTaxRate ?? 0.4) * 100)} %).`
+    : "Ratepension deaktiveret.";
+  const laLine = la?.enabled
+    ? `Livsvarig pension aktiv – ${la.mode === "gross"
+        ? `${(la.annualGross || 0).toLocaleString("da-DK")} kr brutto/år (skat ${Math.round((la.effectiveTaxRate ?? 0.4) * 100)} %)`
+        : `${(la.annualNet || 0).toLocaleString("da-DK")} kr netto/år`} fra alder ${la.fromAge}, fortsætter til levealder ${inp.person.lifeExpectancy}.`
+    : "Livsvarig pension deaktiveret.";
   out.push({
     id: "private-pension-note",
     severity: "info",
-    title: "Pensionsspor: ratepension + livsvarig pension",
-    detail: `Ratepension ${rateOn ? "AKTIV" : "deaktiveret"}${rateOn ? ` — udbetales over ${inp.pension.ratePensionPayoutYears ?? 15} år fra alder ${inp.pension.payoutFromAge}` : ""}. Livsvarig pension ${la?.enabled ? `AKTIV — ${la.mode === "gross" ? `${(la.annualGross || 0).toLocaleString("da-DK")} kr brutto/år` : `${(la.annualNet || 0).toLocaleString("da-DK")} kr netto/år`} fra alder ${la.fromAge}, fortsætter til levealder ${inp.person.lifeExpectancy}` : "deaktiveret"}.`,
+    title: "Pension",
+    detail: `${rateLine} ${laLine}`,
   });
 
   return out;
