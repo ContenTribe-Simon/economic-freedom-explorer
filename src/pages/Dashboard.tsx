@@ -61,8 +61,10 @@ export default function Dashboard() {
   }, [scenario, assumptions]);
 
   const finTone = kpis.financialRobustness >= 70 ? "good" : kpis.financialRobustness >= 40 ? "warn" : "bad";
-  const riskTone = kpis.assumptionRisk <= 30 ? "good" : kpis.assumptionRisk <= 60 ? "warn" : "bad";
+  const confidence = kpis.assumptionConfidence;
+  const confTone = confidence >= 70 ? "good" : confidence >= 40 ? "warn" : "bad";
   const spMode = scenario.inputs.income.statePension.mode;
+  const targetMissed = kpis.endShortfallVsTarget > 0;
 
   return (
     <div className="space-y-8">
