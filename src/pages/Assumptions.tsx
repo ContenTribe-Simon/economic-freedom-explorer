@@ -100,10 +100,11 @@ export default function Assumptions() {
         <div className="grid md:grid-cols-2 gap-4">
           <PctField label="Effektiv skat ved privat pensionsudbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
         </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          Bruges kun til privat/arbejdsmarkedspension — <strong>ikke folkepension</strong>.
-          Folkepensionens metode og skat sættes pr. scenarie under <em>Variabler → Folkepension</em>.
-        </p>
+        <div className="mt-3 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground space-y-1">
+          <div><strong>Modelnote:</strong> Privat pension modelleres som <strong>én fleksibel kapitalpulje</strong> med effektiv skat ved udbetaling. Ratepension, livrente og aldersopsparing er ikke særskilt modelleret endnu.</div>
+          <div>Satsen bruges kun til privat/arbejdsmarkedspension — <strong>ikke folkepension</strong>. Folkepensionens metode og skat sættes pr. scenarie under <em>Variabler → Folkepension</em>.</div>
+          <div>Pensionsudbetalingsalder sættes pr. scenarie under <em>Variabler → Privat pension</em>.</div>
+        </div>
       </Card>
 
       <Card className="p-6">
