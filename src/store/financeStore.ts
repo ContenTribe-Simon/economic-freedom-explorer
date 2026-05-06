@@ -148,7 +148,7 @@ export const useFinanceStore = create<FinanceState>()(
                   payoutFromAge: oldPension.payoutFromAge ?? oldHolding.pensionAvailableFromAge ?? 64,
                   ratePensionEnabled: oldPension.ratePensionEnabled ?? true,
                   ratePensionPayoutYears: oldPension.ratePensionPayoutYears ?? 15,
-                  ratePensionEffectiveTaxRate: oldPension.ratePensionEffectiveTaxRate ?? state.assumptions?.tax?.pensionPayoutRate ?? 0.4,
+                  ratePensionEffectiveTaxRate: oldPension.ratePensionEffectiveTaxRate ?? 0.4,
                   lifeAnnuity: oldPension.lifeAnnuity ?? {
                     enabled: false,
                     mode: "gross",
