@@ -97,12 +97,11 @@ export default function Assumptions() {
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Privat pension</h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          <PctField label="Effektiv skat ved privat pensionsudbetaling" value={a.tax.pensionPayoutRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, pensionPayoutRate: v } }))} />
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Skat på privat pension styres lokalt på hvert pensionsspor (ratepension og livsvarig pension/livrente) under <em>Variabler</em>. Der findes ingen global pensionsskattesats.
+        </p>
         <div className="mt-3 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground space-y-1">
-          <div><strong>Modelnote:</strong> Privat pension er nu opdelt i to spor pr. scenarie: <strong>ratepension</strong> (kapitalpulje med fast udbetalingsperiode) og <strong>livsvarig pension/livrente</strong> (stream til levealder). Begge spor kan være aktive samtidig og konfigureres under <em>Variabler</em>.</div>
-          <div>Satsen her er default. Hvert spor har sin egen effektive skat pr. scenarie.</div>
+          <div><strong>Modelnote:</strong> Privat pension er opdelt i to spor pr. scenarie: <strong>ratepension</strong> (kapitalpulje med fast udbetalingsperiode) og <strong>livsvarig pension/livrente</strong> (stream til levealder). Begge spor kan være aktive samtidig og konfigureres under <em>Variabler</em> — inkl. egen effektiv skat.</div>
           <div>Folkepension behandles separat — se <em>Variabler → Folkepension</em>.</div>
         </div>
       </Card>
