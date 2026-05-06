@@ -419,6 +419,7 @@ export function projectWithStopAge(
         debtsDetail: dt.detail,
         cashflowSurplus,
         growth,
+        holdingFinancingShortfall: dt.holdingFinancingShortfall,
       },
       totalIncomeNet: incomeNet,
       netWorth,
