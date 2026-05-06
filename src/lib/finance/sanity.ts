@@ -95,17 +95,29 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
         id: `liab-double-${liab.id}`,
         severity: "warn",
         title: "Personlig hæftelse kan være knyttet til holdinggælden",
-        detail: `"${liab.name}" (${liab.balance.toLocaleString("da-DK")} kr) har samme beløb som "${match.name}". Tjek at beløbet ikke dobbeltregnes — koble evt. hæftelsen til den underliggende gældspost.`,
+        detail: `"${liab.name}" (${liab.balance.toLocaleString("da-DK")} kr) har samme beløb som "${match.name}". Tjek at beløbet ikke dobbeltregnes — koble evt. hæftelsen til den underliggende gældspost via "Knyttet til gældspost".`,
       });
     }
   }
 
-  // Privat pensionsskat info
+  // Holdinggæld finansieret af holdingkapital — men holdingkapitalen er tom
+  const hsYears = years.filter((y) => y.flows.holdingFinancingShortfall > 0);
+  if (hsYears.length > 0) {
+    const total = hsYears.reduce((s, y) => s + y.flows.holdingFinancingShortfall, 0);
+    out.push({
+      id: "holding-financing-short",
+      severity: "error",
+      title: "Holdinggæld kan ikke betales af holdingkapital",
+      detail: `I ${hsYears.length} år forsøges afdrag på holdinggæld via holdingkapital uden tilstrækkelig dækning (i alt ${total.toLocaleString("da-DK")} kr). Vælg en anden finansieringskilde for holdinggælden, eller tilføj kapital.`,
+    });
+  }
+
+  // Privat pension info
   out.push({
-    id: "pension-tax-info",
+    id: "private-pension-note",
     severity: "info",
-    title: "Effektiv skat ved privat pensionsudbetaling påvirker ikke folkepension",
-    detail: "Sats sat under Antagelser bruges kun for privat/arbejdsmarkedspensionsudtræk.",
+    title: "Privat pension modelleres som én fleksibel kapitalpulje",
+    detail: "Effektiv skat ved udbetaling bruges samlet. Ratepension, livrente og aldersopsparing er ikke særskilt modelleret endnu.",
   });
 
   return out;
