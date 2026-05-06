@@ -220,6 +220,8 @@ export interface Scenario {
   assumptionsOverride?: Partial<Assumptions>;
 }
 
+export type ModelStatus = "valid" | "target_missed" | "invalid";
+
 export interface KPIs {
   plannedStopAge: number;
   earliestSustainableStopAge: number | null;
@@ -239,6 +241,13 @@ export interface KPIs {
   endShortfallVsTarget: number;
   /** Antagelsessikkerhed = 100 − antagelsesrisiko. Højere er bedre. */
   assumptionConfidence: number;
+  /** Samlet ufinansieret holdinggæld over hele perioden. */
+  unfinancedHoldingDebt: number;
+  /** Antal år hvor holdinggæld var ufinansieret. */
+  unfinancedHoldingYears: number;
+  /** Samlet modelstatus. */
+  modelStatus: ModelStatus;
+  modelStatusReason: string;
 }
 
 export type SanitySeverity = "info" | "warn" | "error";
