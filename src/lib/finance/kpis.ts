@@ -18,12 +18,59 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   const earliest = findEarliestSustainableStopAge(scenario, assumptions);
   const minRequired = scenario.inputs.target?.minNetWorthAtEnd ?? 0;
 
-  // ---- Finansiel robusthed ----
-  const noShortfall = !firstShort;
-  const positiveAt95 = yAt95.netWorth > 0;
-  const annualSpend = scenario.inputs.spending.desiredMonthlyNet * 12;
-  const buffer = Math.max(0, Math.min(1, yAt95.netWorth / Math.max(1, annualSpend * 10)));
-  const financial = Math.round((noShortfall ? 40 : 0) + (positiveAt95 ? 30 : 0) + buffer * 30);
+  // ---- Finansiel robusthed (graduérbar) ----
+  const annualSpend = Math.max(1, scenario.inputs.spending.desiredMonthlyNet * 12);
+  let score = 100;
+
+  // 1) Cashflow-shortfall: vægtes efter HVOR TIDLIGT det rammer ift. stop og levealder.
+  if (firstShort) {
+    const yearsAfterStop = firstShort.age - stopAge;
+    const lifeRemainingAtShort = Math.max(1, scenario.inputs.person.lifeExpectancy - firstShort.age);
+    if (yearsAfterStop < 0) {
+      // shortfall FØR planlagt stop = kritisk
+      score -= 70 + Math.min(15, -yearsAfterStop * 2);
+    } else {
+      // 0 år efter stop ≈ -55, 30 år efter stop ≈ -10
+      score -= Math.max(10, 55 - yearsAfterStop * 1.5);
+    }
+    // ekstra straf hvis stort restliv ramt
+    score -= Math.min(10, (lifeRemainingAtShort / 30) * 10);
+  }
+
+  // 2) Månedligt hul efter stop
+  if (avgGap > 0) {
+    score -= Math.min(20, (avgGap / 5000) * 20);
+  }
+
+  // 3) Slutformue vs. minimumskrav
+  const endMargin = (yAt95.netWorth - minRequired) / Math.max(1, annualSpend * 5);
+  if (endMargin < 0) score -= 25;
+  else if (endMargin < 1) score -= Math.min(20, (1 - endMargin) * 20);
+  else score += Math.min(8, (endMargin - 1) * 4); // bonus for buffer
+
+  // 4) Afhængighed af holding/exit (andel af slutformue)
+  const totalEndAssets = Math.max(1, yAt95.closing.free + yAt95.closing.pension + yAt95.closing.holding);
+  const holdingShareEnd = yAt95.closing.holding / totalEndAssets;
+  score -= Math.min(12, holdingShareEnd * 12);
+
+  // 5) Afhængighed af deltid
+  const ptYearsAll = years.filter((y) => y.flows.partTimeNet > 0);
+  if (ptYearsAll.length > 0) {
+    const avgPt = ptYearsAll.reduce((s, y) => s + y.flows.partTimeNet, 0) / ptYearsAll.length;
+    score -= Math.min(8, (avgPt / annualSpend) * 8);
+  }
+
+  // 6) Afhængighed af folkepension
+  const spInp = scenario.inputs.income.statePension;
+  if (spInp.mode !== "none") {
+    const spYearsAll = years.filter((y) => y.flows.statePensionNet > 0);
+    if (spYearsAll.length > 0) {
+      const avgSp = spYearsAll.reduce((s, y) => s + y.flows.statePensionNet, 0) / spYearsAll.length;
+      score -= Math.min(8, (avgSp / annualSpend) * 8);
+    }
+  }
+
+  const financial = Math.max(0, Math.min(100, Math.round(score)));
 
   // ---- Antagelsesrisiko ----
   const inp = scenario.inputs;
