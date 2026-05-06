@@ -139,10 +139,12 @@ export default function Scenarios() {
     { key: "assumptionConfidence", label: "Antagelsessikkerhed", fmt: (v) => `${v}/100`, better: "higher" },
   ];
 
-  const best = (metricKey: string, better: "higher" | "lower") => {
-    const values = rows.map((r) => (r.kpis as any)[metricKey]).filter((v) => v !== null && v !== undefined);
+  const best = (m: Metric) => {
+    const values = rows
+      .map((r) => (m.raw ? m.raw(r.kpis) : (r.kpis as any)[m.key]))
+      .filter((v) => v !== null && v !== undefined && Number.isFinite(v));
     if (values.length === 0) return null;
-    return better === "higher" ? Math.max(...values) : Math.min(...values);
+    return m.better === "higher" ? Math.max(...values) : Math.min(...values);
   };
 
   return (
