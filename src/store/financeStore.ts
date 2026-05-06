@@ -146,6 +146,17 @@ export const useFinanceStore = create<FinanceState>()(
                   monthlyContribution: oldPension.monthlyContribution ?? 0,
                   employerContribution: oldPension.employerContribution ?? 0,
                   payoutFromAge: oldPension.payoutFromAge ?? oldHolding.pensionAvailableFromAge ?? 64,
+                  ratePensionEnabled: oldPension.ratePensionEnabled ?? true,
+                  ratePensionPayoutYears: oldPension.ratePensionPayoutYears ?? 15,
+                  ratePensionEffectiveTaxRate: oldPension.ratePensionEffectiveTaxRate ?? state.assumptions?.tax?.pensionPayoutRate ?? 0.4,
+                  lifeAnnuity: oldPension.lifeAnnuity ?? {
+                    enabled: false,
+                    mode: "gross",
+                    annualGross: 0,
+                    annualNet: 0,
+                    fromAge: 67,
+                    effectiveTaxRate: 0.4,
+                  },
                 },
                 debts,
                 holding: {
