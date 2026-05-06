@@ -307,7 +307,7 @@ export function projectWithStopAge(
 
     // Gæld
     syncLinkedLiabilities(debts);
-    const dt = processDebts(debts, bal.holding);
+    const dt = processDebts(debts, bal.holding, calYear, inp.holding.exitYear);
     bal.debt = dt.totalBalanceNW;
     bal.holding = Math.max(0, bal.holding - dt.holdingPayment);
 
