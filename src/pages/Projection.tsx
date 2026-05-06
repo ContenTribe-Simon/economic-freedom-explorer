@@ -4,7 +4,7 @@ import { project } from "@/lib/finance/projection";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDKK } from "@/lib/format";
-import { YearRow } from "@/lib/finance/types";
+import { ScenarioInputs, YearRow } from "@/lib/finance/types";
 import { X } from "lucide-react";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
@@ -16,7 +16,35 @@ function Row({ label, value, strong, indent }: { label: string; value: number | 
   );
 }
 
-function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
+export function ratePensionStatusText(
+  age: number,
+  inputs: ScenarioInputs,
+  active: boolean,
+): { kind: "payout" | "info"; text: string } {
+  const enabled = inputs.pension.ratePensionEnabled ?? true;
+  if (!enabled) return { kind: "info", text: "Deaktiveret" };
+  if (active) return { kind: "payout", text: "udbetales i år" };
+  const fromAge = inputs.pension.payoutFromAge;
+  const years = Math.max(1, inputs.pension.ratePensionPayoutYears ?? 15);
+  if (age < fromAge) return { kind: "info", text: `Aktiv – starter fra alder ${fromAge}` };
+  if (age >= fromAge + years) return { kind: "info", text: "Aktiv – udbetalingsperiode afsluttet" };
+  return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
+}
+
+export function lifeAnnuityStatusText(
+  age: number,
+  inputs: ScenarioInputs,
+  active: boolean,
+): { kind: "payout" | "info"; text: string } {
+  const la = inputs.pension.lifeAnnuity;
+  if (!la?.enabled) return { kind: "info", text: "Deaktiveret" };
+  if (active) return { kind: "payout", text: "udbetales i år" };
+  if (age < la.fromAge) return { kind: "info", text: `Aktiv – starter fra alder ${la.fromAge}` };
+  if (age > inputs.person.lifeExpectancy) return { kind: "info", text: "Aktiv – udbetalingsperiode afsluttet" };
+  return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
+}
+
+function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs; onClose: () => void }) {
   const f = y.flows;
   const incomeTotal =
     f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
