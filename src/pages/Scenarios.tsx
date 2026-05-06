@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
 import { Trash2 } from "lucide-react";
-import { activeModifierKeys, applyStressModifierToState, STRESS_TESTS } from "@/lib/finance/stress";
+import { STRESS_TESTS } from "@/lib/finance/stress";
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
