@@ -351,16 +351,18 @@ export function projectWithStopAge(
     bal.holding = Math.max(0, bal.holding - dt.holdingPayment);
 
     const spending = inp.spending.desiredMonthlyNet * 12;
-    const incomeNet = salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net;
+    const pensionStreamNet = ratePension.net + lifeAnnuity.net;
+    const incomeNet =
+      salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet;
     const cashflow = incomeNet - dt.privatePayment - spending;
 
     let freeContribution = 0;
     const bufferContribution = 0;
     const withdrawals = { free: 0, pension: 0, holding: 0, buffer: 0 };
     const withdrawalsGross = { free: 0, pension: 0, holding: 0, buffer: 0 };
-    let pensionPayoutNet = 0;
     let cashflowSurplus = 0;
     const holdingExtra = { gross: 0, net: 0, tax: 0 };
+    const pensionExtra = { gross: 0, net: 0, tax: 0 };
 
     // Bestem rækkefølge for shortfall-udtræk afhængig af strategi
     const buildOrder = (): Bucket[] => {
