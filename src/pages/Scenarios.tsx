@@ -16,30 +16,12 @@ export default function Scenarios() {
   const duplicate = useFinanceStore((s) => s.duplicateScenario);
   const del = useFinanceStore((s) => s.deleteScenario);
   const add = useFinanceStore((s) => s.addScenario);
-  const updateScenario = useFinanceStore((s) => s.updateScenario);
 
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
     if (!test) return;
-    const source = scenarios.find((s) => s.id === activeId);
-    if (!source || source.modifiers?.[test.key]) return;
-    const newKeys = [...activeModifierKeys(source), test.key];
-    const existing = findStressScenario(scenarios, source, newKeys);
-    if (existing) {
-      setActive(existing.id);
-      return;
-    }
-    const scenarioName = stressScenarioName(source, newKeys);
-    const newId = add(scenarioName, source.id);
-    updateScenario(newId, (s) => {
-      const copy = structuredClone(s);
-      copy.name = scenarioName;
-      copy.baseScenarioId = baseIdentity(source);
-      copy.baseScenarioName = baseName(source);
-      copy.modifiers = newKeys.reduce<Scenario["modifiers"]>((acc, modifierKey) => ({ ...acc, [modifierKey]: true }), {});
-      test.apply(copy);
-      return copy;
-    });
+    const next = applyStressModifierToState(scenarios, activeId, test.key);
+    useFinanceStore.setState(next);
   };
 
   const activeScenario = scenarios.find((s) => s.id === activeId);
