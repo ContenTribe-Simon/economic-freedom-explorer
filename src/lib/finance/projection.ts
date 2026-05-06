@@ -241,6 +241,7 @@ export function projectWithStopAge(
     let laborTaxAmt = 0;
     let employerPension = 0;
     let ownPensionContribution = 0;
+    const ratePensionEnabled = inp.pension.ratePensionEnabled ?? true;
 
     if (working) {
       salaryGross = inp.income.salaryGross;
@@ -248,8 +249,8 @@ export function projectWithStopAge(
       const r = laborTax(taxableGross, a.tax);
       salaryNet = r.net;
       laborTaxAmt = r.tax;
-      employerPension = inp.pension.employerContribution * 12;
-      ownPensionContribution = inp.pension.monthlyContribution * 12;
+      employerPension = ratePensionEnabled ? inp.pension.employerContribution * 12 : 0;
+      ownPensionContribution = ratePensionEnabled ? inp.pension.monthlyContribution * 12 : 0;
     }
 
     let partTimeNet = 0;
