@@ -19,7 +19,8 @@ function Row({ label, value, strong, indent }: { label: string; value: number | 
 function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
   const f = y.flows;
   const incomeTotal =
-    f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet + f.holdingDistributionNet;
+    f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
+    (f.ratePension?.net ?? 0) + (f.lifeAnnuity?.net ?? 0) + f.holdingDistributionNet;
   return (
     <Card className="p-6 sticky top-4">
       <div className="flex items-start justify-between mb-4">
