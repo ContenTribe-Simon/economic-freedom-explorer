@@ -54,7 +54,7 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
               <Row label="  – skat" value={-f.statePensionTax} indent />
             </>
           )}
-          <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />
+          {f.holdingDistributionNet > 0 && <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />}
           <Row label="Indkomst i alt" value={incomeTotal} strong />
           <Row label="Skat i alt (løn + aktie + folkepension)" value={-f.taxes} indent />
         </section>
