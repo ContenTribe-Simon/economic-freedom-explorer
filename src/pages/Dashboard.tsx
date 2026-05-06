@@ -122,7 +122,7 @@ export default function Dashboard() {
         <KPI
           label="Kapital v. 95"
           value={formatDKK(kpis.capitalAt95, { compact: true })}
-          sub={`Mål: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}${targetMissed ? ` — mangler ${formatDKK(kpis.endShortfallVsTarget, { compact: true })}` : " ✓"}`}
+          sub={`Mål: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}${targetMissed ? ` — mangler ${formatDKK(kpis.endShortfallVsTarget, { compact: true })} ved slutalder` : " ✓"}`}
           tone={kpis.capitalAt95 > 0 && !targetMissed ? "good" : "bad"}
         />
         <KPI label="Første shortfall" value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"} tone={kpis.firstShortfallAge ? "bad" : "good"} />
