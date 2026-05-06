@@ -54,9 +54,27 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
               <Row label="  – skat" value={-f.statePensionTax} indent />
             </>
           )}
+          {f.ratePension?.active && (
+            <>
+              <Row label="Ratepension netto" value={f.ratePension.net} indent />
+              <Row label="  – brutto" value={f.ratePension.gross} indent />
+              <Row label="  – skat" value={-f.ratePension.tax} indent />
+            </>
+          )}
+          {f.lifeAnnuity?.active && (
+            <>
+              <Row label="Livsvarig pension netto" value={f.lifeAnnuity.net} indent />
+              {f.lifeAnnuity.tax > 0 && (
+                <>
+                  <Row label="  – brutto" value={f.lifeAnnuity.gross} indent />
+                  <Row label="  – skat" value={-f.lifeAnnuity.tax} indent />
+                </>
+              )}
+            </>
+          )}
           {f.holdingDistributionNet > 0 && <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />}
           <Row label="Indkomst i alt" value={incomeTotal} strong />
-          <Row label="Skat i alt (løn + aktie + folkepension)" value={-f.taxes} indent />
+          <Row label="Skat i alt" value={-f.taxes} indent />
         </section>
 
         <section>
