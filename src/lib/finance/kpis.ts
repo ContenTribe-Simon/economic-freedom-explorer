@@ -65,6 +65,31 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
 
   const endShortfallVsTarget = Math.max(0, minRequired - yAt95.netWorth);
 
+  // ---- Holdinggæld finansiering ----
+  let unfinancedHoldingDebt = 0;
+  let unfinancedHoldingYears = 0;
+  for (const y of years) {
+    const s = y.flows.holdingFinancingShortfall ?? 0;
+    if (s > 0.5) {
+      unfinancedHoldingDebt += s;
+      unfinancedHoldingYears++;
+    }
+  }
+
+  // ---- Model status ----
+  let modelStatus: "valid" | "target_missed" | "invalid" = "valid";
+  let modelStatusReason = "Scenariet er validt — ingen shortfall, ingen ufinansierede afdrag, mål opfyldt.";
+  if (unfinancedHoldingDebt > 0.5 || firstShort) {
+    modelStatus = "invalid";
+    const reasons: string[] = [];
+    if (firstShort) reasons.push(`cashflow-shortfall fra alder ${firstShort.age}`);
+    if (unfinancedHoldingDebt > 0.5) reasons.push(`ufinansieret holdinggæld i ${unfinancedHoldingYears} år (${Math.round(unfinancedHoldingDebt).toLocaleString("da-DK")} kr)`);
+    modelStatusReason = `Scenariet har ugyldige antagelser eller ufinansierede betalinger: ${reasons.join("; ")}.`;
+  } else if (endShortfallVsTarget > 0.5) {
+    modelStatus = "target_missed";
+    modelStatusReason = `Scenariet holder, men minimumsmål er ikke opfyldt — mangler ${Math.round(endShortfallVsTarget).toLocaleString("da-DK")} kr ved slutalder.`;
+  }
+
   return {
     plannedStopAge: stopAge,
     earliestSustainableStopAge: earliest,
@@ -79,5 +104,9 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     robustnessScore: financial,
     minNetWorthAtEnd: minRequired,
     endShortfallVsTarget,
+    unfinancedHoldingDebt,
+    unfinancedHoldingYears,
+    modelStatus,
+    modelStatusReason,
   };
 }
