@@ -272,6 +272,23 @@ export default function Inputs() {
                 <PctField label="Rente" value={d.interestRate} onChange={(v) => updateDebt(i, { interestRate: v })} />
                 <NumField label="Månedlig ydelse" value={d.monthlyPayment} onChange={(v) => updateDebt(i, { monthlyPayment: v })} suffix="kr/md" step={500} />
               </div>
+              {d.kind === "holding" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Holdinggæld – finansiering</Label>
+                  <select
+                    className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full"
+                    value={d.holdingFinancing ?? "holding_capital"}
+                    onChange={(e) => updateDebt(i, { holdingFinancing: e.target.value as any })}
+                  >
+                    <option value="holding_capital">Betales af holdingens eksisterende kapital</option>
+                    <option value="private_cashflow">Betales af privat cashflow</option>
+                    <option value="external_company">Betales af ekstern selskabscashflow (uden for modellen)</option>
+                    <option value="exit_only">Afdrages først ved exit</option>
+                    <option value="display_only">Kun visning/risiko</option>
+                  </select>
+                  <p className="text-[11px] text-muted-foreground">Hvis holdingkapital er for lille til at dække ydelsen, vises shortfall i sanity check.</p>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40 text-sm">
                   <input
