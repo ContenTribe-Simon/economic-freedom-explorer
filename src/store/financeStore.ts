@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Assumptions, Scenario, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
+import { applyStressModifierToState } from "@/lib/finance/stress";
 
 interface FinanceState {
   scenarios: Scenario[];
@@ -11,6 +12,7 @@ interface FinanceState {
   updateScenario: (id: string, updater: (s: Scenario) => Scenario) => void;
   addScenario: (name?: string, fromId?: string) => string;
   duplicateScenario: (id: string) => string;
+  applyStressModifier: (key: StressModifierKey) => void;
   renameScenario: (id: string, name: string) => void;
   deleteScenario: (id: string) => void;
   updateAssumptions: (updater: (a: Assumptions) => Assumptions) => void;
@@ -55,6 +57,8 @@ export const useFinanceStore = create<FinanceState>()(
         if (!orig) return id;
         return get().addScenario(`${orig.name} (kopi)`, id);
       },
+      applyStressModifier: (key) =>
+        set((s) => applyStressModifierToState(s.scenarios, s.activeScenarioId, key)),
       renameScenario: (id, name) =>
         set((s) => ({ scenarios: s.scenarios.map((sc) => (sc.id === id ? { ...sc, name } : sc)) })),
       deleteScenario: (id) =>
