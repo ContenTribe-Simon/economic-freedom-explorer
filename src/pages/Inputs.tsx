@@ -168,10 +168,21 @@ export default function Inputs() {
         </div>
       </Section>
 
-      <Section title="Pension" description="Bundet kapital — beskattes ved udbetaling efter sats sat under Antagelser.">
+      <Section title="Privat pension" description="Bundet kapital — beskattes ved udbetaling efter sats sat under Antagelser.">
         <NumField label="Nuværende saldo" value={inp.pension.balance} onChange={(v) => set("pension", { ...inp.pension, balance: v })} suffix="kr" step={10000} />
         <NumField label="Egen indbetaling" value={inp.pension.monthlyContribution} onChange={(v) => set("pension", { ...inp.pension, monthlyContribution: v })} suffix="kr/md" step={500} />
         <NumField label="Arbejdsgiverbidrag" value={inp.pension.employerContribution} onChange={(v) => set("pension", { ...inp.pension, employerContribution: v })} suffix="kr/md" step={500} />
+        <NumField
+          label="Pension tilgængelig fra alder"
+          value={inp.pension.payoutFromAge ?? 64}
+          onChange={(v) => set("pension", { ...inp.pension, payoutFromAge: v })}
+          suffix="år"
+          hint="Bruges til ALLE pensionsudtræk. For nye ordninger er udbetalingsalderen typisk knyttet til folkepensionsalderen — brug fx folkepensionsalder − 3 år som forsigtig antagelse."
+        />
+        <p className="md:col-span-2 text-xs text-muted-foreground">
+          Privat pension modelleres som <strong>én fleksibel kapitalpulje</strong> med effektiv skat ved udbetaling.
+          Ratepension, livrente og aldersopsparing er ikke særskilt modelleret endnu.
+        </p>
       </Section>
 
       <Section title="Holding" description="Selskabskapital. Udlodning beskattes som aktieindkomst.">
