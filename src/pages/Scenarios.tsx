@@ -6,69 +6,83 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
 import { Trash2 } from "lucide-react";
-import { Scenario } from "@/lib/finance/types";
+import { Scenario, StressModifierKey } from "@/lib/finance/types";
 
-type StressMod = { suffix: string; apply: (s: Scenario) => void };
+type StressMod = { key: StressModifierKey; label: string; suffix: string; apply: (s: Scenario) => void };
 
-const STRESS_TESTS: { key: string; label: string; mod: StressMod }[] = [
+export const STRESS_TESTS: StressMod[] = [
   {
-    key: "no-barma",
+    key: "noBarma",
     label: "No Barma",
-    mod: {
-      suffix: "uden Barma",
-      apply: (s) => {
-        s.inputs.holding.balance = 0;
-        s.inputs.holding.expectedExitValue = 0;
-        s.inputs.holding.annualDistribution = 0;
-      },
+    suffix: "uden Barma",
+    apply: (s) => {
+      s.inputs.holding.balance = 0;
+      s.inputs.holding.expectedExitValue = 0;
+      s.inputs.holding.annualDistribution = 0;
     },
   },
   {
-    key: "no-parttime",
+    key: "noPartTime",
     label: "No part-time",
-    mod: {
-      suffix: "uden deltid",
-      apply: (s) => {
-        s.inputs.income.partTime.grossAnnual = 0;
-        s.inputs.income.partTime.netMonthly = 0;
-        s.inputs.fullRetireAge = s.inputs.stopAge;
-      },
+    suffix: "uden deltid",
+    apply: (s) => {
+      s.inputs.income.partTime.grossAnnual = 0;
+      s.inputs.income.partTime.netMonthly = 0;
+      s.inputs.fullRetireAge = s.inputs.stopAge;
     },
   },
   {
-    key: "low-return",
+    key: "lowReturn",
     label: "Low return",
-    mod: {
-      suffix: "lavt afkast",
-      apply: (s) => {
-        s.assumptionsOverride = {
-          ...(s.assumptionsOverride ?? {}),
-          realReturn: { free: 0.02, pension: 0.02, holding: 0.01 },
-        };
-      },
+    suffix: "lavt afkast",
+    apply: (s) => {
+      s.assumptionsOverride = {
+        ...(s.assumptionsOverride ?? {}),
+        realReturn: { free: 0.02, pension: 0.02, holding: 0.01 },
+      };
     },
   },
   {
-    key: "higher-spending",
+    key: "higherSpending",
     label: "Higher spending",
-    mod: {
-      suffix: "højere forbrug",
-      apply: (s) => {
-        s.inputs.spending.desiredMonthlyNet = Math.round(s.inputs.spending.desiredMonthlyNet * 1.25);
-      },
+    suffix: "højere forbrug",
+    apply: (s) => {
+      s.inputs.spending.desiredMonthlyNet = Math.round(s.inputs.spending.desiredMonthlyNet * 1.25);
     },
   },
   {
-    key: "no-folkepension",
+    key: "noFolkepension",
     label: "No folkepension",
-    mod: {
-      suffix: "uden folkepension",
-      apply: (s) => {
-        s.inputs.income.statePension.mode = "none";
-      },
+    suffix: "uden folkepension",
+    apply: (s) => {
+      s.inputs.income.statePension.mode = "none";
     },
   },
 ];
+
+const modifierOrder = STRESS_TESTS.map((t) => t.key);
+
+const activeModifierKeys = (scenario: Scenario) => modifierOrder.filter((key) => scenario.modifiers?.[key]);
+
+const modifierSignature = (keys: StressModifierKey[]) => [...new Set(keys)].sort().join("|");
+
+const baseIdentity = (scenario: Scenario) => scenario.baseScenarioId ?? scenario.id;
+
+const baseName = (scenario: Scenario) => scenario.baseScenarioName ?? scenario.name.split(" – ")[0];
+
+export const stressScenarioName = (source: Scenario, keys: StressModifierKey[]) => {
+  const suffixes = modifierOrder
+    .filter((key) => keys.includes(key))
+    .map((key) => STRESS_TESTS.find((t) => t.key === key)?.suffix)
+    .filter(Boolean);
+  return [baseName(source), ...suffixes].join(" – ");
+};
+
+export const findStressScenario = (scenarios: Scenario[], source: Scenario, keys: StressModifierKey[]) => {
+  const signature = modifierSignature(keys);
+  const base = baseIdentity(source);
+  return scenarios.find((scenario) => baseIdentity(scenario) === base && modifierSignature(activeModifierKeys(scenario)) === signature);
+};
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
