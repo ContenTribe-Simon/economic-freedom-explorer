@@ -19,7 +19,7 @@ describe("tax", () => {
     expect(high.tax).toBeGreaterThan(low.tax);
   });
   it("pension payout flat", () => {
-    const r = pensionPayoutTax(100000, defaultAssumptions.tax);
+    const r = pensionPayoutTax(100000, 0.4);
     expect(r.tax).toBeCloseTo(40000);
   });
 });
