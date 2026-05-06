@@ -102,16 +102,42 @@ export default function Scenarios() {
     [scenarios, assumptions],
   );
 
-  const metrics = [
-    { key: "plannedStopAge", label: "Planlagt stop", fmt: (v: number) => `${v} år`, better: "lower" },
-    { key: "earliestSustainableStopAge", label: "Tidligste bæredygtige stop", fmt: (v: number | null) => (v ? `${v} år` : "—"), better: "lower" },
-    { key: "capitalAtStopAge", label: "Kapital v. stop", fmt: (v: number) => formatDKK(v, { compact: true }), better: "higher" },
-    { key: "capitalAt65", label: "Kapital v. 65", fmt: (v: number) => formatDKK(v, { compact: true }), better: "higher" },
-    { key: "capitalAt95", label: "Kapital v. 95", fmt: (v: number) => formatDKK(v, { compact: true }), better: "higher" },
-    { key: "firstShortfallAge", label: "Første shortfall", fmt: (v: number | null) => (v ? `Alder ${v}` : "Ingen"), better: "higher" },
-    { key: "monthlyGapAfterStop", label: "Mdl. hul efter stop", fmt: (v: number) => formatDKK(v, { compact: true }), better: "lower" },
-    { key: "robustnessScore", label: "Robusthed", fmt: (v: number) => `${v}/100`, better: "higher" },
-  ] as const;
+  type Metric = {
+    key: string;
+    label: string;
+    fmt: (v: any, k?: any) => string;
+    better: "higher" | "lower";
+    raw?: (k: any) => number;
+  };
+  const metrics: Metric[] = [
+    { key: "plannedStopAge", label: "Planlagt stop", fmt: (v) => `${v} år`, better: "lower" },
+    { key: "earliestSustainableStopAge", label: "Tidligste bæredygtige stop", fmt: (v) => (v ? `${v} år` : "—"), better: "lower" },
+    { key: "capitalAtStopAge", label: "Kapital v. stop", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
+    { key: "capitalAt65", label: "Kapital v. 65", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
+    { key: "capitalAt95", label: "Kapital v. 95", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
+    {
+      key: "cashflowShortfall",
+      label: "Cashflow-shortfall",
+      fmt: (_v, k) => (k?.firstShortfallAge ? `Fra alder ${k.firstShortfallAge}` : "Ingen"),
+      better: "higher",
+      raw: (k) => k.firstShortfallAge ?? 999,
+    },
+    {
+      key: "minTargetStatus",
+      label: "Minimumsmål v. slutalder",
+      fmt: (_v, k) =>
+        (k?.endShortfallVsTarget ?? 0) > 0.5
+          ? `Mangler ${formatDKK(k.endShortfallVsTarget, { compact: true })}`
+          : (k?.minNetWorthAtEnd ?? 0) > 0
+            ? `Opfyldt (mål ${formatDKK(k.minNetWorthAtEnd, { compact: true })})`
+            : "Intet mål sat",
+      better: "lower",
+      raw: (k) => k.endShortfallVsTarget ?? 0,
+    },
+    { key: "monthlyGapAfterStop", label: "Mdl. hul efter stop", fmt: (v) => formatDKK(v, { compact: true }), better: "lower" },
+    { key: "robustnessScore", label: "Robusthed", fmt: (v) => `${v}/100`, better: "higher" },
+    { key: "assumptionConfidence", label: "Antagelsessikkerhed", fmt: (v) => `${v}/100`, better: "higher" },
+  ];
 
   const best = (metricKey: string, better: "higher" | "lower") => {
     const values = rows.map((r) => (r.kpis as any)[metricKey]).filter((v) => v !== null && v !== undefined);
