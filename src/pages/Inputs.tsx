@@ -168,20 +168,111 @@ export default function Inputs() {
         </div>
       </Section>
 
-      <Section title="Privat pension" description="Bundet kapital — beskattes ved udbetaling efter sats sat under Antagelser.">
+      <Section title="Ratepension" description="Kapitalpulje der udbetales over en fast periode (fx 10–30 år). Beskattes som personlig indkomst.">
+        <div className="md:col-span-2">
+          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
+            <input
+              type="checkbox"
+              checked={inp.pension.ratePensionEnabled ?? true}
+              onChange={(e) => set("pension", { ...inp.pension, ratePensionEnabled: e.target.checked })}
+            />
+            <span className="text-sm">Aktivér ratepension</span>
+          </label>
+        </div>
         <NumField label="Nuværende saldo" value={inp.pension.balance} onChange={(v) => set("pension", { ...inp.pension, balance: v })} suffix="kr" step={10000} />
         <NumField label="Egen indbetaling" value={inp.pension.monthlyContribution} onChange={(v) => set("pension", { ...inp.pension, monthlyContribution: v })} suffix="kr/md" step={500} />
         <NumField label="Arbejdsgiverbidrag" value={inp.pension.employerContribution} onChange={(v) => set("pension", { ...inp.pension, employerContribution: v })} suffix="kr/md" step={500} />
         <NumField
-          label="Pension tilgængelig fra alder"
+          label="Tilgængelig fra alder"
           value={inp.pension.payoutFromAge ?? 64}
           onChange={(v) => set("pension", { ...inp.pension, payoutFromAge: v })}
           suffix="år"
-          hint="Bruges til ALLE pensionsudtræk. For nye ordninger er udbetalingsalderen typisk knyttet til folkepensionsalderen — brug fx folkepensionsalder − 3 år som forsigtig antagelse."
+          hint="For nye ordninger typisk knyttet til folkepensionsalder − 3 år."
+        />
+        <div className="space-y-1.5">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Udbetalingsperiode</Label>
+          <select
+            className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full"
+            value={inp.pension.ratePensionPayoutYears ?? 15}
+            onChange={(e) => set("pension", { ...inp.pension, ratePensionPayoutYears: Number(e.target.value) })}
+          >
+            {[10, 15, 20, 25, 30].map((y) => (
+              <option key={y} value={y}>{y} år</option>
+            ))}
+          </select>
+          <p className="text-[11px] text-muted-foreground">Saldoen fordeles ligeligt over perioden.</p>
+        </div>
+        <PctField
+          label="Effektiv skat ved udbetaling"
+          value={inp.pension.ratePensionEffectiveTaxRate ?? 0.4}
+          onChange={(v) => set("pension", { ...inp.pension, ratePensionEffectiveTaxRate: v })}
         />
         <p className="md:col-span-2 text-xs text-muted-foreground">
-          Privat pension modelleres som <strong>én fleksibel kapitalpulje</strong> med effektiv skat ved udbetaling.
-          Ratepension, livrente og aldersopsparing er ikke særskilt modelleret endnu.
+          Ratepension udbetales som en årlig strøm over den valgte periode. Eventuelt overskud i et år går til fri kapital. Ekstra udtræk ud over planlagt udbetaling kan ske ved shortfall (afhænger af holdingstrategi).
+        </p>
+      </Section>
+
+      <Section title="Livsvarig pension / livrente" description="Stream af udbetalinger fra startalder til levealder. Behandles ikke som en kapitalpulje der kan løbe tør.">
+        <div className="md:col-span-2">
+          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
+            <input
+              type="checkbox"
+              checked={inp.pension.lifeAnnuity?.enabled ?? false}
+              onChange={(e) => set("pension", { ...inp.pension, lifeAnnuity: { ...inp.pension.lifeAnnuity, enabled: e.target.checked } })}
+            />
+            <span className="text-sm">Aktivér livsvarig pension</span>
+          </label>
+        </div>
+        <div className="md:col-span-2 flex gap-2">
+          {(["gross", "net"] as const).map((m) => (
+            <label
+              key={m}
+              className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-md border cursor-pointer text-sm ${
+                (inp.pension.lifeAnnuity?.mode ?? "gross") === m ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="laMode"
+                checked={(inp.pension.lifeAnnuity?.mode ?? "gross") === m}
+                onChange={() => set("pension", { ...inp.pension, lifeAnnuity: { ...inp.pension.lifeAnnuity, mode: m } })}
+              />
+              {m === "gross" ? "Brutto/år (skat beregnes)" : "Netto/år (bruges direkte)"}
+            </label>
+          ))}
+        </div>
+        {(inp.pension.lifeAnnuity?.mode ?? "gross") === "gross" ? (
+          <>
+            <NumField
+              label="Forventet brutto/år"
+              value={inp.pension.lifeAnnuity?.annualGross ?? 0}
+              onChange={(v) => set("pension", { ...inp.pension, lifeAnnuity: { ...inp.pension.lifeAnnuity, annualGross: v } })}
+              suffix="kr/år"
+              step={5000}
+            />
+            <PctField
+              label="Effektiv pensionsskat"
+              value={inp.pension.lifeAnnuity?.effectiveTaxRate ?? 0.4}
+              onChange={(v) => set("pension", { ...inp.pension, lifeAnnuity: { ...inp.pension.lifeAnnuity, effectiveTaxRate: v } })}
+            />
+          </>
+        ) : (
+          <NumField
+            label="Forventet netto/år"
+            value={inp.pension.lifeAnnuity?.annualNet ?? 0}
+            onChange={(v) => set("pension", { ...inp.pension, lifeAnnuity: { ...inp.pension.lifeAnnuity, annualNet: v } })}
+            suffix="kr/år"
+            step={5000}
+          />
+        )}
+        <NumField
+          label="Startalder"
+          value={inp.pension.lifeAnnuity?.fromAge ?? 67}
+          onChange={(v) => set("pension", { ...inp.pension, lifeAnnuity: { ...inp.pension.lifeAnnuity, fromAge: v } })}
+          suffix="år"
+        />
+        <p className="md:col-span-2 text-xs text-muted-foreground">
+          Livsvarig pension fortsætter til forventet levealder ({inp.person.lifeExpectancy}). Den indgår ikke i pensionssaldoen og kan ikke løbe tør.
         </p>
       </Section>
 

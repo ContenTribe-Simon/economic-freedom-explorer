@@ -19,7 +19,8 @@ function Row({ label, value, strong, indent }: { label: string; value: number | 
 function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
   const f = y.flows;
   const incomeTotal =
-    f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet + f.holdingDistributionNet;
+    f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
+    (f.ratePension?.net ?? 0) + (f.lifeAnnuity?.net ?? 0) + f.holdingDistributionNet;
   return (
     <Card className="p-6 sticky top-4">
       <div className="flex items-start justify-between mb-4">
@@ -54,9 +55,27 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
               <Row label="  – skat" value={-f.statePensionTax} indent />
             </>
           )}
+          {f.ratePension?.active && (
+            <>
+              <Row label="Ratepension netto" value={f.ratePension.net} indent />
+              <Row label="  – brutto" value={f.ratePension.gross} indent />
+              <Row label="  – skat" value={-f.ratePension.tax} indent />
+            </>
+          )}
+          {f.lifeAnnuity?.active && (
+            <>
+              <Row label="Livsvarig pension netto" value={f.lifeAnnuity.net} indent />
+              {f.lifeAnnuity.tax > 0 && (
+                <>
+                  <Row label="  – brutto" value={f.lifeAnnuity.gross} indent />
+                  <Row label="  – skat" value={-f.lifeAnnuity.tax} indent />
+                </>
+              )}
+            </>
+          )}
           {f.holdingDistributionNet > 0 && <Row label="Holdingudlodning netto" value={f.holdingDistributionNet} indent />}
           <Row label="Indkomst i alt" value={incomeTotal} strong />
-          <Row label="Skat i alt (løn + aktie + folkepension)" value={-f.taxes} indent />
+          <Row label="Skat i alt" value={-f.taxes} indent />
         </section>
 
         <section>
@@ -79,8 +98,14 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
           <Row label="Ekstra holdingudtræk (skat)" value={-f.holdingExtra.tax} indent />
           <Row label="Ekstra holdingudtræk (netto)" value={f.holdingExtra.net} indent />
           <Row label="Holding-saldo efter udtræk" value={y.closing.holding - f.growth.holding} indent />
-          <Row label="Udtræk pension (brutto)" value={-f.withdrawalsGross.pension} />
-          <Row label="Udtræk pension (netto)" value={f.withdrawals.pension} indent />
+          {f.pensionExtra && f.pensionExtra.gross > 0 && (
+            <>
+              <Row label="Ekstra ratepensionsudtræk (brutto)" value={-f.pensionExtra.gross} indent />
+              <Row label="Ekstra ratepensionsudtræk (skat)" value={-f.pensionExtra.tax} indent />
+              <Row label="Ekstra ratepensionsudtræk (netto)" value={f.pensionExtra.net} indent />
+            </>
+          )}
+          <Row label="Pensionsindkomst i alt (netto)" value={f.pensionPayoutNet} indent />
           {f.withdrawals.buffer > 0 && <Row label="Udtræk fra buffer" value={-f.withdrawals.buffer} />}
           {f.cashflowSurplus !== 0 && (
             <Row label="Cashflow vs. planlagt opsparing" value={f.cashflowSurplus} indent />

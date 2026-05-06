@@ -113,11 +113,13 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
   }
 
   // Privat pension info
+  const la = inp.pension.lifeAnnuity;
+  const rateOn = inp.pension.ratePensionEnabled ?? true;
   out.push({
     id: "private-pension-note",
     severity: "info",
-    title: "Privat pension modelleres som én fleksibel kapitalpulje",
-    detail: "Effektiv skat ved udbetaling bruges samlet. Ratepension, livrente og aldersopsparing er ikke særskilt modelleret endnu.",
+    title: "Pensionsspor: ratepension + livsvarig pension",
+    detail: `Ratepension ${rateOn ? "AKTIV" : "deaktiveret"}${rateOn ? ` — udbetales over ${inp.pension.ratePensionPayoutYears ?? 15} år fra alder ${inp.pension.payoutFromAge}` : ""}. Livsvarig pension ${la?.enabled ? `AKTIV — ${la.mode === "gross" ? `${(la.annualGross || 0).toLocaleString("da-DK")} kr brutto/år` : `${(la.annualNet || 0).toLocaleString("da-DK")} kr netto/år`} fra alder ${la.fromAge}, fortsætter til levealder ${inp.person.lifeExpectancy}` : "deaktiveret"}.`,
   });
 
   return out;

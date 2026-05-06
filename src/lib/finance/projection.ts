@@ -241,6 +241,7 @@ export function projectWithStopAge(
     let laborTaxAmt = 0;
     let employerPension = 0;
     let ownPensionContribution = 0;
+    const ratePensionEnabled = inp.pension.ratePensionEnabled ?? true;
 
     if (working) {
       salaryGross = inp.income.salaryGross;
@@ -248,8 +249,8 @@ export function projectWithStopAge(
       const r = laborTax(taxableGross, a.tax);
       salaryNet = r.net;
       laborTaxAmt = r.tax;
-      employerPension = inp.pension.employerContribution * 12;
-      ownPensionContribution = inp.pension.monthlyContribution * 12;
+      employerPension = ratePensionEnabled ? inp.pension.employerContribution * 12 : 0;
+      ownPensionContribution = ratePensionEnabled ? inp.pension.monthlyContribution * 12 : 0;
     }
 
     let partTimeNet = 0;
@@ -283,6 +284,44 @@ export function projectWithStopAge(
       bal.holding += inp.holding.expectedExitValue;
     }
 
+    // ---- Ratepension (planlagt udbetaling over fast periode) ----
+    const ratePension = { gross: 0, net: 0, tax: 0, active: false };
+    const ratePayoutFromAge = inp.pension.payoutFromAge ?? 64;
+    const ratePayoutYears = Math.max(1, inp.pension.ratePensionPayoutYears ?? 15);
+    const rateTaxRate = inp.pension.ratePensionEffectiveTaxRate ?? a.tax.pensionPayoutRate;
+    if (
+      ratePensionEnabled &&
+      age >= ratePayoutFromAge &&
+      age < ratePayoutFromAge + ratePayoutYears &&
+      bal.pension > 0
+    ) {
+      const remainingYears = ratePayoutFromAge + ratePayoutYears - age;
+      const grossPlanned = bal.pension / Math.max(1, remainingYears);
+      const grossTake = Math.min(bal.pension, grossPlanned);
+      bal.pension -= grossTake;
+      const tax = grossTake * rateTaxRate;
+      ratePension.gross = grossTake;
+      ratePension.tax = tax;
+      ratePension.net = grossTake - tax;
+      ratePension.active = true;
+    }
+
+    // ---- Livsvarig pension / livrente (stream til levealder) ----
+    const lifeAnnuity = { gross: 0, net: 0, tax: 0, active: false };
+    const la = inp.pension.lifeAnnuity;
+    if (la?.enabled && age >= la.fromAge) {
+      if (la.mode === "gross") {
+        const tax = la.annualGross * (la.effectiveTaxRate ?? a.tax.pensionPayoutRate);
+        lifeAnnuity.gross = la.annualGross;
+        lifeAnnuity.tax = tax;
+        lifeAnnuity.net = la.annualGross - tax;
+      } else {
+        lifeAnnuity.net = la.annualNet;
+        lifeAnnuity.gross = la.annualNet;
+      }
+      lifeAnnuity.active = lifeAnnuity.net > 0;
+    }
+
     const distFromAge = inp.holding.startDistributionAtStopAge
       ? stopAge
       : inp.holding.distributionFromAge;
@@ -312,16 +351,18 @@ export function projectWithStopAge(
     bal.holding = Math.max(0, bal.holding - dt.holdingPayment);
 
     const spending = inp.spending.desiredMonthlyNet * 12;
-    const incomeNet = salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net;
+    const pensionStreamNet = ratePension.net + lifeAnnuity.net;
+    const incomeNet =
+      salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet;
     const cashflow = incomeNet - dt.privatePayment - spending;
 
     let freeContribution = 0;
     const bufferContribution = 0;
     const withdrawals = { free: 0, pension: 0, holding: 0, buffer: 0 };
     const withdrawalsGross = { free: 0, pension: 0, holding: 0, buffer: 0 };
-    let pensionPayoutNet = 0;
     let cashflowSurplus = 0;
     const holdingExtra = { gross: 0, net: 0, tax: 0 };
+    const pensionExtra = { gross: 0, net: 0, tax: 0 };
 
     // Bestem rækkefølge for shortfall-udtræk afhængig af strategi
     const buildOrder = (): Bucket[] => {
@@ -368,7 +409,11 @@ export function projectWithStopAge(
         const r = withdrawFromBucket(b, needed, bal, a);
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
-        if (b === "pension") pensionPayoutNet += r.netCovered;
+        if (b === "pension") {
+          pensionExtra.net += r.netCovered;
+          pensionExtra.gross += r.gross;
+          pensionExtra.tax += r.tax;
+        }
         if (b === "holding") {
           holdingExtra.net += r.netCovered;
           holdingExtra.gross += r.gross;
@@ -447,17 +492,20 @@ export function projectWithStopAge(
         statePensionGross,
         statePensionTax,
         holdingDistributionNet: totalHoldingNet,
-        pensionPayoutNet,
+        pensionPayoutNet: ratePension.net + lifeAnnuity.net + pensionExtra.net,
+        ratePension,
+        lifeAnnuity,
+        pensionExtra,
         employerPensionContribution: employerPension,
         ownPensionContribution,
         freeContribution,
         bufferContribution,
         spending,
-        taxes: laborTaxAmt + totalHoldingTax + statePensionTax,
+        taxes: laborTaxAmt + totalHoldingTax + statePensionTax + ratePension.tax + lifeAnnuity.tax + pensionExtra.tax,
         debtInterest: dt.privateInterest + dt.holdingInterest,
         debtPrincipal: dt.privatePrincipal + dt.holdingPrincipal,
-        withdrawals: { ...withdrawals, holding: totalHoldingNet },
-        withdrawalsGross: { ...withdrawalsGross, holding: totalHoldingGross },
+        withdrawals: { ...withdrawals, holding: totalHoldingNet, pension: ratePension.net + lifeAnnuity.net + pensionExtra.net },
+        withdrawalsGross: { ...withdrawalsGross, holding: totalHoldingGross, pension: ratePension.gross + lifeAnnuity.gross + pensionExtra.gross },
         holdingPlanned,
         holdingExtra,
         debtsDetail: dt.detail,
