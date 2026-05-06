@@ -22,10 +22,10 @@ export function shareTax(amount: number, t: TaxAssumptions): { net: number; tax:
   return { net: amount - tax, tax };
 }
 
-/** Pensionsudbetaling - flad afgift. */
-export function pensionPayoutTax(amount: number, t: TaxAssumptions): { net: number; tax: number } {
+/** Pensionsudbetaling - flad afgift med eksplicit sats (lokal pr. spor). */
+export function pensionPayoutTax(amount: number, rate: number): { net: number; tax: number } {
   if (amount <= 0) return { net: 0, tax: 0 };
-  const tax = amount * t.pensionPayoutRate;
+  const tax = amount * rate;
   return { net: amount - tax, tax };
 }
 
@@ -46,8 +46,8 @@ export function grossHoldingForNet(net: number, t: TaxAssumptions): number {
   return t.shareThreshold + remaining / (1 - t.shareHighRate);
 }
 
-/** Hvor meget brutto fra pension for at få `net` netto. */
-export function grossPensionForNet(net: number, t: TaxAssumptions): number {
+/** Hvor meget brutto fra pension for at få `net` netto. Sats er lokal pr. spor. */
+export function grossPensionForNet(net: number, rate: number): number {
   if (net <= 0) return 0;
-  return net / (1 - t.pensionPayoutRate);
+  return net / (1 - rate);
 }

@@ -164,8 +164,6 @@ export interface TaxAssumptions {
   shareLowRate: number;
   shareHighRate: number;
   shareThreshold: number;
-  /** Effektiv skat ved PRIVAT/arbejdsmarkedspensionsudbetaling. Påvirker IKKE folkepension. */
-  pensionPayoutRate: number;
   corporateRate: number;
 }
 

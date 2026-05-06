@@ -12,7 +12,6 @@ export const defaultAssumptions: Assumptions = {
     shareLowRate: 0.27,
     shareHighRate: 0.42,
     shareThreshold: 79400,
-    pensionPayoutRate: 0.4,
     corporateRate: 0.22,
   },
   statePensionAnnualNet: 90000,
