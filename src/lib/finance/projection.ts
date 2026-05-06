@@ -39,6 +39,7 @@ function withdrawFromBucket(
   netNeeded: number,
   bal: Balances,
   a: Assumptions,
+  pensionTaxRate: number,
 ): { netCovered: number; gross: number; tax: number } {
   if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0 };
   if (bucket === "free") {
@@ -53,9 +54,9 @@ function withdrawFromBucket(
     bal.holding -= take;
     return { netCovered: net, gross: take, tax };
   }
-  const grossNeeded = grossPensionForNet(netNeeded, a.tax);
+  const grossNeeded = grossPensionForNet(netNeeded, pensionTaxRate);
   const take = Math.min(bal.pension, grossNeeded);
-  const { net, tax } = pensionPayoutTax(take, a.tax);
+  const { net, tax } = pensionPayoutTax(take, pensionTaxRate);
   bal.pension -= take;
   return { netCovered: net, gross: take, tax };
 }
@@ -288,7 +289,7 @@ export function projectWithStopAge(
     const ratePension = { gross: 0, net: 0, tax: 0, active: false };
     const ratePayoutFromAge = inp.pension.payoutFromAge ?? 64;
     const ratePayoutYears = Math.max(1, inp.pension.ratePensionPayoutYears ?? 15);
-    const rateTaxRate = inp.pension.ratePensionEffectiveTaxRate ?? a.tax.pensionPayoutRate;
+    const rateTaxRate = inp.pension.ratePensionEffectiveTaxRate ?? 0.4;
     if (
       ratePensionEnabled &&
       age >= ratePayoutFromAge &&
@@ -311,7 +312,7 @@ export function projectWithStopAge(
     const la = inp.pension.lifeAnnuity;
     if (la?.enabled && age >= la.fromAge) {
       if (la.mode === "gross") {
-        const tax = la.annualGross * (la.effectiveTaxRate ?? a.tax.pensionPayoutRate);
+        const tax = la.annualGross * (la.effectiveTaxRate ?? 0.4);
         lifeAnnuity.gross = la.annualGross;
         lifeAnnuity.tax = tax;
         lifeAnnuity.net = la.annualGross - tax;
