@@ -409,7 +409,11 @@ export function projectWithStopAge(
         const r = withdrawFromBucket(b, needed, bal, a);
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
-        if (b === "pension") pensionPayoutNet += r.netCovered;
+        if (b === "pension") {
+          pensionExtra.net += r.netCovered;
+          pensionExtra.gross += r.gross;
+          pensionExtra.tax += r.tax;
+        }
         if (b === "holding") {
           holdingExtra.net += r.netCovered;
           holdingExtra.gross += r.gross;
