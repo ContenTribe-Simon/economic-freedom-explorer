@@ -44,10 +44,10 @@ function AuditPanel({ y, onClose }: { y: YearRow; onClose: () => void }) {
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Indkomst (netto)</div>
-          <Row label="Løn netto" value={f.salaryNet} indent />
-          <Row label="Deltid netto" value={f.partTimeNet} indent />
-          <Row label="Familiefond" value={f.familyFundNet} indent />
-          <Row label="Folkepension netto" value={f.statePensionNet} indent />
+          {f.salaryNet > 0 && <Row label="Løn netto" value={f.salaryNet} indent />}
+          {f.partTimeNet > 0 && <Row label="Deltid netto" value={f.partTimeNet} indent />}
+          {f.familyFundNet > 0 && <Row label="Familiefond" value={f.familyFundNet} indent />}
+          {f.statePensionNet > 0 && <Row label="Folkepension netto" value={f.statePensionNet} indent />}
           {f.statePensionGross > 0 && (
             <>
               <Row label="  – brutto" value={f.statePensionGross} indent />
