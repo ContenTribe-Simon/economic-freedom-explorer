@@ -43,7 +43,7 @@ function ScoreCard({
   const [open, setOpen] = useState(false);
   const toneClass = tone === "good" ? "text-success" : tone === "warn" ? "text-warning" : "text-destructive";
   return (
-    <Card className="p-5" data-testid={`${testIdPrefix}-card`}>
+    <Card className="p-5 h-fit self-start" data-testid={`${testIdPrefix}-card`}>
       <div className="kpi-label">{label}</div>
       <div className={`kpi-value mt-2 ${toneClass}`}>{score} / 100</div>
       <div className="text-xs text-muted-foreground mt-1">Vurdering: {scoreVerdict(score)}</div>
