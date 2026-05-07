@@ -137,3 +137,40 @@ export default function Assumptions() {
     </div>
   );
 }
+
+function ConfidenceCard() {
+  const scenario = useActiveScenario();
+  const update = useFinanceStore((s) => s.updateScenario);
+  const conf = getConfidence(scenario);
+  const setLevel = (key: ConfidenceKey, level: ConfidenceLevel) => {
+    update(scenario.id, (s) => ({
+      ...s,
+      inputs: { ...s.inputs, confidence: { ...(s.inputs.confidence ?? {}), [key]: level } },
+    }));
+  };
+  return (
+    <Card className="p-6" data-testid="confidence-section">
+      <h2 className="font-display text-xl font-semibold mb-1">Sikkerhedsvurderinger</h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Hvor sikker er du på de centrale antagelser i det aktive scenarie? Bruges kun til antagelsessikkerheds-scoren — påvirker ikke år-for-år beregningen.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {(Object.keys(CONFIDENCE_LABELS) as ConfidenceKey[]).map((key) => (
+          <div key={key} className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">{CONFIDENCE_LABELS[key]}</Label>
+            <select
+              value={conf[key]}
+              onChange={(e) => setLevel(key, e.target.value as ConfidenceLevel)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              data-testid={`confidence-${key}`}
+            >
+              {(Object.keys(LEVEL_LABELS) as ConfidenceLevel[]).map((lvl) => (
+                <option key={lvl} value={lvl}>{LEVEL_LABELS[lvl]}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
