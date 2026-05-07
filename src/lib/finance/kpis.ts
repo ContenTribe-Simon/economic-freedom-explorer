@@ -1,6 +1,59 @@
-import { Assumptions, KPIs, Scenario, YearRow } from "./types";
-import { findEarliestSustainableStopAge, project, projectWithStopAge, mergeAssumptions } from "./projection";
+import {
+  Assumptions,
+  ConfidenceFactor,
+  ConfidenceKey,
+  ConfidenceLevel,
+  KPIs,
+  Scenario,
+  ScenarioConfidence,
+  ScoreFactor,
+  YearRow,
+} from "./types";
+import { findEarliestSustainableStopAge, mergeAssumptions } from "./projection";
 import { defaultAssumptions } from "./defaults";
+
+// ---- Confidence helpers (pure, no projection effect) ----
+const LEVEL_VALUE: Record<ConfidenceLevel, number> = {
+  very_high: 90,
+  high: 70,
+  low: 45,
+  speculative: 20,
+};
+
+export const DEFAULT_CONFIDENCE: Required<ScenarioConfidence> = {
+  salary: "very_high",
+  partTime: "high",
+  familyFund: "low",
+  statePension: "high",
+  ratePension: "very_high",
+  lifeAnnuity: "very_high",
+  holdingExit: "speculative",
+  returns: "high",
+  spending: "high",
+};
+
+export const CONFIDENCE_LABELS: Record<ConfidenceKey, string> = {
+  salary: "Løn / arbejdsindkomst",
+  partTime: "Deltidsindtægt",
+  familyFund: "Familiefond",
+  statePension: "Folkepension",
+  ratePension: "Ratepension",
+  lifeAnnuity: "Livsvarig pension/livrente",
+  holdingExit: "Holding-exit / udlodning",
+  returns: "Realafkast",
+  spending: "Forbrug",
+};
+
+export const LEVEL_LABELS: Record<ConfidenceLevel, string> = {
+  very_high: "Meget sikker",
+  high: "Rimelig sikker",
+  low: "Usikker",
+  speculative: "Spekulativ",
+};
+
+export function getConfidence(scenario: Scenario): Required<ScenarioConfidence> {
+  return { ...DEFAULT_CONFIDENCE, ...(scenario.inputs.confidence ?? {}) };
+}
 
 export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: Assumptions = defaultAssumptions): KPIs {
   const stopAge = scenario.inputs.stopAge;
@@ -17,102 +70,208 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
 
   const earliest = findEarliestSustainableStopAge(scenario, assumptions);
   const minRequired = scenario.inputs.target?.minNetWorthAtEnd ?? 0;
-
-  // ---- Finansiel robusthed (graduérbar) ----
   const annualSpend = Math.max(1, scenario.inputs.spending.desiredMonthlyNet * 12);
-  let score = 100;
-
-  // 1) Cashflow-shortfall: vægtes efter HVOR TIDLIGT det rammer ift. stop og levealder.
-  if (firstShort) {
-    const yearsAfterStop = firstShort.age - stopAge;
-    const lifeRemainingAtShort = Math.max(1, scenario.inputs.person.lifeExpectancy - firstShort.age);
-    if (yearsAfterStop < 0) {
-      // shortfall FØR planlagt stop = kritisk
-      score -= 70 + Math.min(15, -yearsAfterStop * 2);
-    } else {
-      // 0 år efter stop ≈ -55, 30 år efter stop ≈ -10
-      score -= Math.max(10, 55 - yearsAfterStop * 1.5);
-    }
-    // ekstra straf hvis stort restliv ramt
-    score -= Math.min(10, (lifeRemainingAtShort / 30) * 10);
-  }
-
-  // 2) Månedligt hul efter stop
-  if (avgGap > 0) {
-    score -= Math.min(20, (avgGap / 5000) * 20);
-  }
-
-  // 3) Slutformue vs. minimumskrav
-  const endMargin = (yAt95.netWorth - minRequired) / Math.max(1, annualSpend * 5);
-  if (endMargin < 0) score -= 25;
-  else if (endMargin < 1) score -= Math.min(20, (1 - endMargin) * 20);
-  else score += Math.min(8, (endMargin - 1) * 4); // bonus for buffer
-
-  // 4) Afhængighed af holding/exit (andel af slutformue)
-  const totalEndAssets = Math.max(1, yAt95.closing.free + yAt95.closing.pension + yAt95.closing.holding);
-  const holdingShareEnd = yAt95.closing.holding / totalEndAssets;
-  score -= Math.min(12, holdingShareEnd * 12);
-
-  // 5) Afhængighed af deltid
-  const ptYearsAll = years.filter((y) => y.flows.partTimeNet > 0);
-  if (ptYearsAll.length > 0) {
-    const avgPt = ptYearsAll.reduce((s, y) => s + y.flows.partTimeNet, 0) / ptYearsAll.length;
-    score -= Math.min(8, (avgPt / annualSpend) * 8);
-  }
-
-  // 6) Afhængighed af folkepension
-  const spInp = scenario.inputs.income.statePension;
-  if (spInp.mode !== "none") {
-    const spYearsAll = years.filter((y) => y.flows.statePensionNet > 0);
-    if (spYearsAll.length > 0) {
-      const avgSp = spYearsAll.reduce((s, y) => s + y.flows.statePensionNet, 0) / spYearsAll.length;
-      score -= Math.min(8, (avgSp / annualSpend) * 8);
-    }
-  }
-
-  const financial = Math.max(0, Math.min(100, Math.round(score)));
-
-  // ---- Antagelsesrisiko ----
   const inp = scenario.inputs;
   const a = mergeAssumptions(assumptions, scenario.assumptionsOverride);
-  let risk = 0;
 
-  // Hvor meget af slutformuen kommer fra holding?
+  // ===== Financial robustness — vægtet ~ 35/25/20/10/10 =====
+  const breakdown: ScoreFactor[] = [];
+
+  // 1) Cashflow (35)
+  let cashflowScore = 100;
+  if (firstShort) {
+    const yearsAfterStop = firstShort.age - stopAge;
+    if (yearsAfterStop < 0) cashflowScore = 0;
+    else cashflowScore = Math.max(0, Math.min(100, yearsAfterStop * 4));
+    breakdown.push({
+      label: `Cashflow-shortfall fra alder ${firstShort.age}`,
+      detail: `Manglende dækning ramt ${yearsAfterStop < 0 ? `${-yearsAfterStop} år før` : `${yearsAfterStop} år efter`} planlagt stop (${stopAge}).`,
+      impact: "negative",
+      magnitude: yearsAfterStop < 5 ? "high" : yearsAfterStop < 15 ? "medium" : "low",
+    });
+  } else {
+    breakdown.push({
+      label: "Ingen cashflow-shortfall",
+      detail: "Planlagt forbrug dækkes igennem hele perioden.",
+      impact: "positive",
+      magnitude: "high",
+    });
+  }
+  if (avgGap > 0) {
+    cashflowScore -= Math.min(40, (avgGap / 5000) * 25);
+    breakdown.push({
+      label: `Månedligt hul efter stop: ${Math.round(avgGap).toLocaleString("da-DK")} kr`,
+      detail: "Gennemsnitligt manglende månedligt nettobeløb efter planlagt stop.",
+      impact: "negative",
+      magnitude: avgGap > 10000 ? "high" : avgGap > 3000 ? "medium" : "low",
+    });
+  }
+  cashflowScore = Math.max(0, cashflowScore);
+
+  // 2) End margin vs minimum (25)
+  const endMargin = (yAt95.netWorth - minRequired) / Math.max(1, annualSpend * 5);
+  let endScore: number;
+  if (endMargin < 0) {
+    endScore = 0;
+    const missing = Math.max(0, minRequired - yAt95.netWorth);
+    breakdown.push({
+      label: `Minimumsmål ikke opfyldt — mangler ${Math.round(missing).toLocaleString("da-DK")} kr`,
+      detail: "Slutformue ved alder 95 ligger under minimumsmålet.",
+      impact: "negative",
+      magnitude: "high",
+    });
+  } else if (endMargin < 1) {
+    endScore = Math.round(endMargin * 70);
+    breakdown.push({
+      label: "Lav margin til minimumsmål",
+      detail: `Slutformue er kun ${Math.round(endMargin * 100)} % over minimumsmålet (mål: 5× årsforbrug i buffer).`,
+      impact: "negative",
+      magnitude: endMargin < 0.4 ? "high" : "medium",
+    });
+  } else {
+    endScore = Math.min(100, 70 + endMargin * 10);
+    breakdown.push({
+      label: "Komfortabel slutmargin",
+      detail: `Slutformue er ${endMargin.toFixed(1)}× over 5-års forbrugsmargin.`,
+      impact: "positive",
+      magnitude: "medium",
+    });
+  }
+
+  // 3) Stress / sårbarhed (20) — afhængighed af få store kilder
   const totalEnd = Math.max(1, yAt95.closing.free + yAt95.closing.pension + yAt95.closing.holding);
   const holdingShare = yAt95.closing.holding / totalEnd;
-  const exitWeight = inp.holding.expectedExitValue / Math.max(1, inp.holding.balance + inp.holding.expectedExitValue);
-  risk += Math.min(30, holdingShare * 25 + exitWeight * 10);
+  let stressScore = 100 - holdingShare * 60;
+  // Hvis ratepension dækker meget af forbruget i udbetalingsår
+  const stressLabel = holdingShare > 0.4
+    ? "Høj afhængighed af holdingværdi"
+    : holdingShare > 0.2
+      ? "Moderat afhængighed af holding"
+      : "Lav afhængighed af holding";
+  breakdown.push({
+    label: stressLabel,
+    detail: `Holding udgør ${Math.round(holdingShare * 100)} % af slutaktiverne.`,
+    impact: holdingShare > 0.3 ? "negative" : "neutral",
+    magnitude: holdingShare > 0.4 ? "high" : holdingShare > 0.2 ? "medium" : "low",
+  });
+  stressScore = Math.max(0, Math.min(100, stressScore));
 
-  // Folkepension: hvor stor andel af nettoindkomst efter stop?
-  const sp = inp.income.statePension;
-  if (sp.mode !== "none") {
-    const spYears = years.filter((y) => y.age >= sp.fromAge && y.flows.statePensionNet > 0);
-    if (spYears.length > 0) {
-      const avgSp = spYears.reduce((s, y) => s + y.flows.statePensionNet, 0) / spYears.length;
-      risk += Math.min(15, (avgSp / annualSpend) * 20);
+  // 4) Likviditet/buffer (10)
+  const bufferMonths = (inp.free.cashBuffer ?? 0) / Math.max(1, inp.spending.desiredMonthlyNet);
+  let liqScore = Math.min(100, bufferMonths * 12); // 8+ mdr → 100
+  breakdown.push({
+    label: bufferMonths >= 6 ? "Solid kontant buffer" : bufferMonths >= 3 ? "OK kontant buffer" : "Lav kontant buffer",
+    detail: `Buffer svarer til ca. ${bufferMonths.toFixed(1)} måneders forbrug.`,
+    impact: bufferMonths >= 3 ? "positive" : "negative",
+    magnitude: bufferMonths >= 6 ? "low" : bufferMonths >= 3 ? "low" : "medium",
+  });
+  liqScore = Math.max(0, Math.min(100, liqScore));
+
+  // 5) Få store kilder (10)
+  const ptYearsAll = years.filter((y) => y.flows.partTimeNet > 0);
+  const avgPt = ptYearsAll.length ? ptYearsAll.reduce((s, y) => s + y.flows.partTimeNet, 0) / ptYearsAll.length : 0;
+  const ptShare = avgPt / annualSpend;
+  let concentrationScore = 100 - Math.min(50, ptShare * 50) - Math.min(40, holdingShare * 40);
+  concentrationScore = Math.max(0, Math.min(100, concentrationScore));
+
+  const financial = Math.round(
+    cashflowScore * 0.35 +
+      endScore * 0.25 +
+      stressScore * 0.20 +
+      liqScore * 0.10 +
+      concentrationScore * 0.10,
+  );
+
+  // Sorter breakdown: negative first by magnitude
+  const magOrder = { high: 3, medium: 2, low: 1 };
+  const sortedBreakdown = [...breakdown].sort((x, y) => {
+    if (x.impact !== y.impact) {
+      const ord = { negative: 0, neutral: 1, positive: 2 };
+      return ord[x.impact] - ord[y.impact];
     }
+    return magOrder[y.magnitude] - magOrder[x.magnitude];
+  }).slice(0, 5);
+
+  const robustnessSummary = (() => {
+    const top = sortedBreakdown.find((b) => b.impact === "negative");
+    if (top) return `Trækkes især ned af: ${top.label.toLowerCase()}.`;
+    return "Scenariet hænger godt sammen — ingen større svagheder.";
+  })();
+
+  // ===== Antagelsessikkerhed (vægtet) =====
+  const confidence = getConfidence(scenario);
+
+  // Effekt-vægte pr. antagelse — udledt af hvor meget den faktisk indgår
+  const sumPt = years.reduce((s, y) => s + y.flows.partTimeNet, 0);
+  const sumSp = years.reduce((s, y) => s + y.flows.statePensionNet, 0);
+  const sumFf = years.reduce((s, y) => s + y.flows.familyFundNet, 0);
+  const sumRate = years.reduce((s, y) => s + (y.flows.ratePension?.net ?? 0), 0);
+  const sumLife = years.reduce((s, y) => s + (y.flows.lifeAnnuity?.net ?? 0), 0);
+  const sumSalary = years.reduce((s, y) => s + y.flows.salaryNet, 0);
+  const sumHoldingValue = inp.holding.expectedExitValue + inp.holding.balance;
+  const sumNeed = annualSpend * years.length;
+
+  const rawWeight: Record<ConfidenceKey, number> = {
+    salary: sumSalary / sumNeed,
+    partTime: sumPt / sumNeed,
+    familyFund: sumFf / sumNeed,
+    statePension: inp.income.statePension.mode === "none" ? 0 : sumSp / sumNeed,
+    ratePension: inp.pension.ratePensionEnabled ? sumRate / sumNeed : 0,
+    lifeAnnuity: inp.pension.lifeAnnuity.enabled ? sumLife / sumNeed : 0,
+    holdingExit: sumHoldingValue / Math.max(1, sumNeed),
+    returns: 1, // afkast påvirker altid
+    spending: 1, // forbrug påvirker altid
+  };
+
+  // Klassificer effekt-størrelse for visning
+  function classifyEffect(w: number): "low" | "medium" | "high" {
+    if (w >= 0.4) return "high";
+    if (w >= 0.15) return "medium";
+    return "low";
   }
 
-  // Deltidsindtægt
-  const ptYears = years.filter((y) => y.flows.partTimeNet > 0);
-  if (ptYears.length > 0) {
-    const avgPt = ptYears.reduce((s, y) => s + y.flows.partTimeNet, 0) / ptYears.length;
-    risk += Math.min(15, (avgPt / annualSpend) * 15);
-  }
+  const factors: ConfidenceFactor[] = (Object.keys(CONFIDENCE_LABELS) as ConfidenceKey[]).map((key) => {
+    const level = confidence[key];
+    const w = Math.min(1.5, Math.max(0, rawWeight[key]));
+    const effect = classifyEffect(w);
+    // Bidrag = level-værdi × vægt (vægtning normaliseres bagefter)
+    const contribution = LEVEL_VALUE[level] * w;
+    return {
+      key,
+      label: CONFIDENCE_LABELS[key],
+      level,
+      effect,
+      contribution,
+      note: w < 0.05 ? "Bruges ikke i scenariet" : undefined,
+    };
+  });
 
-  // Realafkast – jo højere antagelse, jo større risiko
-  const avgReturn = (a.realReturn.free + a.realReturn.pension + a.realReturn.holding) / 3;
-  risk += Math.max(0, Math.min(20, (avgReturn - 0.03) * 400)); // 3 % = 0, 8 % = 20
+  const totalWeight = factors.reduce((s, f) => s + Math.min(1.5, Math.max(0, rawWeight[f.key])), 0);
+  const assumptionConfidenceScore = totalWeight > 0
+    ? Math.round(factors.reduce((s, f) => s + f.contribution, 0) / totalWeight)
+    : 70;
+  const assumptionConfidence = Math.max(0, Math.min(100, assumptionConfidenceScore));
+  const assumptionRisk = 100 - assumptionConfidence;
 
-  // Margin ved slutalder ift. minimum
-  const margin = (yAt95.netWorth - minRequired) / Math.max(1, annualSpend * 5);
-  if (margin < 1) risk += Math.min(20, (1 - margin) * 20);
+  const sortedFactors = [...factors]
+    .filter((f) => !f.note)
+    .sort((x, y) => {
+      // Mest "trækkende ned" først: lav level + høj vægt
+      const xPull = (100 - LEVEL_VALUE[x.level]) * Math.min(1.5, rawWeight[x.key]);
+      const yPull = (100 - LEVEL_VALUE[y.level]) * Math.min(1.5, rawWeight[y.key]);
+      return yPull - xPull;
+    });
 
-  const assumptionRisk = Math.round(Math.max(0, Math.min(100, risk)));
+  const confidenceSummary = (() => {
+    const worst = sortedFactors[0];
+    if (!worst) return "Ingen vigtige antagelser i scenariet.";
+    if (LEVEL_VALUE[worst.level] >= 70) return "Scenariet bygger primært på rimeligt sikre antagelser.";
+    return `Scenariet afhænger især af ${worst.label.toLowerCase()} (${LEVEL_LABELS[worst.level].toLowerCase()}).`;
+  })();
 
   const endShortfallVsTarget = Math.max(0, minRequired - yAt95.netWorth);
 
-  // ---- Holdinggæld finansiering ----
+  // Holding finansiering
   let unfinancedHoldingDebt = 0;
   let unfinancedHoldingYears = 0;
   for (const y of years) {
@@ -123,7 +282,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     }
   }
 
-  // ---- Model status ----
+  // Modelstatus
   let modelStatus: "valid" | "target_missed" | "invalid" = "valid";
   let modelStatusReason = "Scenariet er validt — ingen shortfall, ingen ufinansierede afdrag, mål opfyldt.";
   if (unfinancedHoldingDebt > 0.5 || firstShort) {
@@ -147,7 +306,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     monthlyGapAfterStop: avgGap,
     financialRobustness: financial,
     assumptionRisk,
-    assumptionConfidence: 100 - assumptionRisk,
+    assumptionConfidence,
     robustnessScore: financial,
     minNetWorthAtEnd: minRequired,
     endShortfallVsTarget,
@@ -155,5 +314,15 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     unfinancedHoldingYears,
     modelStatus,
     modelStatusReason,
+    robustnessBreakdown: sortedBreakdown,
+    robustnessSummary,
+    confidenceBreakdown: sortedFactors.slice(0, 5),
+    confidenceSummary,
   };
+}
+
+export function scoreVerdict(score: number): "Høj" | "Middel" | "Lav" {
+  if (score >= 70) return "Høj";
+  if (score >= 40) return "Middel";
+  return "Lav";
 }

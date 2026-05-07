@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
-import { deriveKPIs } from "@/lib/finance/kpis";
+import { deriveKPIs, scoreVerdict, LEVEL_LABELS } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
 import { Card } from "@/components/ui/card";
 import { formatDKK } from "@/lib/format";
+import { ChevronDown } from "lucide-react";
+import type { ConfidenceFactor, ScoreFactor } from "@/lib/finance/types";
 import {
   Area,
   AreaChart,
@@ -29,6 +31,79 @@ function KPI({ label, value, sub, tone, tooltip }: { label: string; value: strin
       <div className={`kpi-value mt-2 ${toneClass}`}>{value}</div>
       {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
     </Card>
+  );
+}
+
+function ScoreCard({
+  label, score, summary, tone, what, details, testIdPrefix,
+}: {
+  label: string; score: number; summary: string;
+  tone: "good" | "warn" | "bad"; what: string; details: ReactNode; testIdPrefix: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const toneClass = tone === "good" ? "text-success" : tone === "warn" ? "text-warning" : "text-destructive";
+  return (
+    <Card className="p-5" data-testid={`${testIdPrefix}-card`}>
+      <div className="kpi-label">{label}</div>
+      <div className={`kpi-value mt-2 ${toneClass}`}>{score} / 100</div>
+      <div className="text-xs text-muted-foreground mt-1">Vurdering: {scoreVerdict(score)}</div>
+      <div className="text-xs mt-2 break-words">{summary}</div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs text-primary mt-3 inline-flex items-center gap-1 hover:underline"
+        data-testid={`${testIdPrefix}-toggle`}
+        aria-expanded={open}
+      >
+        {open ? "Skjul detaljer" : "Vis detaljer"}
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="mt-3 pt-3 border-t border-border space-y-2 text-xs" data-testid={`${testIdPrefix}-details`}>
+          <p className="text-muted-foreground italic">{what}</p>
+          {details}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function impactDot(impact: "positive" | "negative" | "neutral") {
+  const cls = impact === "positive" ? "bg-success" : impact === "negative" ? "bg-destructive" : "bg-muted-foreground";
+  return <span className={`inline-block w-1.5 h-1.5 rounded-full ${cls} mt-1.5 shrink-0`} />;
+}
+
+function FactorBullet({ f }: { f: ScoreFactor }) {
+  const tag = f.magnitude === "high" ? "Stor effekt" : f.magnitude === "medium" ? "Medium effekt" : "Lille effekt";
+  return (
+    <li className="flex items-start gap-2">
+      {impactDot(f.impact)}
+      <div className="min-w-0">
+        <div className="font-medium">{f.label}</div>
+        <div className="text-muted-foreground">{f.detail} · {tag}</div>
+      </div>
+    </li>
+  );
+}
+
+function ConfBullet({ f }: { f: ConfidenceFactor }) {
+  const effectLabel = f.effect === "high" ? "Høj" : f.effect === "medium" ? "Medium" : "Lav";
+  const positive = f.level === "very_high" || f.level === "high";
+  const trend = f.note
+    ? "Bruges ikke — påvirker ikke scoren"
+    : positive
+      ? "Trækker næsten ikke ned"
+      : f.effect === "high" ? "Trækker scoren ned" : "Trækker scoren lidt ned";
+  return (
+    <li className="flex items-start gap-2">
+      {impactDot(f.note ? "neutral" : positive ? "positive" : "negative")}
+      <div className="min-w-0">
+        <div className="font-medium">{f.label}</div>
+        <div className="text-muted-foreground">
+          Sikkerhed: {LEVEL_LABELS[f.level]} · Effekt: {effectLabel} · {trend}
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -126,18 +201,34 @@ export default function Dashboard() {
           tone={kpis.capitalAt95 > 0 && !targetMissed ? "good" : "bad"}
         />
         <KPI label="Første shortfall" value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"} tone={kpis.firstShortfallAge ? "bad" : "good"} />
-        <KPI
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ScoreCard
           label="Finansiel robusthed"
-          value={`${kpis.financialRobustness} / 100`}
+          score={kpis.financialRobustness}
           tone={finTone}
-          tooltip="Baseret på shortfall og slutformue. Højere er bedre."
+          summary={kpis.robustnessSummary}
+          what="Måler hvor godt scenariet økonomisk hænger sammen, hvis tingene udvikler sig lidt dårligere end forventet."
+          testIdPrefix="robustness"
+          details={
+            <ul className="space-y-2">
+              {kpis.robustnessBreakdown.map((f, i) => <FactorBullet key={i} f={f} />)}
+            </ul>
+          }
         />
-        <KPI
+        <ScoreCard
           label="Antagelsessikkerhed"
-          value={`${confidence} / 100`}
+          score={confidence}
           tone={confTone}
-          sub="Højere = mindre afhængig af optimistiske antagelser"
-          tooltip="100 − antagelsesrisiko. Vurderer afhængighed af holding-exit, folkepension, deltidsindtægt, realafkast og slutmargin."
+          summary={kpis.confidenceSummary}
+          what="Måler hvor sikker modellen er på antagelserne, vægtet efter hvor meget de påvirker scenariet. Justér i Variabler → Sikkerhedsvurderinger."
+          testIdPrefix="confidence"
+          details={
+            <ul className="space-y-2">
+              {kpis.confidenceBreakdown.map((f, i) => <ConfBullet key={i} f={f} />)}
+            </ul>
+          }
         />
       </div>
 

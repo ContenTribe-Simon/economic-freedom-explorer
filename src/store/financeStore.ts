@@ -89,8 +89,8 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 8,
-      migrate: (state: any) => {
+      version: 9,
+      migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
         if (state.assumptions?.tax && "pensionPayoutRate" in state.assumptions.tax) {
@@ -207,6 +207,13 @@ export const useFinanceStore = create<FinanceState>()(
               },
             };
           });
+        }
+        // v9: sikr at confidence-felt findes (tomt objekt = brug defaults)
+        if (Array.isArray(state.scenarios)) {
+          state.scenarios = state.scenarios.map((sc: any) => ({
+            ...sc,
+            inputs: { ...sc.inputs, confidence: sc.inputs?.confidence ?? {} },
+          }));
         }
         return state;
       },

@@ -141,6 +141,19 @@ export interface TargetInputs {
 
 export type SavingsLogic = "planned" | "cashflow" | "hybrid";
 
+export type ConfidenceLevel = "very_high" | "high" | "low" | "speculative";
+export type ConfidenceKey =
+  | "salary"
+  | "partTime"
+  | "familyFund"
+  | "statePension"
+  | "ratePension"
+  | "lifeAnnuity"
+  | "holdingExit"
+  | "returns"
+  | "spending";
+export type ScenarioConfidence = Partial<Record<ConfidenceKey, ConfidenceLevel>>;
+
 export interface ScenarioInputs {
   person: PersonInputs;
   free: FreeBucketInputs;
@@ -153,6 +166,8 @@ export interface ScenarioInputs {
   stopAge: number;
   fullRetireAge: number;
   savingsLogic: SavingsLogic;
+  /** Brugerens sikkerhedsvurderinger pr. central antagelse. */
+  confidence?: ScenarioConfidence;
 }
 
 export type StressModifierKey = "noBarma" | "noPartTime" | "lowReturn" | "higherSpending" | "noFolkepension";
@@ -288,6 +303,30 @@ export interface KPIs {
   /** Samlet modelstatus. */
   modelStatus: ModelStatus;
   modelStatusReason: string;
+  /** Top-faktorer der trækker robustheden op/ned. */
+  robustnessBreakdown: ScoreFactor[];
+  robustnessSummary: string;
+  /** Top-faktorer for antagelsessikkerhed. */
+  confidenceBreakdown: ConfidenceFactor[];
+  confidenceSummary: string;
+}
+
+export type FactorImpact = "positive" | "neutral" | "negative";
+export interface ScoreFactor {
+  label: string;
+  detail: string;
+  impact: FactorImpact;
+  magnitude: "low" | "medium" | "high";
+}
+
+export interface ConfidenceFactor {
+  key: ConfidenceKey;
+  label: string;
+  level: ConfidenceLevel;
+  effect: "low" | "medium" | "high";
+  /** Vægtet bidrag til samlet score (negativt = trækker ned). */
+  contribution: number;
+  note?: string;
 }
 
 export type SanitySeverity = "info" | "warn" | "error";
