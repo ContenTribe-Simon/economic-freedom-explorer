@@ -602,14 +602,11 @@ export default function Inputs() {
 function ConfidenceSection({ scenarioId }: { scenarioId: string }) {
   const scenario = useActiveScenario();
   const update = useFinanceStore((s) => s.updateScenario);
-  // dynamisk import for at undgå cirkulær reference
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { CONFIDENCE_LABELS, LEVEL_LABELS, DEFAULT_CONFIDENCE, getConfidence } = require("@/lib/finance/kpis") as typeof import("@/lib/finance/kpis");
   const conf = getConfidence(scenario);
-  const setLevel = (key: string, level: string) => {
+  const setLevel = (key: ConfidenceKey, level: ConfidenceLevel) => {
     update(scenarioId, (s) => ({
       ...s,
-      inputs: { ...s.inputs, confidence: { ...(s.inputs.confidence ?? {}), [key]: level as any } },
+      inputs: { ...s.inputs, confidence: { ...(s.inputs.confidence ?? {}), [key]: level } },
     }));
   };
   return (
@@ -617,15 +614,16 @@ function ConfidenceSection({ scenarioId }: { scenarioId: string }) {
       title="Sikkerhedsvurderinger"
       description="Hvor sikker er du på de centrale antagelser? Bruges kun til antagelsessikkerheds-scoren — påvirker ikke år-for-år beregningen."
     >
-      {(Object.keys(CONFIDENCE_LABELS) as (keyof typeof CONFIDENCE_LABELS)[]).map((key) => (
+      {(Object.keys(CONFIDENCE_LABELS) as ConfidenceKey[]).map((key) => (
         <div key={key} className="space-y-1.5">
           <Label className="text-xs uppercase tracking-wider text-muted-foreground">{CONFIDENCE_LABELS[key]}</Label>
           <select
             value={conf[key]}
-            onChange={(e) => setLevel(key as string, e.target.value)}
+            onChange={(e) => setLevel(key, e.target.value as ConfidenceLevel)}
             className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+            data-testid={`confidence-${key}`}
           >
-            {(Object.keys(LEVEL_LABELS) as (keyof typeof LEVEL_LABELS)[]).map((lvl) => (
+            {(Object.keys(LEVEL_LABELS) as ConfidenceLevel[]).map((lvl) => (
               <option key={lvl} value={lvl}>{LEVEL_LABELS[lvl]}</option>
             ))}
           </select>
