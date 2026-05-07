@@ -316,7 +316,7 @@ export interface ScoreFactor {
   label: string;
   detail: string;
   impact: FactorImpact;
-  magnitude: "low" | "medium" | "high";
+  magnitude: "low" | "medium" | "high" | "critical";
 }
 
 export interface ConfidenceFactor {
