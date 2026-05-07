@@ -203,7 +203,7 @@ export default function Dashboard() {
         <KPI label="Første shortfall" value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"} tone={kpis.firstShortfallAge ? "bad" : "good"} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
         <ScoreCard
           label="Finansiel robusthed"
           score={kpis.financialRobustness}
