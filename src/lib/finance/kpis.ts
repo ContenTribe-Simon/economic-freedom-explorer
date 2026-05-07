@@ -352,8 +352,10 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   };
 }
 
-export function scoreVerdict(score: number): "Høj" | "Middel" | "Lav" {
+export function scoreVerdict(score: number): "Meget lav" | "Lav" | "Middel" | "Høj" | "Meget høj" {
+  if (score >= 85) return "Meget høj";
   if (score >= 70) return "Høj";
-  if (score >= 40) return "Middel";
-  return "Lav";
+  if (score >= 50) return "Middel";
+  if (score >= 25) return "Lav";
+  return "Meget lav";
 }
