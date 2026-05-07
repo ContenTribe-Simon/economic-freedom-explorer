@@ -74,7 +74,7 @@ function impactDot(impact: "positive" | "negative" | "neutral") {
 }
 
 function FactorBullet({ f }: { f: ScoreFactor }) {
-  const tag = f.magnitude === "high" ? "Stor effekt" : f.magnitude === "medium" ? "Medium effekt" : "Lille effekt";
+  const tag = f.magnitude === "critical" ? "Kritisk effekt" : f.magnitude === "high" ? "Stor effekt" : f.magnitude === "medium" ? "Medium effekt" : "Lille effekt";
   return (
     <li className="flex items-start gap-2">
       {impactDot(f.impact)}
