@@ -17,6 +17,8 @@ import {
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
 import { Trash2 } from "lucide-react";
+import { CONFIDENCE_LABELS, LEVEL_LABELS, getConfidence } from "@/lib/finance/kpis";
+import type { ConfidenceKey, ConfidenceLevel } from "@/lib/finance/types";
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
