@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFinanceStore } from "@/store/financeStore";
+import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { defaultAssumptions } from "@/lib/finance/defaults";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
+import { CONFIDENCE_LABELS, LEVEL_LABELS, getConfidence } from "@/lib/finance/kpis";
+import type { ConfidenceKey, ConfidenceLevel } from "@/lib/finance/types";
 
 function NumberField({ label, value, onChange, suffix, step = 1, hint }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number; hint?: string }) {
   return (
@@ -113,6 +115,8 @@ export default function Assumptions() {
         </div>
       </Card>
 
+      <ConfidenceCard />
+
       <Card className="p-6 bg-muted/40">
         <h3 className="font-display text-lg font-semibold mb-2">Antagelser bag modellen</h3>
         <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
@@ -131,5 +135,42 @@ export default function Assumptions() {
         <pre className="mt-2 p-3 bg-muted rounded overflow-auto">{JSON.stringify(defaultAssumptions, null, 2)}</pre>
       </details>
     </div>
+  );
+}
+
+function ConfidenceCard() {
+  const scenario = useActiveScenario();
+  const update = useFinanceStore((s) => s.updateScenario);
+  const conf = getConfidence(scenario);
+  const setLevel = (key: ConfidenceKey, level: ConfidenceLevel) => {
+    update(scenario.id, (s) => ({
+      ...s,
+      inputs: { ...s.inputs, confidence: { ...(s.inputs.confidence ?? {}), [key]: level } },
+    }));
+  };
+  return (
+    <Card className="p-6" data-testid="confidence-section">
+      <h2 className="font-display text-xl font-semibold mb-1">Sikkerhedsvurderinger</h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Hvor sikker er du på de centrale antagelser i det aktive scenarie? Bruges kun til antagelsessikkerheds-scoren — påvirker ikke år-for-år beregningen.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {(Object.keys(CONFIDENCE_LABELS) as ConfidenceKey[]).map((key) => (
+          <div key={key} className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">{CONFIDENCE_LABELS[key]}</Label>
+            <select
+              value={conf[key]}
+              onChange={(e) => setLevel(key, e.target.value as ConfidenceLevel)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              data-testid={`confidence-${key}`}
+            >
+              {(Object.keys(LEVEL_LABELS) as ConfidenceLevel[]).map((lvl) => (
+                <option key={lvl} value={lvl}>{LEVEL_LABELS[lvl]}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
