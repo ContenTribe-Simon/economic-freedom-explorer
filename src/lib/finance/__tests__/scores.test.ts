@@ -133,6 +133,7 @@ describe("financial robustness — failure-driven caps", () => {
 
   it("healthy scenario without shortfall and target met can score high", () => {
     const s = makeBaseScenario();
+    s.inputs.spending.desiredMonthlyNet = 5000;
     s.inputs.target.minNetWorthAtEnd = 0;
     const { kpis } = run(s);
     expect(kpis.firstShortfallAge).toBeNull();
