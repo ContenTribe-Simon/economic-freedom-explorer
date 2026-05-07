@@ -100,3 +100,55 @@ describe("long scenario name doesn't break score derivation", () => {
     expect(typeof kpis.robustnessSummary).toBe("string");
   });
 });
+
+describe("financial robustness — failure-driven caps", () => {
+  it("scenario with cashflow shortfall before end gets low robustness (<=25)", () => {
+    const s = makeBaseScenario();
+    s.inputs.spending.desiredMonthlyNet = 80000; // forcer shortfall
+    const { kpis } = run(s);
+    expect(kpis.firstShortfallAge).not.toBeNull();
+    expect(kpis.financialRobustness).toBeLessThanOrEqual(25);
+  });
+
+  it("scenario with both shortfall and missed end target gets very low/low", () => {
+    const s = makeBaseScenario();
+    s.inputs.spending.desiredMonthlyNet = 100000;
+    s.inputs.target.minNetWorthAtEnd = 5_000_000;
+    const { kpis } = run(s);
+    expect(kpis.firstShortfallAge).not.toBeNull();
+    expect(kpis.endShortfallVsTarget).toBeGreaterThan(0);
+    expect(kpis.financialRobustness).toBeLessThanOrEqual(25);
+  });
+
+  it("scenario without shortfall but missing target by >50% capped around 30", () => {
+    const s = makeBaseScenario();
+    s.inputs.target.minNetWorthAtEnd = 1e11; // umuligt højt → mangler >50%
+    const { kpis } = run(s);
+    if (!kpis.firstShortfallAge && kpis.endShortfallVsTarget > 0) {
+      expect(kpis.financialRobustness).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it("healthy scenario without shortfall and target met can score high", () => {
+    const s = makeBaseScenario();
+    s.inputs.target.minNetWorthAtEnd = 0;
+    const { kpis } = run(s);
+    expect(kpis.firstShortfallAge).toBeNull();
+    expect(kpis.financialRobustness).toBeGreaterThanOrEqual(50);
+  });
+
+  it("verdict for shortfall scenario is never higher than 'Lav'", () => {
+    const s = makeBaseScenario();
+    s.inputs.spending.desiredMonthlyNet = 80000;
+    const { kpis } = run(s);
+    const v = scoreVerdict(kpis.financialRobustness);
+    expect(["Meget lav", "Lav"]).toContain(v);
+  });
+
+  it("critical factor appears at the top of breakdown", () => {
+    const s = makeBaseScenario();
+    s.inputs.spending.desiredMonthlyNet = 80000;
+    const { kpis } = run(s);
+    expect(kpis.robustnessBreakdown[0].magnitude).toBe("critical");
+  });
+});
