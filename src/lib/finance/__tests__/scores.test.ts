@@ -27,6 +27,8 @@ describe("financial robustness", () => {
 
   it("reacts to a forced shortfall (huge spending)", () => {
     const s1 = makeBaseScenario();
+    s1.inputs.spending.desiredMonthlyNet = 5000;
+    s1.inputs.target.minNetWorthAtEnd = 0;
     const s2 = makeBaseScenario();
     s2.inputs.spending.desiredMonthlyNet = 200000;
     const a = run(s1).kpis.financialRobustness;
