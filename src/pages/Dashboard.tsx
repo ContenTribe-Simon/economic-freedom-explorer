@@ -222,7 +222,7 @@ export default function Dashboard() {
           score={confidence}
           tone={confTone}
           summary={kpis.confidenceSummary}
-          what="Måler hvor sikker modellen er på antagelserne, vægtet efter hvor meget de påvirker scenariet. Justér i Variabler → Sikkerhedsvurderinger."
+          what="Måler hvor sikker modellen er på antagelserne, vægtet efter hvor meget de påvirker scenariet. Justér i Antagelser → Sikkerhedsvurderinger."
           testIdPrefix="confidence"
           details={
             <ul className="space-y-2">
