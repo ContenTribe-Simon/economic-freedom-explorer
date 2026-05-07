@@ -74,7 +74,7 @@ function impactDot(impact: "positive" | "negative" | "neutral") {
 }
 
 function FactorBullet({ f }: { f: ScoreFactor }) {
-  const tag = f.magnitude === "high" ? "Stor effekt" : f.magnitude === "medium" ? "Medium effekt" : "Lille effekt";
+  const tag = f.magnitude === "critical" ? "Kritisk effekt" : f.magnitude === "high" ? "Stor effekt" : f.magnitude === "medium" ? "Medium effekt" : "Lille effekt";
   return (
     <li className="flex items-start gap-2">
       {impactDot(f.impact)}
@@ -135,9 +135,9 @@ export default function Dashboard() {
     };
   }, [scenario, assumptions]);
 
-  const finTone = kpis.financialRobustness >= 70 ? "good" : kpis.financialRobustness >= 40 ? "warn" : "bad";
+  const finTone = kpis.financialRobustness >= 70 ? "good" : kpis.financialRobustness >= 50 ? "warn" : "bad";
   const confidence = kpis.assumptionConfidence;
-  const confTone = confidence >= 70 ? "good" : confidence >= 40 ? "warn" : "bad";
+  const confTone = confidence >= 70 ? "good" : confidence >= 50 ? "warn" : "bad";
   const spMode = scenario.inputs.income.statePension.mode;
   const targetMissed = kpis.endShortfallVsTarget > 0;
 

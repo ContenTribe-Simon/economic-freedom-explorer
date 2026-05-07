@@ -74,20 +74,24 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   const inp = scenario.inputs;
   const a = mergeAssumptions(assumptions, scenario.assumptionsOverride);
 
-  // ===== Financial robustness — vægtet ~ 35/25/20/10/10 =====
+  // ===== Financial robustness — failure-driven =====
   const breakdown: ScoreFactor[] = [];
+  const criticalFactors: ScoreFactor[] = [];
+
+  // ---- Kritiske fejl ----
+  const hasShortfall = !!firstShort;
+  const yearsAfterStop = firstShort ? firstShort.age - stopAge : null;
 
   // 1) Cashflow (35)
   let cashflowScore = 100;
   if (firstShort) {
-    const yearsAfterStop = firstShort.age - stopAge;
-    if (yearsAfterStop < 0) cashflowScore = 0;
-    else cashflowScore = Math.max(0, Math.min(100, yearsAfterStop * 4));
-    breakdown.push({
-      label: `Cashflow-shortfall fra alder ${firstShort.age}`,
-      detail: `Manglende dækning ramt ${yearsAfterStop < 0 ? `${-yearsAfterStop} år før` : `${yearsAfterStop} år efter`} planlagt stop (${stopAge}).`,
+    if (yearsAfterStop! < 0) cashflowScore = 0;
+    else cashflowScore = Math.max(0, Math.min(100, yearsAfterStop! * 4));
+    criticalFactors.push({
+      label: `Cashflow-shortfall ved alder ${firstShort.age}`,
+      detail: `Manglende dækning ${yearsAfterStop! < 0 ? `${-yearsAfterStop!} år før` : `${yearsAfterStop!} år efter`} planlagt stop (${stopAge}). Kritisk negativ effekt.`,
       impact: "negative",
-      magnitude: yearsAfterStop < 5 ? "high" : yearsAfterStop < 15 ? "medium" : "low",
+      magnitude: "critical",
     });
   } else {
     breakdown.push({
@@ -97,7 +101,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
       magnitude: "high",
     });
   }
-  if (avgGap > 0) {
+  if (avgGap > 0 && !firstShort) {
     cashflowScore -= Math.min(40, (avgGap / 5000) * 25);
     breakdown.push({
       label: `Månedligt hul efter stop: ${Math.round(avgGap).toLocaleString("da-DK")} kr`,
@@ -110,15 +114,17 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
 
   // 2) End margin vs minimum (25)
   const endMargin = (yAt95.netWorth - minRequired) / Math.max(1, annualSpend * 5);
+  const targetMissedRatio = minRequired > 0 ? Math.max(0, minRequired - yAt95.netWorth) / minRequired : 0;
+  const targetMissed = yAt95.netWorth + 0.5 < minRequired;
   let endScore: number;
-  if (endMargin < 0) {
+  if (targetMissed) {
     endScore = 0;
     const missing = Math.max(0, minRequired - yAt95.netWorth);
-    breakdown.push({
-      label: `Minimumsmål ikke opfyldt — mangler ${Math.round(missing).toLocaleString("da-DK")} kr`,
-      detail: "Slutformue ved alder 95 ligger under minimumsmålet.",
+    criticalFactors.push({
+      label: `Minimumsmål ikke opfyldt – mangler ${Math.round(missing).toLocaleString("da-DK")} kr`,
+      detail: `Slutformue ved alder 95 ligger ${Math.round(targetMissedRatio * 100)} % under minimumsmålet. Kritisk negativ effekt.`,
       impact: "negative",
-      magnitude: "high",
+      magnitude: "critical",
     });
   } else if (endMargin < 1) {
     endScore = Math.round(endMargin * 70);
@@ -138,11 +144,10 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     });
   }
 
-  // 3) Stress / sårbarhed (20) — afhængighed af få store kilder
+  // 3) Stress / sårbarhed (20)
   const totalEnd = Math.max(1, yAt95.closing.free + yAt95.closing.pension + yAt95.closing.holding);
   const holdingShare = yAt95.closing.holding / totalEnd;
   let stressScore = 100 - holdingShare * 60;
-  // Hvis ratepension dækker meget af forbruget i udbetalingsår
   const stressLabel = holdingShare > 0.4
     ? "Høj afhængighed af holdingværdi"
     : holdingShare > 0.2
@@ -158,7 +163,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
 
   // 4) Likviditet/buffer (10)
   const bufferMonths = (inp.free.cashBuffer ?? 0) / Math.max(1, inp.spending.desiredMonthlyNet);
-  let liqScore = Math.min(100, bufferMonths * 12); // 8+ mdr → 100
+  let liqScore = Math.min(100, bufferMonths * 12);
   breakdown.push({
     label: bufferMonths >= 6 ? "Solid kontant buffer" : bufferMonths >= 3 ? "OK kontant buffer" : "Lav kontant buffer",
     detail: `Buffer svarer til ca. ${bufferMonths.toFixed(1)} måneders forbrug.`,
@@ -174,7 +179,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   let concentrationScore = 100 - Math.min(50, ptShare * 50) - Math.min(40, holdingShare * 40);
   concentrationScore = Math.max(0, Math.min(100, concentrationScore));
 
-  const financial = Math.round(
+  let financial = Math.round(
     cashflowScore * 0.35 +
       endScore * 0.25 +
       stressScore * 0.20 +
@@ -182,13 +187,39 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
       concentrationScore * 0.10,
   );
 
-  // Sorter breakdown: negative first by magnitude
-  const magOrder = { high: 3, medium: 2, low: 1 };
-  const sortedBreakdown = [...breakdown].sort((x, y) => {
-    if (x.impact !== y.impact) {
-      const ord = { negative: 0, neutral: 1, positive: 2 };
-      return ord[x.impact] - ord[y.impact];
+  // ---- Failure caps ----
+  if (hasShortfall) {
+    // Jo tidligere shortfall, jo hårdere cap
+    let cap = 25;
+    if (yearsAfterStop !== null) {
+      if (yearsAfterStop < 0) cap = 5;
+      else if (yearsAfterStop <= 2) cap = 10;
+      else if (yearsAfterStop <= 5) cap = 15;
+      else if (yearsAfterStop <= 10) cap = 20;
+      else cap = 25;
     }
+    financial = Math.min(financial, cap);
+  }
+  if (targetMissed) {
+    let cap = 40;
+    if (targetMissedRatio > 0.5) cap = 30;
+    if (targetMissedRatio > 0.25) cap = Math.min(cap, 35);
+    financial = Math.min(financial, cap);
+  }
+  if (hasShortfall && targetMissed) {
+    financial = Math.min(financial, 25);
+  }
+  financial = Math.max(0, Math.min(100, financial));
+
+  // Sorter: kritiske altid øverst, derefter negative > neutral > positive efter magnitude
+  const magOrder = { critical: 4, high: 3, medium: 2, low: 1 } as const;
+  const ord = { negative: 0, neutral: 1, positive: 2 };
+  const merged = [...criticalFactors, ...breakdown];
+  const sortedBreakdown = merged.sort((x, y) => {
+    const xCrit = x.magnitude === "critical" ? 0 : 1;
+    const yCrit = y.magnitude === "critical" ? 0 : 1;
+    if (xCrit !== yCrit) return xCrit - yCrit;
+    if (x.impact !== y.impact) return ord[x.impact] - ord[y.impact];
     return magOrder[y.magnitude] - magOrder[x.magnitude];
   }).slice(0, 5);
 
@@ -321,8 +352,10 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   };
 }
 
-export function scoreVerdict(score: number): "Høj" | "Middel" | "Lav" {
+export function scoreVerdict(score: number): "Meget lav" | "Lav" | "Middel" | "Høj" | "Meget høj" {
+  if (score >= 85) return "Meget høj";
   if (score >= 70) return "Høj";
-  if (score >= 40) return "Middel";
-  return "Lav";
+  if (score >= 50) return "Middel";
+  if (score >= 25) return "Lav";
+  return "Meget lav";
 }
