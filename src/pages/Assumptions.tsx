@@ -115,6 +115,8 @@ export default function Assumptions() {
         </div>
       </Card>
 
+      <ConfidenceCard />
+
       <Card className="p-6 bg-muted/40">
         <h3 className="font-display text-lg font-semibold mb-2">Antagelser bag modellen</h3>
         <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-5">
