@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFinanceStore } from "@/store/financeStore";
+import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { defaultAssumptions } from "@/lib/finance/defaults";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
+import { CONFIDENCE_LABELS, LEVEL_LABELS, getConfidence } from "@/lib/finance/kpis";
+import type { ConfidenceKey, ConfidenceLevel } from "@/lib/finance/types";
 
 function NumberField({ label, value, onChange, suffix, step = 1, hint }: { label: string; value: number; onChange: (n: number) => void; suffix?: string; step?: number; hint?: string }) {
   return (
