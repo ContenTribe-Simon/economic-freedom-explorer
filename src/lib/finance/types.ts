@@ -303,6 +303,30 @@ export interface KPIs {
   /** Samlet modelstatus. */
   modelStatus: ModelStatus;
   modelStatusReason: string;
+  /** Top-faktorer der trækker robustheden op/ned. */
+  robustnessBreakdown: ScoreFactor[];
+  robustnessSummary: string;
+  /** Top-faktorer for antagelsessikkerhed. */
+  confidenceBreakdown: ConfidenceFactor[];
+  confidenceSummary: string;
+}
+
+export type FactorImpact = "positive" | "neutral" | "negative";
+export interface ScoreFactor {
+  label: string;
+  detail: string;
+  impact: FactorImpact;
+  magnitude: "low" | "medium" | "high";
+}
+
+export interface ConfidenceFactor {
+  key: ConfidenceKey;
+  label: string;
+  level: ConfidenceLevel;
+  effect: "low" | "medium" | "high";
+  /** Vægtet bidrag til samlet score (negativt = trækker ned). */
+  contribution: number;
+  note?: string;
 }
 
 export type SanitySeverity = "info" | "warn" | "error";
