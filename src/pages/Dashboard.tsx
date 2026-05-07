@@ -201,18 +201,34 @@ export default function Dashboard() {
           tone={kpis.capitalAt95 > 0 && !targetMissed ? "good" : "bad"}
         />
         <KPI label="Første shortfall" value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"} tone={kpis.firstShortfallAge ? "bad" : "good"} />
-        <KPI
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <ScoreCard
           label="Finansiel robusthed"
-          value={`${kpis.financialRobustness} / 100`}
+          score={kpis.financialRobustness}
           tone={finTone}
-          tooltip="Baseret på shortfall og slutformue. Højere er bedre."
+          summary={kpis.robustnessSummary}
+          what="Måler hvor godt scenariet økonomisk hænger sammen, hvis tingene udvikler sig lidt dårligere end forventet."
+          testIdPrefix="robustness"
+          details={
+            <ul className="space-y-2">
+              {kpis.robustnessBreakdown.map((f, i) => <FactorBullet key={i} f={f} />)}
+            </ul>
+          }
         />
-        <KPI
+        <ScoreCard
           label="Antagelsessikkerhed"
-          value={`${confidence} / 100`}
+          score={confidence}
           tone={confTone}
-          sub="Højere = mindre afhængig af optimistiske antagelser"
-          tooltip="100 − antagelsesrisiko. Vurderer afhængighed af holding-exit, folkepension, deltidsindtægt, realafkast og slutmargin."
+          summary={kpis.confidenceSummary}
+          what="Måler hvor sikker modellen er på antagelserne, vægtet efter hvor meget de påvirker scenariet. Justér i Variabler → Sikkerhedsvurderinger."
+          testIdPrefix="confidence"
+          details={
+            <ul className="space-y-2">
+              {kpis.confidenceBreakdown.map((f, i) => <ConfBullet key={i} f={f} />)}
+            </ul>
+          }
         />
       </div>
 
