@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultAssumptions, makeBaseScenario } from "../defaults";
 import { project } from "../projection";
-import { deriveKPIs, DEFAULT_CONFIDENCE, getConfidence } from "../kpis";
+import { deriveKPIs, DEFAULT_CONFIDENCE, getConfidence, scoreVerdict } from "../kpis";
 
 function run(scenario: ReturnType<typeof makeBaseScenario>) {
   const years = project(scenario, defaultAssumptions);
