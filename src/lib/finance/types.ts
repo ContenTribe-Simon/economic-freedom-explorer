@@ -141,6 +141,19 @@ export interface TargetInputs {
 
 export type SavingsLogic = "planned" | "cashflow" | "hybrid";
 
+export type ConfidenceLevel = "very_high" | "high" | "low" | "speculative";
+export type ConfidenceKey =
+  | "salary"
+  | "partTime"
+  | "familyFund"
+  | "statePension"
+  | "ratePension"
+  | "lifeAnnuity"
+  | "holdingExit"
+  | "returns"
+  | "spending";
+export type ScenarioConfidence = Partial<Record<ConfidenceKey, ConfidenceLevel>>;
+
 export interface ScenarioInputs {
   person: PersonInputs;
   free: FreeBucketInputs;
@@ -153,6 +166,8 @@ export interface ScenarioInputs {
   stopAge: number;
   fullRetireAge: number;
   savingsLogic: SavingsLogic;
+  /** Brugerens sikkerhedsvurderinger pr. central antagelse. */
+  confidence?: ScenarioConfidence;
 }
 
 export type StressModifierKey = "noBarma" | "noPartTime" | "lowReturn" | "higherSpending" | "noFolkepension";
