@@ -227,6 +227,16 @@ export const useFinanceStore = create<FinanceState>()(
             inputs: { ...sc.inputs, confidence: sc.inputs?.confidence ?? {} },
           }));
         }
+        // v10: forbered modelVersion-felter + lifeEvents placeholder
+        if (Array.isArray(state.scenarios)) {
+          const now = Date.now();
+          state.scenarios = state.scenarios.map((sc: any) => ({
+            ...sc,
+            updatedAt: sc.updatedAt ?? sc.createdAt ?? now,
+            metadata: sc.metadata ?? {},
+            inputs: { ...sc.inputs, lifeEvents: sc.inputs?.lifeEvents ?? [] },
+          }));
+        }
         return state;
       },
     },
