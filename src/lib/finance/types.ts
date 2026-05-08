@@ -188,6 +188,8 @@ export interface ScenarioInputs {
   savingsLogic: SavingsLogic;
   /** Brugerens sikkerhedsvurderinger pr. central antagelse. */
   confidence?: ScenarioConfidence;
+  /** Forberedt: generiske livsfaser/events. Påvirker IKKE beregningen endnu. */
+  lifeEvents?: LifeEvent[];
 }
 
 export type StressModifierKey = "noBarma" | "noPartTime" | "lowReturn" | "higherSpending" | "noFolkepension";
