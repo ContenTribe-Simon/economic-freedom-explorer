@@ -219,9 +219,13 @@ export default function Dashboard() {
         <ScoreCard
           label="Finansiel robusthed"
           score={kpis.financialRobustness}
-          tone={finTone}
-          summary={kpis.robustnessSummary}
-          what="Måler hvor godt scenariet økonomisk hænger sammen, hvis tingene udvikler sig lidt dårligere end forventet."
+          tone={kpis.modelStatus === "invalid" ? "bad" : finTone}
+          summary={
+            kpis.modelStatus === "invalid"
+              ? `Scoren er begrænset, fordi scenariet har uafklarede finansieringsproblemer. ${kpis.robustnessSummary}`
+              : kpis.robustnessSummary
+          }
+          what="Måler hvor godt scenariet økonomisk hænger sammen, hvis tingene udvikler sig lidt dårligere end forventet. Capper ved 25/100 hvis scenariet er ugyldigt."
           testIdPrefix="robustness"
           details={
             <ul className="space-y-2">
@@ -233,8 +237,12 @@ export default function Dashboard() {
           label="Antagelsessikkerhed"
           score={confidence}
           tone={confTone}
-          summary={kpis.confidenceSummary}
-          what="Måler hvor sikker modellen er på antagelserne, vægtet efter hvor meget de påvirker scenariet. Justér i Antagelser → Sikkerhedsvurderinger."
+          summary={
+            kpis.modelStatus === "invalid" && confidence >= 50
+              ? `${kpis.confidenceSummary} Antagelserne vurderes som rimelige, men scenariet fejler på cashflow/finansiering — se modelstatus øverst.`
+              : kpis.confidenceSummary
+          }
+          what="Måler hvor sikre antagelserne er — ikke om cashflowet hænger sammen. Justér i Antagelser → Sikkerhedsvurderinger."
           testIdPrefix="confidence"
           details={
             <ul className="space-y-2">
