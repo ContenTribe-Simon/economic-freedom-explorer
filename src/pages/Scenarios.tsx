@@ -43,6 +43,22 @@ export default function Scenarios() {
     raw?: (k: any) => number;
   };
   const metrics: Metric[] = [
+    {
+      key: "modelStatus",
+      label: "Modelstatus",
+      fmt: (_v, k) => {
+        if (k?.modelStatus === "invalid") {
+          const parts: string[] = [];
+          if (k.firstShortfallAge) parts.push(`Cashflow-shortfall fra alder ${k.firstShortfallAge}`);
+          if (k.firstFinancingIssueAge) parts.push(`${k.firstFinancingIssueKind} fra alder ${k.firstFinancingIssueAge}`);
+          return `Ugyldig — ${parts.join("; ") || "se dashboard"}`;
+        }
+        if (k?.modelStatus === "target_missed") return "Valid, men mål ikke opfyldt";
+        return "Valid";
+      },
+      better: "lower",
+      raw: (k) => (k.modelStatus === "valid" ? 0 : k.modelStatus === "target_missed" ? 1 : 2),
+    },
     { key: "plannedStopAge", label: "Planlagt stop", fmt: (v) => `${v} år`, better: "lower" },
     { key: "earliestSustainableStopAge", label: "Tidligste bæredygtige stop", fmt: (v) => (v ? `${v} år` : "—"), better: "lower" },
     { key: "capitalAtStopAge", label: "Kapital v. stop", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
@@ -50,10 +66,17 @@ export default function Scenarios() {
     { key: "capitalAt95", label: "Kapital v. 95", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
     {
       key: "cashflowShortfall",
-      label: "Cashflow-shortfall",
+      label: "Første privat cashflow-shortfall",
       fmt: (_v, k) => (k?.firstShortfallAge ? `Fra alder ${k.firstShortfallAge}` : "Ingen"),
       better: "higher",
       raw: (k) => k.firstShortfallAge ?? 999,
+    },
+    {
+      key: "financingIssue",
+      label: "Første finansieringsproblem",
+      fmt: (_v, k) => (k?.firstFinancingIssueAge ? `${k.firstFinancingIssueKind} fra alder ${k.firstFinancingIssueAge}` : "Ingen"),
+      better: "higher",
+      raw: (k) => k.firstFinancingIssueAge ?? 999,
     },
     {
       key: "minTargetStatus",
