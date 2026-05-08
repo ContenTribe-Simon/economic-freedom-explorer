@@ -141,6 +141,26 @@ export interface TargetInputs {
 
 export type SavingsLogic = "planned" | "cashflow" | "hybrid";
 
+/**
+ * Forberedt datastruktur til fremtidige livsfase-moduler (bolig, børn, FIRE m.v.).
+ * IKKE i brug af beregningsmotoren endnu — feltet ignoreres bevidst i projection.ts.
+ * Tilføjes for at scenarier kan persisteres med events allerede nu.
+ */
+export type LifeEventType = "income" | "expense" | "asset" | "liability" | "oneTime" | "recurring";
+export interface LifeEvent {
+  id: string;
+  label: string;
+  type: LifeEventType;
+  startAge: number;
+  endAge?: number;
+  amount: number;
+  growthRate?: number;
+  confidenceKey?: ConfidenceKey;
+  affectsCashflow: boolean;
+  affectsNetWorth: boolean;
+  notes?: string;
+}
+
 export type ConfidenceLevel = "very_high" | "high" | "low" | "speculative";
 export type ConfidenceKey =
   | "salary"
