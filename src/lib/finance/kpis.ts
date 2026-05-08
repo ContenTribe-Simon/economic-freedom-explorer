@@ -305,27 +305,49 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   // Holding finansiering
   let unfinancedHoldingDebt = 0;
   let unfinancedHoldingYears = 0;
+  let firstFinancingIssueAge: number | null = null;
+  let firstFinancingIssueKind: string | null = null;
+  let firstFinancingIssueAmount = 0;
   for (const y of years) {
     const s = y.flows.holdingFinancingShortfall ?? 0;
     if (s > 0.5) {
       unfinancedHoldingDebt += s;
       unfinancedHoldingYears++;
+      if (firstFinancingIssueAge === null) {
+        firstFinancingIssueAge = y.age;
+        firstFinancingIssueKind = "Ufinansieret holdingbetaling";
+        firstFinancingIssueAmount = s;
+      }
     }
   }
 
   // Modelstatus
   let modelStatus: "valid" | "target_missed" | "invalid" = "valid";
   let modelStatusReason = "Scenariet er validt — ingen shortfall, ingen ufinansierede afdrag, mål opfyldt.";
-  if (unfinancedHoldingDebt > 0.5 || firstShort) {
+  const isInvalid = unfinancedHoldingDebt > 0.5 || !!firstShort;
+  if (isInvalid) {
     modelStatus = "invalid";
     const reasons: string[] = [];
-    if (firstShort) reasons.push(`cashflow-shortfall fra alder ${firstShort.age}`);
-    if (unfinancedHoldingDebt > 0.5) reasons.push(`ufinansieret holdinggæld i ${unfinancedHoldingYears} år (${Math.round(unfinancedHoldingDebt).toLocaleString("da-DK")} kr)`);
-    modelStatusReason = `Scenariet har ugyldige antagelser eller ufinansierede betalinger: ${reasons.join("; ")}.`;
+    if (firstShort) {
+      const amt = Math.round(firstShort.shortfallAmount).toLocaleString("da-DK");
+      reasons.push(`privat cashflow-shortfall fra alder ${firstShort.age} (≈ ${amt} kr)`);
+    }
+    if (unfinancedHoldingDebt > 0.5 && firstFinancingIssueAge !== null) {
+      const amt = Math.round(firstFinancingIssueAmount).toLocaleString("da-DK");
+      reasons.push(`ufinansieret holdinggæld fra alder ${firstFinancingIssueAge} (≈ ${amt} kr i første år, i alt ${Math.round(unfinancedHoldingDebt).toLocaleString("da-DK")} kr over ${unfinancedHoldingYears} år)`);
+    }
+    modelStatusReason = `Scenariet er ugyldigt: ${reasons.join("; ")}.`;
   } else if (endShortfallVsTarget > 0.5) {
     modelStatus = "target_missed";
     modelStatusReason = `Scenariet er gyldigt, men minimumsmålet er ikke opfyldt — mangler ${Math.round(endShortfallVsTarget).toLocaleString("da-DK")} kr ved slutalder.`;
   }
+
+  // Failure cap: hvis modellen er ugyldig (cashflow-shortfall eller ufinansieret holdinggæld),
+  // må finansiel robusthed aldrig fremstå høj.
+  if (isInvalid) {
+    financial = Math.min(financial, 25);
+  }
+
 
   return {
     plannedStopAge: stopAge,
