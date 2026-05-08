@@ -156,7 +156,7 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
             return (
               <>
                 <Row label={`Planlagt opsparing (${logicLabel})`} value={planned} indent />
-                <Row label="Faktisk investeret beløb" value={f.investedAmount} strong />
+                <Row label="Faktisk investeret i fri kapital" value={f.investedAmount} strong />
                 {f.unallocatedCashflow > 0.5 && (
                   <Row label="Ikke-allokeret cashflow" value={f.unallocatedCashflow} indent />
                 )}
