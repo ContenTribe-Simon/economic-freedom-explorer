@@ -75,14 +75,26 @@ export const useFinanceStore = create<FinanceState>()(
         }),
       updateAssumptions: (updater) => set((s) => ({ assumptions: updater(s.assumptions) })),
       resetAssumptions: () => set({ assumptions: defaultAssumptions }),
-      exportJson: () => JSON.stringify({ scenarios: get().scenarios, assumptions: get().assumptions }, null, 2),
+      exportJson: () => {
+        const now = Date.now();
+        const payload: ModelExport = {
+          modelVersion: MODEL_VERSION,
+          createdAt: now,
+          updatedAt: now,
+          activeScenarioId: get().activeScenarioId,
+          scenarios: get().scenarios.map((s) => ({ ...s, updatedAt: s.updatedAt ?? now })),
+          assumptions: get().assumptions,
+          metadata: { source: "local" },
+        };
+        return JSON.stringify(payload, null, 2);
+      },
       importJson: (json) => {
         const parsed = JSON.parse(json);
         if (Array.isArray(parsed.scenarios) && parsed.scenarios.length > 0) {
           set({
             scenarios: parsed.scenarios,
             assumptions: parsed.assumptions ?? defaultAssumptions,
-            activeScenarioId: parsed.scenarios[0].id,
+            activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
           });
         }
       },
