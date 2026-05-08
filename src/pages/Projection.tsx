@@ -145,7 +145,7 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
         </section>
 
         <section>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Cashflow-bro</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Årets overskud/underskud og investering</div>
           <Row label="Indkomst netto" value={incomeTotal} indent />
           <Row label="Forbrug" value={-f.spending} indent />
           <Row label="Renter + afdrag (privat)" value={-(f.debtInterest + f.debtPrincipal)} indent />
