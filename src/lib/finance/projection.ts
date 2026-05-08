@@ -515,6 +515,8 @@ export function projectWithStopAge(
         holdingExtra,
         debtsDetail: dt.detail,
         cashflowSurplus,
+        unallocatedCashflow,
+        investedAmount: freeContribution,
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
       },
