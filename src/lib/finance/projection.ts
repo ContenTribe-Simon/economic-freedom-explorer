@@ -431,6 +431,7 @@ export function projectWithStopAge(
       }
     };
 
+    let unallocatedCashflow = 0;
     if (working) {
       const planned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
       cashflowSurplus = cashflow - planned;
@@ -442,11 +443,14 @@ export function projectWithStopAge(
       } else if (savingsLogic === "planned") {
         freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
         bal.free += freeContribution;
+        // Overskydende cashflow ud over planlagt opsparing investeres IKKE — vises som ikke-allokeret.
+        unallocatedCashflow = Math.max(0, cashflow - freeContribution);
       } else {
         freeContribution = planned;
         bal.free += freeContribution;
         const net = cashflow - planned;
         if (net < 0) drainShortfall(-net);
+        else unallocatedCashflow = net;
       }
     } else {
       if (cashflow >= 0) {
