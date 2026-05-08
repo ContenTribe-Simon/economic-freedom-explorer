@@ -200,7 +200,19 @@ export default function Dashboard() {
           sub={`Mål: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}${targetMissed ? ` — mangler ${formatDKK(kpis.endShortfallVsTarget, { compact: true })} ved slutalder` : " ✓"}`}
           tone={kpis.capitalAt95 > 0 && !targetMissed ? "good" : "bad"}
         />
-        <KPI label="Første shortfall" value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"} tone={kpis.firstShortfallAge ? "bad" : "good"} />
+        <KPI
+          label="Første privat cashflow-shortfall"
+          value={kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"}
+          tone={kpis.firstShortfallAge ? "bad" : "good"}
+          tooltip="Første år hvor det private cashflow ikke kan dække planlagt forbrug og afdrag."
+        />
+        <KPI
+          label="Første finansieringsproblem"
+          value={kpis.firstFinancingIssueAge ? `Alder ${kpis.firstFinancingIssueAge}` : "Ingen"}
+          sub={kpis.firstFinancingIssueAge ? `${kpis.firstFinancingIssueKind} · ${formatDKK(kpis.firstFinancingIssueAmount, { compact: true })}` : "Ingen ufinansierede betalinger"}
+          tone={kpis.firstFinancingIssueAge ? "bad" : "good"}
+          tooltip="Fx ufinansieret holdingbetaling eller holdinggæld der ikke kan dækkes."
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
