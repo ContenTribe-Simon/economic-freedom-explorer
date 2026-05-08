@@ -141,6 +141,26 @@ export interface TargetInputs {
 
 export type SavingsLogic = "planned" | "cashflow" | "hybrid";
 
+/**
+ * Forberedt datastruktur til fremtidige livsfase-moduler (bolig, børn, FIRE m.v.).
+ * IKKE i brug af beregningsmotoren endnu — feltet ignoreres bevidst i projection.ts.
+ * Tilføjes for at scenarier kan persisteres med events allerede nu.
+ */
+export type LifeEventType = "income" | "expense" | "asset" | "liability" | "oneTime" | "recurring";
+export interface LifeEvent {
+  id: string;
+  label: string;
+  type: LifeEventType;
+  startAge: number;
+  endAge?: number;
+  amount: number;
+  growthRate?: number;
+  confidenceKey?: ConfidenceKey;
+  affectsCashflow: boolean;
+  affectsNetWorth: boolean;
+  notes?: string;
+}
+
 export type ConfidenceLevel = "very_high" | "high" | "low" | "speculative";
 export type ConfidenceKey =
   | "salary"
@@ -168,6 +188,8 @@ export interface ScenarioInputs {
   savingsLogic: SavingsLogic;
   /** Brugerens sikkerhedsvurderinger pr. central antagelse. */
   confidence?: ScenarioConfidence;
+  /** Forberedt: generiske livsfaser/events. Påvirker IKKE beregningen endnu. */
+  lifeEvents?: LifeEvent[];
 }
 
 export type StressModifierKey = "noBarma" | "noPartTime" | "lowReturn" | "higherSpending" | "noFolkepension";
@@ -269,6 +291,8 @@ export interface Scenario {
   id: string;
   name: string;
   createdAt: number;
+  /** Sat ved persistens — bruges til fremtidig migration mod Supabase. */
+  updatedAt?: number;
   notes?: string;
   /** Unikke stress-test modifiers anvendt på scenariet. */
   modifiers?: Partial<ScenarioModifiers>;
@@ -277,6 +301,22 @@ export interface Scenario {
   baseScenarioName?: string;
   inputs: ScenarioInputs;
   assumptionsOverride?: Partial<Assumptions>;
+  /** Frit metadata-felt forberedt til fremtidig brug (Supabase, tags m.v.). */
+  metadata?: Record<string, unknown>;
+}
+
+/** Aktuel modelversion for lokal/eksport persistens. Bumpes ved breaking changes i datamodellen. */
+export const MODEL_VERSION = 1 as const;
+
+/** Skema for eksport/import af hele modellen — forberedt til fremtidig serverlagring. */
+export interface ModelExport {
+  modelVersion: number;
+  createdAt: number;
+  updatedAt: number;
+  activeScenarioId: string;
+  scenarios: Scenario[];
+  assumptions: Assumptions;
+  metadata?: Record<string, unknown>;
 }
 
 export type ModelStatus = "valid" | "target_missed" | "invalid";

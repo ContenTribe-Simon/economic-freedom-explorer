@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Assumptions, Scenario, StressModifierKey } from "@/lib/finance/types";
+import { Assumptions, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 import { applyStressModifierToState } from "@/lib/finance/stress";
 
@@ -75,21 +75,33 @@ export const useFinanceStore = create<FinanceState>()(
         }),
       updateAssumptions: (updater) => set((s) => ({ assumptions: updater(s.assumptions) })),
       resetAssumptions: () => set({ assumptions: defaultAssumptions }),
-      exportJson: () => JSON.stringify({ scenarios: get().scenarios, assumptions: get().assumptions }, null, 2),
+      exportJson: () => {
+        const now = Date.now();
+        const payload: ModelExport = {
+          modelVersion: MODEL_VERSION,
+          createdAt: now,
+          updatedAt: now,
+          activeScenarioId: get().activeScenarioId,
+          scenarios: get().scenarios.map((s) => ({ ...s, updatedAt: s.updatedAt ?? now })),
+          assumptions: get().assumptions,
+          metadata: { source: "local" },
+        };
+        return JSON.stringify(payload, null, 2);
+      },
       importJson: (json) => {
         const parsed = JSON.parse(json);
         if (Array.isArray(parsed.scenarios) && parsed.scenarios.length > 0) {
           set({
             scenarios: parsed.scenarios,
             assumptions: parsed.assumptions ?? defaultAssumptions,
-            activeScenarioId: parsed.scenarios[0].id,
+            activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
           });
         }
       },
     }),
     {
       name: "finance-tool.v1",
-      version: 9,
+      version: 10,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -213,6 +225,16 @@ export const useFinanceStore = create<FinanceState>()(
           state.scenarios = state.scenarios.map((sc: any) => ({
             ...sc,
             inputs: { ...sc.inputs, confidence: sc.inputs?.confidence ?? {} },
+          }));
+        }
+        // v10: forbered modelVersion-felter + lifeEvents placeholder
+        if (Array.isArray(state.scenarios)) {
+          const now = Date.now();
+          state.scenarios = state.scenarios.map((sc: any) => ({
+            ...sc,
+            updatedAt: sc.updatedAt ?? sc.createdAt ?? now,
+            metadata: sc.metadata ?? {},
+            inputs: { ...sc.inputs, lifeEvents: sc.inputs?.lifeEvents ?? [] },
           }));
         }
         return state;
