@@ -291,6 +291,8 @@ export interface Scenario {
   id: string;
   name: string;
   createdAt: number;
+  /** Sat ved persistens — bruges til fremtidig migration mod Supabase. */
+  updatedAt?: number;
   notes?: string;
   /** Unikke stress-test modifiers anvendt på scenariet. */
   modifiers?: Partial<ScenarioModifiers>;
@@ -299,6 +301,22 @@ export interface Scenario {
   baseScenarioName?: string;
   inputs: ScenarioInputs;
   assumptionsOverride?: Partial<Assumptions>;
+  /** Frit metadata-felt forberedt til fremtidig brug (Supabase, tags m.v.). */
+  metadata?: Record<string, unknown>;
+}
+
+/** Aktuel modelversion for lokal/eksport persistens. Bumpes ved breaking changes i datamodellen. */
+export const MODEL_VERSION = 1 as const;
+
+/** Skema for eksport/import af hele modellen — forberedt til fremtidig serverlagring. */
+export interface ModelExport {
+  modelVersion: number;
+  createdAt: number;
+  updatedAt: number;
+  activeScenarioId: string;
+  scenarios: Scenario[];
+  assumptions: Assumptions;
+  metadata?: Record<string, unknown>;
 }
 
 export type ModelStatus = "valid" | "target_missed" | "invalid";
