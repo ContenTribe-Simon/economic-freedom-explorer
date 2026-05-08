@@ -228,6 +228,10 @@ export interface YearFlows {
   /** Saldo for hver gældspost ved årets udgang + diagnostiske felter. */
   debtsDetail: DebtYearDetail[];
   cashflowSurplus: number;
+  /** Positivt overskud, der ikke er investeret automatisk under den valgte opsparingslogik. */
+  unallocatedCashflow: number;
+  /** Faktisk investeret beløb i fri kapital i året (samme som freeContribution, men eksponeret eksplicit til audit). */
+  investedAmount: number;
   growth: { free: number; pension: number; holding: number };
   /** Manglende dækning af holdinggæld der skulle betales af holdingkapital. */
   holdingFinancingShortfall: number;
