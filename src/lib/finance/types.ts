@@ -344,6 +344,12 @@ export interface KPIs {
   unfinancedHoldingDebt: number;
   /** Antal år hvor holdinggæld var ufinansieret. */
   unfinancedHoldingYears: number;
+  /** Første alder hvor et finansieringsproblem opstår (fx ufinansieret holdinggæld). */
+  firstFinancingIssueAge: number | null;
+  /** Type/beskrivelse af første finansieringsproblem. */
+  firstFinancingIssueKind: string | null;
+  /** Beløb knyttet til første finansieringsproblem (årets ufinansierede beløb). */
+  firstFinancingIssueAmount: number;
   /** Samlet modelstatus. */
   modelStatus: ModelStatus;
   modelStatusReason: string;
