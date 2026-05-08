@@ -123,7 +123,6 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Opsparing & udtræk</div>
-          <Row label="Opsparing til fri" value={f.freeContribution} />
           <Row label="Pensionsindbetaling (egen)" value={f.ownPensionContribution} />
           <Row label="Pensionsindbetaling (arb.giver)" value={f.employerPensionContribution} />
           <Row label="Udtræk fri" value={-f.withdrawals.free} />
@@ -143,9 +142,35 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
           )}
           <Row label="Pensionsindkomst i alt (netto, sum af ovenstående)" value={f.pensionPayoutNet} indent />
           {f.withdrawals.buffer > 0 && <Row label="Udtræk fra buffer" value={-f.withdrawals.buffer} />}
-          {f.cashflowSurplus !== 0 && (
-            <Row label="Cashflow vs. planlagt opsparing" value={f.cashflowSurplus} indent />
-          )}
+        </section>
+
+        <section>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Cashflow-bro</div>
+          <Row label="Indkomst netto" value={incomeTotal} indent />
+          <Row label="Forbrug" value={-f.spending} indent />
+          <Row label="Renter + afdrag (privat)" value={-(f.debtInterest + f.debtPrincipal)} indent />
+          {(() => {
+            const planned = inputs.free.monthlyContribution * 12 + inputs.free.annualExtraContribution;
+            const logic = inputs.savingsLogic ?? "planned";
+            const logicLabel = logic === "planned" ? "Planlagt opsparing" : logic === "cashflow" ? "Cashflow-baseret" : "Hybrid";
+            return (
+              <>
+                <Row label={`Planlagt opsparing (${logicLabel})`} value={planned} indent />
+                <Row label="Faktisk investeret beløb" value={f.investedAmount} strong />
+                {f.unallocatedCashflow > 0.5 && (
+                  <Row label="Ikke-allokeret cashflow" value={f.unallocatedCashflow} indent />
+                )}
+                {y.shortfallAmount > 0.5 && (
+                  <Row label="Cashflow-shortfall (udækket)" value={-y.shortfallAmount} indent />
+                )}
+                {f.unallocatedCashflow > 0.5 && logic !== "cashflow" && (
+                  <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                    Beløbet investeres ikke automatisk under {logicLabel.toLowerCase()} og indgår derfor ikke i formuefremskrivningen.
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </section>
 
         {f.debtsDetail.length > 0 && (

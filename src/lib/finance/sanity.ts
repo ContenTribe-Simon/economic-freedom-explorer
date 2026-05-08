@@ -38,6 +38,29 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
     }
   }
 
+  // Forklaring af valgt opsparingslogik
+  const logic = inp.savingsLogic ?? "planned";
+  const logicDetail =
+    logic === "planned"
+      ? "Planlagt opsparing: Kun angivet månedlig/årlig opsparing investeres. Øvrigt overskud vises som ikke-allokeret cashflow."
+      : logic === "cashflow"
+        ? "Cashflow-baseret: Hele beregnet overskud efter forbrug og øvrige poster investeres automatisk."
+        : "Hybrid: Planlagt opsparing bruges som minimum. Overskud/underskud efter dette vises separat og investeres ikke automatisk.";
+  out.push({ id: "savings-logic-explain", severity: "info", title: "Opsparingslogik", detail: logicDetail });
+
+  // Ikke-allokeret cashflow eksisterer
+  const unallocYears = years.filter((y) => y.flows.unallocatedCashflow > 0.5);
+  if (unallocYears.length > 0 && logic !== "cashflow") {
+    const totalUnalloc = unallocYears.reduce((s, y) => s + y.flows.unallocatedCashflow, 0);
+    const avgMonthly = totalUnalloc / unallocYears.length / 12;
+    out.push({
+      id: "unallocated-cashflow",
+      severity: "info",
+      title: "Ikke-allokeret cashflow findes i modellen",
+      detail: `I ${unallocYears.length} år er der overskud, der ikke automatisk investeres under den valgte opsparingslogik (gennemsnit ca. ${Math.round(avgMonthly).toLocaleString("da-DK")} kr/md). Beløbet indgår ikke i kapitaludviklingen.`,
+    });
+  }
+
   // Planlagt opsparing > cashflow i nogle år
   const negCashflow = years.filter(
     (y) => y.age < inp.stopAge && y.flows.cashflowSurplus < 0,
