@@ -56,8 +56,8 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
     out.push({
       id: "unallocated-cashflow",
       severity: "info",
-      title: "Ikke-allokeret cashflow findes i modellen",
-      detail: `I ${unallocYears.length} år er der overskud, der ikke automatisk investeres under den valgte opsparingslogik (gennemsnit ca. ${Math.round(avgMonthly).toLocaleString("da-DK")} kr/md). Beløbet indgår ikke i kapitaludviklingen.`,
+      title: "Overskud der ikke investeres automatisk",
+      detail: `I ${unallocYears.length} år er der positivt cashflow, som ikke automatisk investeres under den valgte opsparingslogik (gennemsnit ca. ${Math.round(avgMonthly).toLocaleString("da-DK")} kr/md). Beløbet vises i audit-panelet, men indgår ikke i kapitaludviklingen og bidrager derfor ikke til din formuefremskrivning.`,
     });
   }
 
