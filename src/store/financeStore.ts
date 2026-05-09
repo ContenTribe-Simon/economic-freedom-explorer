@@ -362,6 +362,17 @@ export const useFinanceStore = create<FinanceState>()(
             inputs: { ...sc.inputs, lifeEvents: sc.inputs?.lifeEvents ?? [] },
           }));
         }
+        // v11: klassificér eksisterende scenarier til ny scenario-type
+        // (base / linked_stress_test / custom + manuallyEdited).
+        if (Array.isArray(state.scenarios)) {
+          const all = state.scenarios as Scenario[];
+          state.scenarios = all.map((sc) => {
+            if (sc.type) return sc; // allerede klassificeret (nyt felt)
+            const baseScenario = sc.baseScenarioId ? all.find((x) => x.id === sc.baseScenarioId) : undefined;
+            const cls = classifyLegacyScenario(sc, baseScenario);
+            return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
+          });
+        }
         return state;
       },
     },
