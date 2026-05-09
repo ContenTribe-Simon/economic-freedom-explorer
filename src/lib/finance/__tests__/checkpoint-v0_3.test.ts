@@ -61,7 +61,7 @@ describe("checkpoint: financing source distinctions", () => {
     hd.holdingFinancing = "external_company";
     const { kpis } = run(s);
     expect(kpis.firstFinancingIssueAge).toBeNull();
-    const checks = sanityChecks(s, project(s, defaultAssumptions), defaultAssumptions);
+    const checks = sanityChecks(s, project(s, defaultAssumptions));
     expect(checks.find((c) => c.id === "holding-financing-short")).toBeUndefined();
   });
 
