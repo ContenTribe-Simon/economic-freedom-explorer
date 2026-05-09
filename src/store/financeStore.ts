@@ -139,10 +139,17 @@ export const useFinanceStore = create<FinanceState>()(
         if (!isValidImport(parsed)) {
           throw new Error("Filen ligner ikke en gyldig model-eksport (mangler scenarios).");
         }
+        // Klassificér evt. legacy-scenarier uden `type`-felt.
+        const scenarios = parsed.scenarios.map((sc) => {
+          if (sc.type) return sc;
+          const baseScenario = sc.baseScenarioId ? parsed.scenarios.find((x) => x.id === sc.baseScenarioId) : undefined;
+          const cls = classifyLegacyScenario(sc, baseScenario);
+          return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
+        });
         set({
-          scenarios: parsed.scenarios,
+          scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
-          activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
+          activeScenarioId: parsed.activeScenarioId ?? scenarios[0].id,
         });
       },
       addStandardScenarios: () => {
