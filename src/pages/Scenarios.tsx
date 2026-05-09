@@ -162,8 +162,31 @@ export default function Scenarios() {
                         {scenario.id === activeId ? "Aktiv" : "Klik for aktiver"}
                       </div>
                     </button>
-                    <div className="flex justify-end gap-1 mt-2">
+                    <div className="flex flex-wrap justify-end gap-1 mt-2">
+                      <ScenarioTypeBadge scenario={scenario} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                      {scenario.type === "linked_stress_test"
+                        ? "Beregnes ud fra aktuel basecase + modifier."
+                        : scenario.type === "custom"
+                          ? "Manuelt scenarie – følger ikke automatisk basecase."
+                          : "Basisscenarie – kan redigeres frit."}
+                    </p>
+                    <div className="flex flex-wrap justify-end gap-1 mt-2">
                       <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => duplicate(scenario.id)}>Dupliker</Button>
+                      {scenario.type === "custom" && scenario.baseScenarioId ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          title="Genskab som rent linked stress-test ud fra aktuel basecase"
+                          onClick={() => {
+                            if (confirm("Rebasér scenariet på aktuel basecase? Manuelle ændringer går tabt.")) rebase(scenario.id);
+                          }}
+                        >
+                          Rebasér
+                        </Button>
+                      ) : null}
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => del(scenario.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
