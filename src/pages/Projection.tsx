@@ -237,7 +237,7 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
 }
 
 export default function Projection() {
-  const scenario = useActiveScenario();
+  const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
   const years = useMemo(() => project(scenario, assumptions), [scenario, assumptions]);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
