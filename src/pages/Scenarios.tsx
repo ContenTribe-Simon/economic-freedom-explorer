@@ -32,8 +32,9 @@ export default function Scenarios() {
   const rows = useMemo(
     () =>
       scenarios.map((s) => {
-        const years = project(s, assumptions);
-        return { scenario: s, kpis: deriveKPIs(s, years, assumptions) };
+        const resolved = resolveScenario(s, scenarios);
+        const years = project(resolved, assumptions);
+        return { scenario: s, resolved, kpis: deriveKPIs(resolved, years, assumptions) };
       }),
     [scenarios, assumptions],
   );
