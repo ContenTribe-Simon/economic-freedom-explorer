@@ -114,13 +114,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {scenarios.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
+              {scenarios.map((s) => {
+                const tag =
+                  s.type === "linked_stress_test" ? " · linket" :
+                  s.type === "custom" ? (s.manuallyEdited ? " · custom*" : " · custom") :
+                  "";
+                return (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}<span className="text-[10px] text-muted-foreground ml-1">{tag}</span>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
+          {(() => {
+            const active = scenarios.find((s) => s.id === activeScenarioId);
+            const label =
+              active?.type === "linked_stress_test" ? "Linket stress-test" :
+              active?.type === "custom" ? (active.manuallyEdited ? "Custom (redigeret)" : "Custom") :
+              "Base";
+            return (
+              <p className="text-[10px] uppercase tracking-widest text-sidebar-foreground/60">
+                Type: <span className="text-sidebar-foreground/80">{label}</span>
+              </p>
+            );
+          })()}
           <div className="flex gap-2">
             <Button
               size="sm"
