@@ -382,13 +382,17 @@ export default function Inputs() {
                     value={d.holdingFinancing ?? "holding_capital"}
                     onChange={(e) => updateDebt(i, { holdingFinancing: e.target.value as any })}
                   >
-                    <option value="holding_capital">Betales af holdingens eksisterende kapital</option>
+                    <option value="holding_capital">Betales af holdingkapital / holding cashflow</option>
                     <option value="private_cashflow">Betales af privat cashflow</option>
-                    <option value="external_company">Betales af ekstern selskabscashflow (uden for modellen)</option>
+                    <option value="external_company">Eksternt finansieret / uden for modellen</option>
                     <option value="exit_only">Afdrages først ved exit</option>
                     <option value="display_only">Kun visning/risiko</option>
                   </select>
-                  <p className="text-[11px] text-muted-foreground">Hvis holdingkapital er for lille til at dække ydelsen, vises shortfall i sanity check.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Holdingkapital: modellen tester år-for-år om holding har dækning — ellers vises holding-shortfall.
+                    Privat cashflow: belaster privatøkonomien som privat gæld.
+                    Eksternt finansieret: påvirker ikke modellens cashflow og udløser ikke shortfall-warning.
+                  </p>
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
