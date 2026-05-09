@@ -19,6 +19,17 @@ interface FinanceState {
   resetAssumptions: () => void;
   exportJson: () => string;
   importJson: (json: string) => void;
+  /** Tilføjer manglende standard-scenarier (Base + stress-tests) uden at overskrive eksisterende. */
+  addStandardScenarios: () => { added: number; skipped: number };
+}
+
+const STANDARD_BASE_NAME = "Base case (standard)";
+
+function isValidImport(parsed: unknown): parsed is { scenarios: Scenario[]; assumptions?: Assumptions; activeScenarioId?: string; modelVersion?: number } {
+  if (!parsed || typeof parsed !== "object") return false;
+  const p = parsed as Record<string, unknown>;
+  if (!Array.isArray(p.scenarios) || p.scenarios.length === 0) return false;
+  return p.scenarios.every((s) => s && typeof s === "object" && "inputs" in (s as object) && typeof (s as Scenario).name === "string");
 }
 
 const seed = makeBaseScenario();
