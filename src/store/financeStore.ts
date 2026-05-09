@@ -38,7 +38,7 @@ function isValidImport(parsed: unknown): parsed is { scenarios: Scenario[]; assu
   return p.scenarios.every((s) => s && typeof s === "object" && "inputs" in (s as object) && typeof (s as Scenario).name === "string");
 }
 
-const seed = makeBaseScenario();
+const seed: Scenario = { ...makeBaseScenario(), type: "base", updatedAt: Date.now() };
 
 export const useFinanceStore = create<FinanceState>()(
   persist(
