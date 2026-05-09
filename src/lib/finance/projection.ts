@@ -203,6 +203,21 @@ export function project(scenario: Scenario, globalAssumptions: Assumptions): Yea
   return projectWithStopAge(scenario.inputs, a, scenario.inputs.stopAge);
 }
 
+/**
+ * Resolve hvornår planlagt fri opsparing stopper, ud fra stopreglen.
+ * Returnerer null for "never".
+ */
+export function resolvePlannedContributionStopAge(
+  inp: ScenarioInputs,
+  stopAge: number,
+): number | null {
+  const rule = inp.free.contributionStopRule ?? "stopAge";
+  if (rule === "never") return null;
+  if (rule === "fullRetireAge") return inp.fullRetireAge ?? stopAge;
+  if (rule === "customAge") return inp.free.contributionStopAge ?? stopAge;
+  return stopAge;
+}
+
 export function projectWithStopAge(
   inp: ScenarioInputs,
   a: Assumptions,
@@ -213,6 +228,7 @@ export function projectWithStopAge(
   const savingsLogic = inp.savingsLogic ?? "planned";
   const holdingStrategy = inp.holding.withdrawalStrategy ?? "planned_only";
   const pensionAvailableFromAge = inp.pension.payoutFromAge ?? inp.holding.pensionAvailableFromAge ?? 60;
+  const plannedStopAge = resolvePlannedContributionStopAge(inp, stopAge);
 
   const debts: DebtItem[] = (inp.debts ?? []).map((d) => ({ ...d }));
 
@@ -432,8 +448,11 @@ export function projectWithStopAge(
     };
 
     let unallocatedCashflow = 0;
-    if (working) {
-      const planned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
+    const plannedActive = plannedStopAge === null || age < plannedStopAge;
+    const rawPlanned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
+    const plannedFreeContribution = plannedActive ? rawPlanned : 0;
+    if (working || plannedActive) {
+      const planned = plannedFreeContribution;
       cashflowSurplus = cashflow - planned;
       if (savingsLogic === "cashflow") {
         if (cashflow >= 0) {
@@ -517,6 +536,9 @@ export function projectWithStopAge(
         cashflowSurplus,
         unallocatedCashflow,
         investedAmount: freeContribution,
+        plannedFreeContribution,
+        plannedContributionsActive: plannedActive,
+        plannedContributionStopAge: plannedStopAge,
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
       },

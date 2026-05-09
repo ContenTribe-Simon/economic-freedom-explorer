@@ -245,6 +245,23 @@ export default function Inputs() {
         <NumField label="Nuværende saldo" value={inp.free.balance} onChange={(v) => set("free", { ...inp.free, balance: v })} suffix="kr" step={10000} />
         <NumField label="Månedlig opsparing" value={inp.free.monthlyContribution} onChange={(v) => set("free", { ...inp.free, monthlyContribution: v })} suffix="kr/md" step={500} />
         <NumField label="Årligt ekstra (bonus mv.)" value={inp.free.annualExtraContribution} onChange={(v) => set("free", { ...inp.free, annualExtraContribution: v })} suffix="kr/år" step={5000} />
+        <div className="space-y-1.5">
+          <label className="text-xs uppercase tracking-wider text-muted-foreground">Stop planlagt opsparing</label>
+          <select
+            value={inp.free.contributionStopRule ?? "stopAge"}
+            onChange={(e) => set("free", { ...inp.free, contributionStopRule: e.target.value as any })}
+            className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm"
+          >
+            <option value="stopAge">Ved jobstop / stopalder ({inp.stopAge})</option>
+            <option value="fullRetireAge">Ved fuld pension ({inp.fullRetireAge})</option>
+            <option value="customAge">Brugerdefineret alder</option>
+            <option value="never">Fortsæt hele livet</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground">Bestemmer hvornår den planlagte fri opsparing ophører.</p>
+        </div>
+        {(inp.free.contributionStopRule ?? "stopAge") === "customAge" && (
+          <NumField label="Stop ved alder" value={inp.free.contributionStopAge ?? inp.stopAge} onChange={(v) => set("free", { ...inp.free, contributionStopAge: v })} suffix="år" />
+        )}
       </Section>
 
       <Section title="Kontant buffer" description="Tæller med i nettoformue, men investeres ikke og får intet afkast.">

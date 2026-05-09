@@ -233,7 +233,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 11,
+      version: 12,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -379,6 +379,19 @@ export const useFinanceStore = create<FinanceState>()(
             const cls = classifyLegacyScenario(sc, baseScenario);
             return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
           });
+        }
+        // v12: tilføj eksplicit stopregel for planlagt fri opsparing (default = "stopAge")
+        if (Array.isArray(state.scenarios)) {
+          state.scenarios = state.scenarios.map((sc: any) => ({
+            ...sc,
+            inputs: {
+              ...sc.inputs,
+              free: {
+                ...sc.inputs?.free,
+                contributionStopRule: sc.inputs?.free?.contributionStopRule ?? "stopAge",
+              },
+            },
+          }));
         }
         return state;
       },
