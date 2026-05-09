@@ -18,6 +18,8 @@ export default function Scenarios() {
   const del = useFinanceStore((s) => s.deleteScenario);
   const add = useFinanceStore((s) => s.addScenario);
   const applyStressModifier = useFinanceStore((s) => s.applyStressModifier);
+  const convertToCustom = useFinanceStore((s) => s.convertToCustom);
+  const rebase = useFinanceStore((s) => s.rebaseOnCurrentBase);
 
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
