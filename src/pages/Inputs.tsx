@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   ScenarioInputs,
+  Scenario,
   SavingsLogic,
   DebtItem,
   DebtKind,
@@ -16,7 +17,11 @@ import {
 } from "@/lib/finance/types";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
-import { Trash2 } from "lucide-react";
+import { Trash2, Link2, GitBranch } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
