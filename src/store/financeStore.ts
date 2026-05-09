@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
-import { applyStressModifierToState } from "@/lib/finance/stress";
+import { applyStressModifierToState, STRESS_TESTS } from "@/lib/finance/stress";
 
 interface FinanceState {
   scenarios: Scenario[];
@@ -19,6 +19,17 @@ interface FinanceState {
   resetAssumptions: () => void;
   exportJson: () => string;
   importJson: (json: string) => void;
+  /** Tilføjer manglende standard-scenarier (Base + stress-tests) uden at overskrive eksisterende. */
+  addStandardScenarios: () => { added: number; skipped: number };
+}
+
+const STANDARD_BASE_NAME = "Base case (standard)";
+
+function isValidImport(parsed: unknown): parsed is { scenarios: Scenario[]; assumptions?: Assumptions; activeScenarioId?: string; modelVersion?: number } {
+  if (!parsed || typeof parsed !== "object") return false;
+  const p = parsed as Record<string, unknown>;
+  if (!Array.isArray(p.scenarios) || p.scenarios.length === 0) return false;
+  return p.scenarios.every((s) => s && typeof s === "object" && "inputs" in (s as object) && typeof (s as Scenario).name === "string");
 }
 
 const seed = makeBaseScenario();
@@ -89,14 +100,57 @@ export const useFinanceStore = create<FinanceState>()(
         return JSON.stringify(payload, null, 2);
       },
       importJson: (json) => {
-        const parsed = JSON.parse(json);
-        if (Array.isArray(parsed.scenarios) && parsed.scenarios.length > 0) {
-          set({
-            scenarios: parsed.scenarios,
-            assumptions: parsed.assumptions ?? defaultAssumptions,
-            activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
-          });
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(json);
+        } catch {
+          throw new Error("Filen er ikke gyldig JSON.");
         }
+        if (!isValidImport(parsed)) {
+          throw new Error("Filen ligner ikke en gyldig model-eksport (mangler scenarios).");
+        }
+        set({
+          scenarios: parsed.scenarios,
+          assumptions: parsed.assumptions ?? defaultAssumptions,
+          activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
+        });
+      },
+      addStandardScenarios: () => {
+        const existingNames = new Set(get().scenarios.map((s) => s.name));
+        const toAdd: Scenario[] = [];
+
+        // Base
+        if (!existingNames.has(STANDARD_BASE_NAME)) {
+          const base = makeBaseScenario();
+          base.name = STANDARD_BASE_NAME;
+          base.metadata = { ...(base.metadata ?? {}), standard: true };
+          toAdd.push(base);
+        }
+
+        // Build a temporary working set including the base, to apply each stress-test on top.
+        const baseRef = toAdd[0] ?? get().scenarios.find((s) => s.name === STANDARD_BASE_NAME);
+        if (baseRef) {
+          for (const t of STRESS_TESTS) {
+            const expectedName = `${STANDARD_BASE_NAME} – ${t.suffix}`;
+            if (existingNames.has(expectedName)) continue;
+            const next = structuredClone(baseRef);
+            next.id = crypto.randomUUID();
+            next.name = expectedName;
+            next.createdAt = Date.now();
+            next.baseScenarioId = baseRef.id;
+            next.baseScenarioName = baseRef.name;
+            next.modifiers = { [t.key]: true };
+            next.metadata = { ...(next.metadata ?? {}), standard: true };
+            t.apply(next);
+            toAdd.push(next);
+          }
+        }
+
+        const skipped = (1 + STRESS_TESTS.length) - toAdd.length;
+        if (toAdd.length > 0) {
+          set((s) => ({ scenarios: [...s.scenarios, ...toAdd] }));
+        }
+        return { added: toAdd.length, skipped };
       },
     }),
     {
