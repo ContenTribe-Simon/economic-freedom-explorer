@@ -167,14 +167,20 @@ export const useFinanceStore = create<FinanceState>()(
             next.id = crypto.randomUUID();
             next.name = expectedName;
             next.createdAt = Date.now();
+            next.updatedAt = Date.now();
             next.baseScenarioId = baseRef.id;
             next.baseScenarioName = baseRef.name;
             next.modifiers = { [t.key]: true };
             next.metadata = { ...(next.metadata ?? {}), standard: true };
+            next.type = "linked_stress_test";
+            next.manuallyEdited = false;
             t.apply(next);
             toAdd.push(next);
           }
         }
+
+        // Sørg for at base-scenariet er markeret som "base"
+        if (toAdd[0]) toAdd[0].type = "base";
 
         const skipped = (1 + STRESS_TESTS.length) - toAdd.length;
         if (toAdd.length > 0) {
@@ -182,6 +188,41 @@ export const useFinanceStore = create<FinanceState>()(
         }
         return { added: toAdd.length, skipped };
       },
+      convertToCustom: (id) =>
+        set((s) => ({
+          scenarios: s.scenarios.map((sc) => {
+            if (sc.id !== id) return sc;
+            if (sc.type !== "linked_stress_test") return sc;
+            // Materialisér med aktuelle resolved værdier
+            const resolved = resolveScenario(sc, s.scenarios);
+            return {
+              ...resolved,
+              type: "custom",
+              manuallyEdited: true,
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+      rebaseOnCurrentBase: (id) =>
+        set((s) => {
+          const sc = s.scenarios.find((x) => x.id === id);
+          if (!sc || !sc.baseScenarioId) return s;
+          const base = s.scenarios.find((x) => x.id === sc.baseScenarioId);
+          if (!base) return s;
+          // Genskab som linked_stress_test ud fra aktuel base + bevarede modifiers
+          const linked: Scenario = {
+            ...sc,
+            type: "linked_stress_test",
+            manuallyEdited: false,
+            updatedAt: Date.now(),
+          };
+          const resolved = resolveScenario(linked, s.scenarios);
+          return {
+            ...s,
+            scenarios: s.scenarios.map((x) => (x.id === id ? resolved : x)),
+          };
+        }),
+      resetToCleanStressTest: (id) => get().rebaseOnCurrentBase(id),
     }),
     {
       name: "finance-tool.v1",
