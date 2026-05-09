@@ -1,5 +1,5 @@
 import { ReactNode, useMemo, useState } from "react";
-import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
+import { useActiveScenario, useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs, scoreVerdict, LEVEL_LABELS } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
