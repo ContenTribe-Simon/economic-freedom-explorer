@@ -114,7 +114,6 @@ const SP_METHOD_LABEL = {
 } as const;
 
 export default function Dashboard() {
-  const rawScenario = useActiveScenario();
   const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
 
