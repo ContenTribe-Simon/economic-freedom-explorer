@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   ScenarioInputs,
+  Scenario,
   SavingsLogic,
   DebtItem,
   DebtKind,
@@ -16,7 +17,11 @@ import {
 } from "@/lib/finance/types";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
-import { Trash2 } from "lucide-react";
+import { Trash2, Link2, GitBranch } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -107,8 +112,21 @@ const IMPACT_LABEL: Record<DebtCashflowImpact, string> = {
 
 export default function Inputs() {
   const scenario = useActiveScenario();
-  const update = useFinanceStore((s) => s.updateScenario);
-  const rename = useFinanceStore((s) => s.renameScenario);
+  const updateRaw = useFinanceStore((s) => s.updateScenario);
+  const renameRaw = useFinanceStore((s) => s.renameScenario);
+  const convertToCustom = useFinanceStore((s) => s.convertToCustom);
+  const rebase = useFinanceStore((s) => s.rebaseOnCurrentBase);
+  const isLinked = scenario.type === "linked_stress_test";
+
+  const [pendingEdit, setPendingEdit] = useState<null | (() => void)>(null);
+
+  // Wrap mutations: hvis scenariet er et linket stress-test, vis dialog først.
+  const guard = (fn: () => void) => {
+    if (!isLinked) return fn();
+    setPendingEdit(() => fn);
+  };
+  const update: typeof updateRaw = (id, updater) => guard(() => updateRaw(id, updater));
+  const rename: typeof renameRaw = (id, name) => guard(() => renameRaw(id, name));
 
   const set = <K extends keyof ScenarioInputs>(key: K, value: ScenarioInputs[K]) =>
     update(scenario.id, (s) => ({ ...s, inputs: { ...s.inputs, [key]: value } }));
@@ -128,6 +146,14 @@ export default function Inputs() {
   };
   const removeDebt = (idx: number) => set("debts", inp.debts.filter((_, i) => i !== idx));
 
+  const confirmConvert = () => {
+    convertToCustom(scenario.id);
+    // Anvend den ventede ændring efter konvertering — inputs henter nyt scenarie i næste render.
+    const fn = pendingEdit;
+    setPendingEdit(null);
+    if (fn) setTimeout(fn, 0);
+  };
+
   return (
     <div className="space-y-6">
       <header>
@@ -139,6 +165,74 @@ export default function Inputs() {
         />
         <p className="text-muted-foreground mt-2">Justér nedenfor – ændringer slår igennem i hele modellen med det samme.</p>
       </header>
+
+      {isLinked && (
+        <Card className="p-4 border-l-4 border-l-primary">
+          <div className="flex items-start gap-3">
+            <Link2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-sm">Linket stress-test</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Dette scenarie beregnes ud fra den aktuelle basecase
+                {scenario.baseScenarioName ? ` (${scenario.baseScenarioName})` : ""} plus stress-modifiers.
+                Hvis basecase ændres, opdateres dette scenarie automatisk. Manuelle ændringer her vil
+                konvertere scenariet til et frit, custom scenarie.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" variant="outline" onClick={() => convertToCustom(scenario.id)}>
+                  Konvertér til custom
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {scenario.type === "custom" && scenario.baseScenarioId && (
+        <Card className="p-4 border-l-4 border-l-muted-foreground">
+          <div className="flex items-start gap-3">
+            <GitBranch className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-sm">Manuelt scenarie</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Dette scenarie følger ikke længere automatisk basecase
+                {scenario.baseScenarioName ? ` (${scenario.baseScenarioName})` : ""}.
+                Du kan rebasér det for at gendanne et rent stress-test ud fra aktuel basecase
+                — manuelle ændringer går da tabt.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm("Rebasér scenariet på aktuel basecase? Manuelle ændringer går tabt.")) {
+                      rebase(scenario.id);
+                    }
+                  }}
+                >
+                  Rebasér på aktuel basecase
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <AlertDialog open={pendingEdit !== null} onOpenChange={(open) => !open && setPendingEdit(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konvertér linket stress-test?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette er et linket stress-test scenarie. Hvis du ændrer dette felt, bliver scenariet
+              konverteret til et manuelt scenarie og følger ikke længere automatisk basecase.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingEdit(null)}>Annullér</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmConvert}>Konvertér til custom</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Section title="Person & alder">
         <NumField label="Nuværende alder" value={inp.person.currentAge} onChange={(v) => set("person", { ...inp.person, currentAge: v })} suffix="år" />

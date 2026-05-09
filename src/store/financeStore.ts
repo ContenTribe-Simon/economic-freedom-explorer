@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
-import { applyStressModifierToState, STRESS_TESTS } from "@/lib/finance/stress";
+import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 
 interface FinanceState {
   scenarios: Scenario[];
@@ -21,6 +21,12 @@ interface FinanceState {
   importJson: (json: string) => void;
   /** Tilføjer manglende standard-scenarier (Base + stress-tests) uden at overskrive eksisterende. */
   addStandardScenarios: () => { added: number; skipped: number };
+  /** Materialisér et linked stress-test til et frit redigerbart custom-scenarie. */
+  convertToCustom: (id: string) => void;
+  /** Genskab et custom/linked-scenarie ud fra aktuel basecase + modifiers (gør det igen til linked stress-test). */
+  rebaseOnCurrentBase: (id: string) => void;
+  /** Alias for rebaseOnCurrentBase — fjerner manuelle ændringer og genskaber rent linked stress-test. */
+  resetToCleanStressTest: (id: string) => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
@@ -32,7 +38,7 @@ function isValidImport(parsed: unknown): parsed is { scenarios: Scenario[]; assu
   return p.scenarios.every((s) => s && typeof s === "object" && "inputs" in (s as object) && typeof (s as Scenario).name === "string");
 }
 
-const seed = makeBaseScenario();
+const seed: Scenario = { ...makeBaseScenario(), type: "base", updatedAt: Date.now() };
 
 export const useFinanceStore = create<FinanceState>()(
   persist(
@@ -48,16 +54,40 @@ export const useFinanceStore = create<FinanceState>()(
       },
       updateScenario: (id, updater) =>
         set((s) => ({
-          scenarios: s.scenarios.map((sc) => (sc.id === id ? updater(sc) : sc)),
+          scenarios: s.scenarios.map((sc) => {
+            if (sc.id !== id) return sc;
+            const next = updater(sc);
+            // Hvis et linket stress-test bliver opdateret, materialisér det til custom.
+            // (UI eskalerer typisk via convertToCustom() først, men dette er en sikkerhedsventil.)
+            if (sc.type === "linked_stress_test" && next !== sc) {
+              return { ...next, type: "custom", manuallyEdited: true, updatedAt: Date.now() };
+            }
+            return { ...next, updatedAt: Date.now() };
+          }),
         })),
       addScenario: (name = "Nyt scenarie", fromId) => {
         const base = fromId ? get().scenarios.find((s) => s.id === fromId) : undefined;
         const sc: Scenario = base
-          ? { ...structuredClone(base), id: crypto.randomUUID(), name, createdAt: Date.now() }
+          ? {
+              ...structuredClone(base),
+              id: crypto.randomUUID(),
+              name,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              // Et nyt scenarie kopieret fra en anden er altid uafhængigt (custom),
+              // medmindre brugeren eksplicit kører applyStressModifier bagefter.
+              type: "custom",
+              manuallyEdited: false,
+              modifiers: {},
+              baseScenarioId: undefined,
+              baseScenarioName: undefined,
+            }
           : {
               id: crypto.randomUUID(),
               name,
               createdAt: Date.now(),
+              updatedAt: Date.now(),
+              type: "custom",
               inputs: structuredClone(defaultInputs),
             };
         set((s) => ({ scenarios: [...s.scenarios, sc], activeScenarioId: sc.id }));
@@ -109,10 +139,17 @@ export const useFinanceStore = create<FinanceState>()(
         if (!isValidImport(parsed)) {
           throw new Error("Filen ligner ikke en gyldig model-eksport (mangler scenarios).");
         }
+        // Klassificér evt. legacy-scenarier uden `type`-felt.
+        const scenarios = parsed.scenarios.map((sc) => {
+          if (sc.type) return sc;
+          const baseScenario = sc.baseScenarioId ? parsed.scenarios.find((x) => x.id === sc.baseScenarioId) : undefined;
+          const cls = classifyLegacyScenario(sc, baseScenario);
+          return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
+        });
         set({
-          scenarios: parsed.scenarios,
+          scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
-          activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
+          activeScenarioId: parsed.activeScenarioId ?? scenarios[0].id,
         });
       },
       addStandardScenarios: () => {
@@ -137,14 +174,20 @@ export const useFinanceStore = create<FinanceState>()(
             next.id = crypto.randomUUID();
             next.name = expectedName;
             next.createdAt = Date.now();
+            next.updatedAt = Date.now();
             next.baseScenarioId = baseRef.id;
             next.baseScenarioName = baseRef.name;
             next.modifiers = { [t.key]: true };
             next.metadata = { ...(next.metadata ?? {}), standard: true };
+            next.type = "linked_stress_test";
+            next.manuallyEdited = false;
             t.apply(next);
             toAdd.push(next);
           }
         }
+
+        // Sørg for at base-scenariet er markeret som "base"
+        if (toAdd[0]) toAdd[0].type = "base";
 
         const skipped = (1 + STRESS_TESTS.length) - toAdd.length;
         if (toAdd.length > 0) {
@@ -152,10 +195,45 @@ export const useFinanceStore = create<FinanceState>()(
         }
         return { added: toAdd.length, skipped };
       },
+      convertToCustom: (id) =>
+        set((s) => ({
+          scenarios: s.scenarios.map((sc) => {
+            if (sc.id !== id) return sc;
+            if (sc.type !== "linked_stress_test") return sc;
+            // Materialisér med aktuelle resolved værdier
+            const resolved = resolveScenario(sc, s.scenarios);
+            return {
+              ...resolved,
+              type: "custom",
+              manuallyEdited: true,
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+      rebaseOnCurrentBase: (id) =>
+        set((s) => {
+          const sc = s.scenarios.find((x) => x.id === id);
+          if (!sc || !sc.baseScenarioId) return s;
+          const base = s.scenarios.find((x) => x.id === sc.baseScenarioId);
+          if (!base) return s;
+          // Genskab som linked_stress_test ud fra aktuel base + bevarede modifiers
+          const linked: Scenario = {
+            ...sc,
+            type: "linked_stress_test",
+            manuallyEdited: false,
+            updatedAt: Date.now(),
+          };
+          const resolved = resolveScenario(linked, s.scenarios);
+          return {
+            ...s,
+            scenarios: s.scenarios.map((x) => (x.id === id ? resolved : x)),
+          };
+        }),
+      resetToCleanStressTest: (id) => get().rebaseOnCurrentBase(id),
     }),
     {
       name: "finance-tool.v1",
-      version: 10,
+      version: 11,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -291,6 +369,17 @@ export const useFinanceStore = create<FinanceState>()(
             inputs: { ...sc.inputs, lifeEvents: sc.inputs?.lifeEvents ?? [] },
           }));
         }
+        // v11: klassificér eksisterende scenarier til ny scenario-type
+        // (base / linked_stress_test / custom + manuallyEdited).
+        if (Array.isArray(state.scenarios)) {
+          const all = state.scenarios as Scenario[];
+          state.scenarios = all.map((sc) => {
+            if (sc.type) return sc; // allerede klassificeret (nyt felt)
+            const baseScenario = sc.baseScenarioId ? all.find((x) => x.id === sc.baseScenarioId) : undefined;
+            const cls = classifyLegacyScenario(sc, baseScenario);
+            return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
+          });
+        }
         return state;
       },
     },
@@ -299,4 +388,15 @@ export const useFinanceStore = create<FinanceState>()(
 
 export function useActiveScenario() {
   return useFinanceStore((s) => s.scenarios.find((sc) => sc.id === s.activeScenarioId) ?? s.scenarios[0]);
+}
+
+/**
+ * Hook der returnerer det aktive scenarie KLAR til beregning.
+ * For linked stress-tests rebygges scenariet ud fra aktuel basecase + modifiers.
+ */
+export function useResolvedActiveScenario() {
+  return useFinanceStore((s) => {
+    const active = s.scenarios.find((sc) => sc.id === s.activeScenarioId) ?? s.scenarios[0];
+    return resolveScenario(active, s.scenarios);
+  });
 }

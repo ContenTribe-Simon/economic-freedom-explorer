@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
+import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -237,7 +237,7 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
 }
 
 export default function Projection() {
-  const scenario = useActiveScenario();
+  const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
   const years = useMemo(() => project(scenario, assumptions), [scenario, assumptions]);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);

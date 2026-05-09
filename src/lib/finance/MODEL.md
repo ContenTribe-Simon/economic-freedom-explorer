@@ -2,6 +2,26 @@
 
 Kort overblik over beregningsflowet i `src/lib/finance/`. Bruges som internt referencekort for fremtidige udvidelser.
 
+## Scenarie-typer
+
+Hvert `Scenario` har en `type`:
+
+| Type | Adfærd |
+| --- | --- |
+| `base` | Uafhængigt basisscenarie. Frit redigerbart. |
+| `linked_stress_test` | Linket til et `baseScenarioId`. Beregnes dynamisk via `resolveScenario(scenario, scenarios)` som *aktuel basecase + aktive modifiers*. Egne `inputs` er kun cache. Manuel ændring eskalerer til `custom`. |
+| `custom` | Uafhængigt scenarie (typisk eskaleret fra et linket stress-test eller oprettet manuelt). `manuallyEdited=true` markerer at brugeren har ændret noget. Følger ikke længere basecase. |
+
+Hver `StressModifier` i `stress.ts` deklarerer eksplicit `allowedFields` — det dokumenterer hvilke felter modifieren styrer. Andre felter skal komme fra basecase.
+
+Helpers:
+- `resolveScenario(scenario, scenarios)` — bruges af alle compute call sites (Dashboard, Projection, Report, Scenarios) før `project()`.
+- `classifyLegacyScenario(scenario, base)` — bruges af persist-migration v11 og `importJson` til at klassificere scenarier uden `type`-felt.
+
+Store-actions: `convertToCustom(id)`, `rebaseOnCurrentBase(id)`, `resetToCleanStressTest(id)`.
+
+
+
 ## Filstruktur
 
 | Fil | Ansvar |

@@ -1,154 +1,131 @@
+## Mål
 
-# MVP: Personligt økonomi- & pensionsværktøj
+Indføre en tydelig scenarie-arkitektur med tre typer (`base`, `linked_stress_test`, `custom`) hvor linked stress-tests beregnes dynamisk fra aktuel basecase + modifiers — så ændringer i basecase automatisk slår igennem, mens manuelle ændringer eskalerer scenariet til `custom`.
 
-Dansk UI, lokal lagring (localStorage), scenarie-sammenligning og DK-realistisk skattemodel. Fokus på korrekt, gennemsigtig beregningsmotor før polish.
+## Datamodel (`src/lib/finance/types.ts`)
 
-## 1. Datastruktur
+Udvid `Scenario`:
+```ts
+type ScenarioType = "base" | "linked_stress_test" | "custom";
 
-Tre lag: **Inputs** (brugerens variable), **Assumptions** (skat/afkast/inflation), **Projection** (beregnet år-for-år).
-
-```text
-Scenario {
-  id, name, createdAt, notes
-  inputs: ScenarioInputs
-  assumptionsOverride?: Partial<Assumptions>   // nedarver fra global
-}
-
-ScenarioInputs {
-  person: { currentAge, lifeExpectancy = 95 }
-  buckets: {
-    free:    { balance, monthlyContribution, annualExtraContribution }
-    pension: { balance, monthlyContribution, employerContribution }
-    holding: { balance, expectedExitValue, exitYear, annualDistribution }
-    debt:    { balance, interestRate, monthlyPayment }
-  }
-  income: {
-    salaryNet, partTimeNetFromAge, partTimeAnnualNet,
-    familyFundAnnual, familyFundUntilAge,
-    statePensionFromAge = 67
-  }
-  spending: { desiredMonthlyNet, oneOffEvents: [] }   // events bruges i fuld version
-  stopAge: number                                      // fuldtidsstop
-  fullRetireAge: number                                // helt stop
-}
-
-Assumptions {
-  realReturn: { free, pension, holding }
-  inflation
-  tax: {
-    labor: { amBidrag: 0.08, bottomRate, topRate, topBracket, personalAllowance }
-    capital: { shareLow: 0.27, shareHigh: 0.42, shareThreshold }
-    pensionPayout: 0.40           // pensionsafgift v. udbetaling
-    corporate: 0.22
-    dividendFromHolding: { low: 0.27, high: 0.42, threshold }
-  }
-  statePensionAnnualNet
-  realTermsMode: true             // alt vises i nutidskroner
-}
-
-YearRow {
-  age, year
-  openingBalances {free, pension, holding, debt}
-  flows {
-    contributions {free, pension, holding}
-    income {salary, partTime, familyFund, statePension, holdingDistribution, pensionPayout}
-    taxes  {labor, capital, pensionPayout, dividend}
-    spending, debtInterest, debtPrincipal
-    withdrawals {free, pension, holding}      // hvad der reelt blev hævet
-  }
-  closingBalances {free, pension, holding, debt}
-  netWorth, shortfall (bool), monthlyGapAfterStop
+interface Scenario {
+  // eksisterende felter...
+  type?: ScenarioType;          // default: "custom" for legacy uden modifiers, "base" hvis ingen baseScenarioId
+  manuallyEdited?: boolean;     // sat når bruger eskalerer fra linked → custom
+  changedFields?: string[];     // valgfri sporing
 }
 ```
 
-## 2. Beregningslogik (årlig motor)
+Bump `MODEL_VERSION` ikke (ingen breaking change i beregningsmotor) men tilføj migration i persist.
 
-Pure funktion: `project(scenario, assumptions) → YearRow[]`. Ingen UI-afhængighed → let at unit-teste.
+## Modifier-katalog (`src/lib/finance/stress.ts`)
 
-For hvert år fra `currentAge` til `lifeExpectancy`:
+Hver `StressModifier` får et eksplicit `allowedFields: string[]` (dot-paths) udover `apply`:
 
-1. **Indtægter før stop**: løn (efter AM, bund/top, personfradrag), arbejdsgiverpension.
-2. **Indtægter efter stopAge**: deltid indtil `fullRetireAge`, familiefond indtil `familyFundUntilAge`, holdingudlodning (beskattes som aktieindkomst, lav/høj sats), pensionsudbetaling fra `fullRetireAge` (40% afgift), folkepension fra `statePensionFromAge`.
-3. **Holding-exit**: i `exitYear` lægges `expectedExitValue` til holding-balance (selskabsskat antages allerede afregnet, evt. justerbart).
-4. **Forbrugsbehov** = `desiredMonthlyNet * 12` (i realværdi) + engangsevents.
-5. **Cashflow-fald-igennem**:
-   - Hvis indkomst-efter-skat ≥ forbrug → overskud → indbetales til free (eller pension hvis stadig arbejdende).
-   - Hvis underskud → træk i prioriteret rækkefølge: **free → holdingudlodning → pension** (efter respektive skatter). Brugeren kan senere ændre rækkefølgen.
-6. **Vækst**: alle balancer vokser med `realReturn` (efter inflation, da vi er i nutidskroner).
-7. **Gæld**: rente tilskrives, månedlig ydelse trækkes fra free-cashflow.
-8. **Shortfall**: når samlet kapital ikke kan dække forbrug → marker år, fortsæt med 0.
+| Modifier | Tilladte felter |
+| --- | --- |
+| `noBarma` | `inputs.holding.balance`, `inputs.holding.expectedExitValue`, `inputs.holding.annualDistribution` |
+| `noPartTime` | `inputs.income.partTime.grossAnnual`, `inputs.income.partTime.netMonthly`, `inputs.fullRetireAge` |
+| `lowReturn` | `assumptionsOverride.realReturn.free/.pension/.holding` |
+| `higherSpending` | `inputs.spending.desiredMonthlyNet` |
+| `noFolkepension` | `inputs.income.statePension.mode` |
 
-**DK-realistisk skat (MVP)**:
-- Lønindkomst: AM-bidrag 8%, derefter progressiv (bund + top over topgrænse), personfradrag.
-- Aktieindkomst (holdingudlodning + frie aktier): 27% under tærskel, 42% over.
-- Pensionsudbetaling: flad 40% afgift (kan udvides til ratepension/livrente senere).
-- Folkepension: indtastes som nettobeløb (samspil med pension er kompliceret → flagges i assumptions).
-- Alle satser/grænser ligger i `Assumptions` og kan redigeres.
+Tilføj helper `resolveScenario(scenario, baseScenario)` som for `linked_stress_test`:
+1. Tager dyb kopi af `baseScenario`
+2. Bevarer scenarie-ID/navn/type/modifiers
+3. Anvender hver aktiv modifier via `apply`
 
-## 3. UI-struktur (MVP)
+## Beregning (`projection.ts` / `kpis.ts`)
 
-```text
-/                       Dashboard (aktivt scenarie + KPI'er + graf)
-/inputs                 Inputside (alle variable, grupperet)
-/assumptions            Skatte-/afkast-/inflationsantagelser
-/projection             År-for-år tabel (eksporterbar)
-/scenarios              Scenarie-sammenligning (3-5 side om side)
+**Ingen ændring i selve motoren.** I stedet wrapper på indgangen — alle steder der i dag kalder `project(scenario, assumptions)` skal i stedet hente det resolvede scenarie:
+
+```ts
+const resolved = resolveScenarioForCompute(scenario, scenarios);
+const years = project(resolved, assumptions);
 ```
 
-Venstre sidebar med navigation + scenarie-vælger (dropdown + "nyt scenarie", "dupliker", "omdøb", "slet").
+Tilføj én ny helper i `stress.ts` (eller ny `resolve.ts`) — opdater call sites:
+- `Dashboard.tsx`
+- `Projection.tsx`
+- `Scenarios.tsx`
+- `Report.tsx`
+- evt. tests
 
-### Inputside (grupperet i kort)
-- Person & alder
-- Fri kapital
-- Pension
-- Holding (inkl. exit)
-- Gæld
-- Indkomst (løn, deltid, familiefond, folkepension)
-- Forbrug & stopalder
+## Manuel redigering eskalering
 
-### Dashboard / aktivt scenarie viser
-- KPI-kort: Tidligste mulige stopalder, Kapital ved stopalder, Kapital ved 65, Kapital ved 95, Første shortfall-år, Månedligt hul efter stop, Robusthedsscore (simpel: andel af år uden shortfall + buffer ved 95).
-- Graf: stacked area af free/pension/holding over tid + linje for forbrug.
-- Banner hvis shortfall + forklaring.
+`Inputs.tsx` (og `Assumptions.tsx`) — wrap input-handlers så ændring på et `linked_stress_test` udløser bekræftelses-dialog:
 
-### Scenarie-sammenligning
-Tabel: scenarienavn × KPI'er. Highlight bedste/værste pr. række. Knap "dupliker som nyt scenarie".
+> "Dette er et linket stress-test scenarie. Hvis du ændrer dette felt, bliver scenariet konverteret til et manuelt scenarie."
+> [Konvertér til custom] [Annullér]
 
-### Assumptions-side
-Alle skatteparametre, afkast, inflation, realterms-mode. Tydelig "Antagelser bag modellen" tekst med disclaimers.
+Konvertering sker via store-action `convertToCustom(id)` der:
+1. Materialiserer det resolvede scenarie (kopierer alle felter ind som concrete values)
+2. Sætter `type = "custom"`, `manuallyEdited = true`
+3. Bevarer `baseScenarioId`/`baseScenarioName` til reference
 
-## 4. Robusthedsscore (MVP-definition)
-Simpel 0-100: 40 point for "ingen shortfall før 95", 30 for "kapital > 0 ved 95", 30 skaleret efter buffer (kapital ved 95 / årligt forbrug). Vises med farve.
+Whitelist: hvis det ændrede felt er i modifierens `allowedFields`, blokér ændringen helt (eller tillad og opdater stress-konfigurationen — vi vælger blokér, da modifier-værdier er deterministiske).
 
-## 5. Lagring
-- `localStorage`-key `finance-tool.v1` med `{ scenarios[], assumptions, activeScenarioId }`.
-- Eksport/import som JSON-fil (knap i header) → giver migration-vej til cloud senere.
-- Ét seed-scenarie ("Base case") oprettes ved første besøg.
+## Store-actions (`src/store/financeStore.ts`)
 
-## 6. Teknisk
+Nye/ændrede actions:
+- `convertToCustom(id)` — materialiser linked → custom
+- `rebaseOnCurrentBase(id)` — for custom: kopier basecase-felter ind igen, behold modifiers, sæt `manuallyEdited = false`, type=`linked_stress_test` hvis modifiers findes
+- `resetToCleanStressTest(id)` — drop alle ad-hoc ændringer, bliv `linked_stress_test`
+- Migration ved persist hydrate: scenarier uden `type` får:
+  - `type = "base"` hvis `!baseScenarioId && !modifiers`
+  - `type = "linked_stress_test"` hvis modifiers && passer med modifier whitelist (deep-equal mod resolved)
+  - ellers `type = "custom"`, `manuallyEdited = true`
 
-- React + TypeScript + Tailwind + shadcn (allerede i projektet).
-- Beregningsmotor i `src/lib/finance/` som rene funktioner:
-  - `tax.ts` (labor, capital, pensionPayout, dividend)
-  - `cashflow.ts` (forbrug vs. indkomst, withdraw-prioritet)
-  - `projection.ts` (hovedløkken)
-  - `kpis.ts` (afled KPI'er fra YearRow[])
-  - `defaults.ts` (DK-satser 2026 som startværdier)
-- Vitest unit-tests for skat + projection (allerede vitest opsat).
-- State: Zustand store + localStorage-persist; React Query ikke nødvendig endnu.
-- Recharts til graf, shadcn `<Table>` til år-for-år.
-- React Hook Form + Zod til inputs.
-- Routing: tilføj de 5 ruter i `App.tsx`.
+## UI
 
-## 7. Eksplicit ude af MVP (gemmes til fuld version)
-- Sensitivity sliders, stress-test-presets, livsbegivenhedstidslinje, snapshots over tid, cloud-sync/login, multi-valuta, nominel/real toggle pr. felt, samspilseffekter på folkepension.
+**Sidebar / Scenarie-vælger (AppShell)**: badge ved hvert scenarie:
+- "Base" / "Linket stress-test" / "Custom"
 
-## 8. Leverancerækkefølge
-1. Typer + defaults + skattefunktioner + tests.
-2. `projection.ts` + KPI'er + tests (verificér med håndregnet base case).
-3. Zustand store + localStorage + seed-scenarie.
-4. Layout med sidebar + scenarie-vælger.
-5. Inputside + Assumptions-side.
-6. Dashboard (KPI + graf) + Projection-tabel.
-7. Scenarie-sammenligning.
-8. Eksport/import JSON + disclaimers.
+**Scenarios.tsx**: 
+- Header-cellen viser badge + kort tekst:
+  - linked: "Beregnes ud fra aktuel basecase + modifier."
+  - custom: "Manuelt scenarie – følger ikke basecase."
+- For custom: knapper "Rebasér på basecase" / "Nulstil til stress-test" / "Behold"
+
+**Inputs.tsx**: Banner øverst når aktivt scenarie er `linked_stress_test`:
+> "Linket stress-test. Felter låst og styres af basecase + modifier."
+
+Inputs disables for ikke-allowed-felter; allowed-felter er også låst (deterministiske).
+
+For `custom`: lille banner med rebase/reset-handlinger.
+
+## Eksport/import (`financeStore.exportJson` / `importJson`)
+
+`Scenario` eksporteres som-er — de nye felter (`type`, `manuallyEdited`, `changedFields`) følger med naturligt. Validering i `importJson` accepterer manglende felter (kører migration igen).
+
+## Tests (`__tests__/scenario-types.test.ts` ny)
+
+1. Linked "uden Barma" + ændring af basecase `desiredMonthlyNet` 21000 → 15000 → resolved scenarie bruger 15000 og `holding.balance === 0`.
+2. Linked "uden deltid" + ændring af basecase `income.partTime.grossAnnual` (men noPartTime nuller den, så test på et andet felt fx `salary`) → resolved følger ny basecase.
+3. `convertToCustom` på et linked scenarie → type=`custom`, manuallyEdited=true, efterfølgende basecase-ændring påvirker IKKE scenariet.
+4. Eksport→import bevarer `type`, `baseScenarioId`, `modifiers`, `manuallyEdited`.
+5. Migration: legacy scenarie uden `type` men med modifiers og kun modifier-felter ændret → klassificeres som `linked_stress_test`.
+6. Migration: legacy scenarie med modifiers + ekstra ændringer → `custom` + manuallyEdited.
+
+## Filer
+
+| Fil | Ændring |
+| --- | --- |
+| `src/lib/finance/types.ts` | Tilføj `ScenarioType`, udvid `Scenario` |
+| `src/lib/finance/stress.ts` | Tilføj `allowedFields` pr. modifier, `resolveScenarioForCompute`, classify-helper til migration |
+| `src/store/financeStore.ts` | Migration, nye actions, applyStressModifier markerer som linked_stress_test |
+| `src/pages/Scenarios.tsx` | Badges, custom-handlinger, brug resolved scenarie til KPI |
+| `src/pages/Dashboard.tsx` | Brug resolved scenarie |
+| `src/pages/Projection.tsx` | Brug resolved scenarie |
+| `src/pages/Report.tsx` | Brug resolved scenarie |
+| `src/pages/Inputs.tsx` | Eskalerings-dialog, lock UI for linked, banners |
+| `src/components/AppShell.tsx` | Badge i scenarie-listen |
+| `src/lib/finance/__tests__/scenario-types.test.ts` | Ny testsuite |
+| `src/lib/finance/MODEL.md` | Dokumentér scenarie-typer |
+
+## Garantier
+
+- Ingen ændring i `projection.ts`, `kpis.ts`, `tax.ts`, `sanity.ts`.
+- Ingen ændring i shortfall/holding/pension/score-logik.
+- Eksisterende scenarier bevares via migration.
+- Alle eksisterende tests skal fortsat passere.

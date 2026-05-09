@@ -287,6 +287,17 @@ export interface YearRow {
   monthlyGap: number;
 }
 
+/**
+ * Scenarie-type:
+ *  - "base": uafhængigt basisscenarie. Kan redigeres frit.
+ *  - "linked_stress_test": linket til et base-scenarie. Beregnes dynamisk som
+ *    aktuel basecase + aktive modifiers — felterne i `inputs` er kun en cache
+ *    og ignoreres ved beregning. Manuelle ændringer eskalerer scenariet til "custom".
+ *  - "custom": uafhængigt scenarie. Kan stamme fra et stress-test eller være oprettet manuelt.
+ *    Følger ikke længere automatisk basecase.
+ */
+export type ScenarioType = "base" | "linked_stress_test" | "custom";
+
 export interface Scenario {
   id: string;
   name: string;
@@ -303,6 +314,12 @@ export interface Scenario {
   assumptionsOverride?: Partial<Assumptions>;
   /** Frit metadata-felt forberedt til fremtidig brug (Supabase, tags m.v.). */
   metadata?: Record<string, unknown>;
+  /** Scenarietype — styrer om scenariet beregnes dynamisk eller bruger egne inputs. */
+  type?: ScenarioType;
+  /** Sat når et linket stress-test er blevet manuelt redigeret og dermed eskaleret til custom. */
+  manuallyEdited?: boolean;
+  /** Valgfri sporing af felter ændret ift. basecase (bruges ikke af motoren endnu). */
+  changedFields?: string[];
 }
 
 /** Aktuel modelversion for lokal/eksport persistens. Bumpes ved breaking changes i datamodellen. */

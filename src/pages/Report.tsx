@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
+import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
@@ -22,7 +22,7 @@ function statusLabel(s: ReturnType<typeof deriveKPIs>["modelStatus"]) {
 }
 
 export default function Report() {
-  const scenario = useActiveScenario();
+  const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
 
   const { kpis, chartData, checks } = useMemo(() => {

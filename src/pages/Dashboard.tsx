@@ -1,5 +1,5 @@
 import { ReactNode, useMemo, useState } from "react";
-import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
+import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs, scoreVerdict, LEVEL_LABELS } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
@@ -114,7 +114,7 @@ const SP_METHOD_LABEL = {
 } as const;
 
 export default function Dashboard() {
-  const scenario = useActiveScenario();
+  const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
 
   const { years, kpis, chartData, checks } = useMemo(() => {

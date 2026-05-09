@@ -5,8 +5,35 @@ import { deriveKPIs } from "@/lib/finance/kpis";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
-import { Trash2 } from "lucide-react";
-import { STRESS_TESTS } from "@/lib/finance/stress";
+import { Trash2, Link2, GitBranch } from "lucide-react";
+import { resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
+import { Badge } from "@/components/ui/badge";
+import type { Scenario } from "@/lib/finance/types";
+
+export function ScenarioTypeBadge({ scenario }: { scenario: Scenario }) {
+  if (scenario.type === "linked_stress_test") {
+    return (
+      <Badge variant="secondary" className="gap-1 text-[10px] uppercase tracking-wider">
+        <Link2 className="h-3 w-3" />
+        Linket stress-test
+      </Badge>
+    );
+  }
+  if (scenario.type === "custom") {
+    return (
+      <Badge variant="outline" className="gap-1 text-[10px] uppercase tracking-wider">
+        <GitBranch className="h-3 w-3" />
+        Custom{scenario.manuallyEdited ? " · redigeret" : ""}
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="default" className="gap-1 text-[10px] uppercase tracking-wider">
+      Base
+    </Badge>
+  );
+}
+
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
@@ -17,6 +44,8 @@ export default function Scenarios() {
   const del = useFinanceStore((s) => s.deleteScenario);
   const add = useFinanceStore((s) => s.addScenario);
   const applyStressModifier = useFinanceStore((s) => s.applyStressModifier);
+  const convertToCustom = useFinanceStore((s) => s.convertToCustom);
+  const rebase = useFinanceStore((s) => s.rebaseOnCurrentBase);
 
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
@@ -29,8 +58,9 @@ export default function Scenarios() {
   const rows = useMemo(
     () =>
       scenarios.map((s) => {
-        const years = project(s, assumptions);
-        return { scenario: s, kpis: deriveKPIs(s, years, assumptions) };
+        const resolved = resolveScenario(s, scenarios);
+        const years = project(resolved, assumptions);
+        return { scenario: s, resolved, kpis: deriveKPIs(resolved, years, assumptions) };
       }),
     [scenarios, assumptions],
   );
@@ -158,8 +188,31 @@ export default function Scenarios() {
                         {scenario.id === activeId ? "Aktiv" : "Klik for aktiver"}
                       </div>
                     </button>
-                    <div className="flex justify-end gap-1 mt-2">
+                    <div className="flex flex-wrap justify-end gap-1 mt-2">
+                      <ScenarioTypeBadge scenario={scenario} />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                      {scenario.type === "linked_stress_test"
+                        ? "Beregnes ud fra aktuel basecase + modifier."
+                        : scenario.type === "custom"
+                          ? "Manuelt scenarie – følger ikke automatisk basecase."
+                          : "Basisscenarie – kan redigeres frit."}
+                    </p>
+                    <div className="flex flex-wrap justify-end gap-1 mt-2">
                       <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => duplicate(scenario.id)}>Dupliker</Button>
+                      {scenario.type === "custom" && scenario.baseScenarioId ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          title="Genskab som rent linked stress-test ud fra aktuel basecase"
+                          onClick={() => {
+                            if (confirm("Rebasér scenariet på aktuel basecase? Manuelle ændringer går tabt.")) rebase(scenario.id);
+                          }}
+                        >
+                          Rebasér
+                        </Button>
+                      ) : null}
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => del(scenario.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
