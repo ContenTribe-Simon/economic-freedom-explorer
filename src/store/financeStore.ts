@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Assumptions, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
+import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 import { applyStressModifierToState } from "@/lib/finance/stress";
 
