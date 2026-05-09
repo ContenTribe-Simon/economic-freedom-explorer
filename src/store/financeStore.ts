@@ -100,14 +100,57 @@ export const useFinanceStore = create<FinanceState>()(
         return JSON.stringify(payload, null, 2);
       },
       importJson: (json) => {
-        const parsed = JSON.parse(json);
-        if (Array.isArray(parsed.scenarios) && parsed.scenarios.length > 0) {
-          set({
-            scenarios: parsed.scenarios,
-            assumptions: parsed.assumptions ?? defaultAssumptions,
-            activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
-          });
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(json);
+        } catch {
+          throw new Error("Filen er ikke gyldig JSON.");
         }
+        if (!isValidImport(parsed)) {
+          throw new Error("Filen ligner ikke en gyldig model-eksport (mangler scenarios).");
+        }
+        set({
+          scenarios: parsed.scenarios,
+          assumptions: parsed.assumptions ?? defaultAssumptions,
+          activeScenarioId: parsed.activeScenarioId ?? parsed.scenarios[0].id,
+        });
+      },
+      addStandardScenarios: () => {
+        const existingNames = new Set(get().scenarios.map((s) => s.name));
+        const toAdd: Scenario[] = [];
+
+        // Base
+        if (!existingNames.has(STANDARD_BASE_NAME)) {
+          const base = makeBaseScenario();
+          base.name = STANDARD_BASE_NAME;
+          base.metadata = { ...(base.metadata ?? {}), standard: true };
+          toAdd.push(base);
+        }
+
+        // Build a temporary working set including the base, to apply each stress-test on top.
+        const baseRef = toAdd[0] ?? get().scenarios.find((s) => s.name === STANDARD_BASE_NAME);
+        if (baseRef) {
+          for (const t of STRESS_TESTS) {
+            const expectedName = `${STANDARD_BASE_NAME} – ${t.suffix}`;
+            if (existingNames.has(expectedName)) continue;
+            const next = structuredClone(baseRef);
+            next.id = crypto.randomUUID();
+            next.name = expectedName;
+            next.createdAt = Date.now();
+            next.baseScenarioId = baseRef.id;
+            next.baseScenarioName = baseRef.name;
+            next.modifiers = { [t.key]: true };
+            next.metadata = { ...(next.metadata ?? {}), standard: true };
+            t.apply(next);
+            toAdd.push(next);
+          }
+        }
+
+        const skipped = (1 + STRESS_TESTS.length) - toAdd.length;
+        if (toAdd.length > 0) {
+          set((s) => ({ scenarios: [...s.scenarios, ...toAdd] }));
+        }
+        return { added: toAdd.length, skipped };
       },
     }),
     {
