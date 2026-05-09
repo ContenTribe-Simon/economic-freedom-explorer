@@ -120,3 +120,14 @@
     @apply text-xs uppercase tracking-widest text-muted-foreground;
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .print\:hidden { display: none !important; }
+  .report-page { padding: 0 !important; max-width: 100% !important; }
+  .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+  @page { size: A4; margin: 16mm; }
+}
