@@ -5,6 +5,15 @@ export interface PersonInputs {
   lifeExpectancy: number;
 }
 
+/**
+ * Stopregel for planlagt fri opsparing.
+ *  - "stopAge": stop ved jobstop / stopalder (default)
+ *  - "fullRetireAge": stop ved fuld pension (også deltid stoppet)
+ *  - "customAge": stop ved en brugerdefineret alder
+ *  - "never": fortsæt hele livet
+ */
+export type FreeContributionStopRule = "stopAge" | "fullRetireAge" | "customAge" | "never";
+
 export interface FreeBucketInputs {
   /** Investerbar/fri kapital — får realafkast og bruges først ved udtræk. */
   balance: number;
@@ -14,6 +23,10 @@ export interface FreeBucketInputs {
   cashBuffer: number;
   /** Hvis true må buffer bruges hvis fri kapital løber tør, før holding/pension. */
   bufferUsableForShortfall: boolean;
+  /** Eksplicit stopregel for planlagt fri opsparing. Default: "stopAge". */
+  contributionStopRule?: FreeContributionStopRule;
+  /** Anvendt når contributionStopRule = "customAge". */
+  contributionStopAge?: number;
 }
 
 export type LifeAnnuityMode = "gross" | "net";
@@ -254,6 +267,12 @@ export interface YearFlows {
   unallocatedCashflow: number;
   /** Faktisk investeret beløb i fri kapital i året (samme som freeContribution, men eksponeret eksplicit til audit). */
   investedAmount: number;
+  /** Planlagt fri opsparing for året (kan være 0 hvis stoppet pga. stopregel). */
+  plannedFreeContribution: number;
+  /** Er den planlagte fri opsparing aktiv i året iht. stopreglen? */
+  plannedContributionsActive: boolean;
+  /** Resolved alder hvor planlagt fri opsparing stopper (null hvis aldrig). */
+  plannedContributionStopAge: number | null;
   growth: { free: number; pension: number; holding: number };
   /** Manglende dækning af holdinggæld der skulle betales af holdingkapital. */
   holdingFinancingShortfall: number;
