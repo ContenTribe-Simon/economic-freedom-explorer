@@ -54,16 +54,40 @@ export const useFinanceStore = create<FinanceState>()(
       },
       updateScenario: (id, updater) =>
         set((s) => ({
-          scenarios: s.scenarios.map((sc) => (sc.id === id ? updater(sc) : sc)),
+          scenarios: s.scenarios.map((sc) => {
+            if (sc.id !== id) return sc;
+            const next = updater(sc);
+            // Hvis et linket stress-test bliver opdateret, materialisér det til custom.
+            // (UI eskalerer typisk via convertToCustom() først, men dette er en sikkerhedsventil.)
+            if (sc.type === "linked_stress_test" && next !== sc) {
+              return { ...next, type: "custom", manuallyEdited: true, updatedAt: Date.now() };
+            }
+            return { ...next, updatedAt: Date.now() };
+          }),
         })),
       addScenario: (name = "Nyt scenarie", fromId) => {
         const base = fromId ? get().scenarios.find((s) => s.id === fromId) : undefined;
         const sc: Scenario = base
-          ? { ...structuredClone(base), id: crypto.randomUUID(), name, createdAt: Date.now() }
+          ? {
+              ...structuredClone(base),
+              id: crypto.randomUUID(),
+              name,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              // Et nyt scenarie kopieret fra en anden er altid uafhængigt (custom),
+              // medmindre brugeren eksplicit kører applyStressModifier bagefter.
+              type: "custom",
+              manuallyEdited: false,
+              modifiers: {},
+              baseScenarioId: undefined,
+              baseScenarioName: undefined,
+            }
           : {
               id: crypto.randomUUID(),
               name,
               createdAt: Date.now(),
+              updatedAt: Date.now(),
+              type: "custom",
               inputs: structuredClone(defaultInputs),
             };
         set((s) => ({ scenarios: [...s.scenarios, sc], activeScenarioId: sc.id }));
