@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
+import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
