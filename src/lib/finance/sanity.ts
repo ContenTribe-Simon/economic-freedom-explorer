@@ -131,7 +131,21 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
       id: "holding-financing-short",
       severity: "error",
       title: "Holdinggæld kan ikke betales af holdingkapital",
-      detail: `I ${hsYears.length} år forsøges afdrag på holdinggæld via holdingkapital uden tilstrækkelig dækning (i alt ${total.toLocaleString("da-DK")} kr). Modellen lader gælden stå indtil der er dækning. Scenariet er ikke fuldt validt, før finansiering af holdinggæld er afklaret — vælg fx "Privat cashflow", "Ekstern selskabscashflow" eller "Afdrages ved exit".`,
+      detail: `I ${hsYears.length} år forsøges afdrag på holdinggæld via holdingkapital uden tilstrækkelig dækning (i alt ${total.toLocaleString("da-DK")} kr). Modellen lader gælden stå indtil der er dækning. Scenariet er ikke fuldt validt, før finansiering af holdinggæld er afklaret — vælg fx "Privat cashflow", "Eksternt finansieret" eller "Afdrages ved exit".`,
+    });
+  }
+
+  // Neutral note: holdinggæld markeret som eksternt finansieret
+  const externalHoldingDebts = inp.debts.filter(
+    (d) => d.kind === "holding" && d.balance > 0 && (d.holdingFinancing ?? "holding_capital") === "external_company",
+  );
+  if (externalHoldingDebts.length > 0) {
+    const names = externalHoldingDebts.map((d) => `"${d.name}"`).join(", ");
+    out.push({
+      id: "holding-debt-external",
+      severity: "info",
+      title: "Holdinggæld er eksternt finansieret",
+      detail: `${names} er markeret som eksternt finansieret og indgår derfor ikke som cashflow-belastning i modellen. Medregning i nettoformue styres separat via checkboxen "Medregn i nettoformue".`,
     });
   }
 
