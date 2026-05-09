@@ -45,6 +45,7 @@ export const defaultInputs: ScenarioInputs = {
     annualExtraContribution: 50000,
     cashBuffer: 100000,
     bufferUsableForShortfall: false,
+    contributionStopRule: "stopAge",
   },
   pension: {
     balance: 800000,
