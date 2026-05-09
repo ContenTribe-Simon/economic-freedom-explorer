@@ -84,7 +84,7 @@ export const useFinanceStore = create<FinanceState>()(
           activeScenarioId: get().activeScenarioId,
           scenarios: get().scenarios.map((s) => ({ ...s, updatedAt: s.updatedAt ?? now })),
           assumptions: get().assumptions,
-          metadata: { source: "local" },
+          metadata: { source: "local", release: MODEL_RELEASE },
         };
         return JSON.stringify(payload, null, 2);
       },
