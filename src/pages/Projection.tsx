@@ -150,12 +150,26 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
           <Row label="Forbrug" value={-f.spending} indent />
           <Row label="Renter + afdrag (privat)" value={-(f.debtInterest + f.debtPrincipal)} indent />
           {(() => {
-            const planned = inputs.free.monthlyContribution * 12 + inputs.free.annualExtraContribution;
             const logic = inputs.savingsLogic ?? "planned";
             const logicLabel = logic === "planned" ? "Planlagt opsparing" : logic === "cashflow" ? "Cashflow-baseret" : "Hybrid";
+            const rule = inputs.free.contributionStopRule ?? "stopAge";
+            const ruleLabel =
+              rule === "stopAge" ? `Stop ved jobstop (alder ${inputs.stopAge})`
+              : rule === "fullRetireAge" ? `Stop ved fuld pension (alder ${inputs.fullRetireAge})`
+              : rule === "customAge" ? `Stop ved alder ${inputs.free.contributionStopAge ?? inputs.stopAge}`
+              : "Fortsætter hele livet";
+            const active = f.plannedContributionsActive;
+            const stopAge = f.plannedContributionStopAge;
             return (
               <>
-                <Row label={`Planlagt opsparing (${logicLabel})`} value={planned} indent />
+                <Row label={`Stopregel for fri opsparing`} value={ruleLabel} indent />
+                <Row label="Planlagt opsparing aktiv" value={active ? "Ja" : "Nej"} indent />
+                <Row label={`Planlagt opsparing (${logicLabel})`} value={f.plannedFreeContribution} indent />
+                {!active && stopAge !== null && (
+                  <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                    Planlagt opsparing: 0 kr — stoppet ved alder {stopAge}.
+                  </div>
+                )}
                 <Row label="Faktisk investeret i fri kapital" value={f.investedAmount} strong />
                 {f.unallocatedCashflow > 0.5 && (
                   <Row label="Ikke-allokeret cashflow" value={f.unallocatedCashflow} indent />
