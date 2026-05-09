@@ -5,8 +5,9 @@ import { deriveKPIs } from "@/lib/finance/kpis";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
-import { Trash2 } from "lucide-react";
-import { STRESS_TESTS } from "@/lib/finance/stress";
+import { Trash2, Link2, Pencil, GitBranch } from "lucide-react";
+import { resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
+import { Badge } from "@/components/ui/badge";
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
