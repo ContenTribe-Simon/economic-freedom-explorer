@@ -1,10 +1,20 @@
-import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload } from "lucide-react";
+import { NavLink, useLocation } from "react-router-dom";
+import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers } from "lucide-react";
 import { useFinanceStore } from "@/store/financeStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -12,12 +22,40 @@ const navItems = [
   { to: "/projection", label: "År-for-år", icon: Table },
   { to: "/scenarios", label: "Scenarier", icon: GitCompareArrows },
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },
+  { to: "/report", label: "Rapport", icon: FileText },
 ];
 
+function formatRelative(ts: number | null): string {
+  if (!ts) return "—";
+  const diff = Math.max(0, Date.now() - ts);
+  if (diff < 5_000) return "lige nu";
+  if (diff < 60_000) return `${Math.round(diff / 1000)} sek siden`;
+  if (diff < 3_600_000) return `${Math.round(diff / 60_000)} min siden`;
+  return new Date(ts).toLocaleString("da-DK", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { scenarios, activeScenarioId, setActive, addScenario, duplicateScenario, exportJson, importJson } =
+  const { scenarios, activeScenarioId, setActive, addScenario, duplicateScenario, exportJson, importJson, addStandardScenarios } =
     useFinanceStore();
   const fileRef = useRef<HTMLInputElement>(null);
+  const location = useLocation();
+  const isReport = location.pathname === "/report";
+
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(() => Date.now());
+  const [_, force] = useState(0);
+  const [pendingImport, setPendingImport] = useState<string | null>(null);
+
+  // Track local persistence: zustand persist writes on every state change.
+  useEffect(() => {
+    const unsub = useFinanceStore.subscribe(() => setLastSavedAt(Date.now()));
+    return unsub;
+  }, []);
+
+  // Re-render the relative timestamp every 30s.
+  useEffect(() => {
+    const id = window.setInterval(() => force((n) => n + 1), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleExport = () => {
     const blob = new Blob([exportJson()], { type: "application/json" });
@@ -27,24 +65,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     a.download = `finance-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("Eksporteret som JSON");
   };
 
-  const handleImport = (file: File) => {
+  const handleImportFile = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        importJson(reader.result as string);
-        toast.success("Importeret");
-      } catch {
-        toast.error("Kunne ikke læse fil");
-      }
-    };
+    reader.onload = () => setPendingImport(reader.result as string);
+    reader.onerror = () => toast.error("Kunne ikke læse filen");
     reader.readAsText(file);
   };
 
+  const confirmImport = () => {
+    if (!pendingImport) return;
+    try {
+      importJson(pendingImport);
+      toast.success("Importeret — nuværende data er erstattet");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kunne ikke importere fil");
+    } finally {
+      setPendingImport(null);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleAddStandard = () => {
+    const { added, skipped } = addStandardScenarios();
+    if (added === 0) toast.info("Standard-scenarierne findes allerede");
+    else toast.success(`Tilføjet ${added} standard-scenarie${added === 1 ? "" : "r"}${skipped ? ` (${skipped} fandtes allerede)` : ""}`);
+  };
+
+  // Print/report mode: render only the page content, no chrome.
+  if (isReport) {
+    return <main className="min-h-screen bg-background">{children}</main>;
+  }
+
   return (
     <div className="min-h-screen flex bg-background">
-      <aside className="w-64 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col">
+      <aside className="w-64 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col print:hidden">
         <div className="p-6 border-b border-sidebar-border">
           <div className="text-xs uppercase tracking-[0.2em] text-sidebar-foreground/60 mb-1">Personlig Økonomi</div>
           <div className="font-display text-2xl font-semibold leading-tight">Frihedsmodel</div>
@@ -104,29 +161,69 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-sidebar-border space-y-2">
-          <Button size="sm" variant="ghost" className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" /> Eksporter
+        <div className="p-3 border-t border-sidebar-border space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-sidebar-foreground/50 px-2 pb-1">Data &amp; rapport</div>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={handleExport}
+          >
+            <Download className="h-4 w-4 mr-2" /> Eksporter JSON
           </Button>
-          <Button size="sm" variant="ghost" className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-4 w-4 mr-2" /> Importer
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload className="h-4 w-4 mr-2" /> Importer JSON
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={handleAddStandard}
+          >
+            <Layers className="h-4 w-4 mr-2" /> Tilføj standard-scenarier
           </Button>
           <input
             ref={fileRef}
             type="file"
             accept="application/json"
             className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
+            onChange={(e) => e.target.files?.[0] && handleImportFile(e.target.files[0])}
           />
-          <p className="text-[10px] text-sidebar-foreground/50 leading-relaxed pt-2">
-            Data gemmes lokalt i din browser. Modellen er forsimplet og udgør ikke rådgivning.
-          </p>
+          <div className="pt-3 mt-2 border-t border-sidebar-border space-y-1">
+            <p className="text-[10px] text-sidebar-foreground/60" data-testid="last-saved">
+              Sidst gemt lokalt: <span className="font-medium">{formatRelative(lastSavedAt)}</span>
+            </p>
+            <p className="text-[10px] text-sidebar-foreground/50 leading-relaxed">
+              Data gemmes lokalt i din browser. Modellen er forsimplet og udgør ikke rådgivning.
+            </p>
+          </div>
         </div>
       </aside>
 
       <main className="flex-1 overflow-auto">
         <div className="max-w-6xl mx-auto p-8">{children}</div>
       </main>
+
+      <AlertDialog open={pendingImport !== null} onOpenChange={(open) => !open && setPendingImport(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Importer model?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette erstatter alle nuværende scenarier, antagelser og sikkerhedsvurderinger med indholdet af filen.
+              Eksportér først hvis du vil bevare en kopi af dine nuværende data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingImport(null)}>Annullér</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmImport}>Erstat data</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
