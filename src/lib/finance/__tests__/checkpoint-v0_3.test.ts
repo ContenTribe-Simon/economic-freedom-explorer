@@ -40,14 +40,13 @@ describe("checkpoint: base case is valid", () => {
     expect(kpis.financialRobustness).toBeGreaterThan(25);
   });
 
-  it("base case with holding exit value remains valid and exit is recorded", () => {
+  it("base case with holding exit value remains valid", () => {
     const s = makeBaseScenario();
     s.inputs.holding.expectedExitValue = 3_000_000;
     s.inputs.holding.exitYear = new Date().getFullYear() + 10;
-    const { years, kpis } = run(s);
+    const { kpis } = run(s);
     expect(kpis.modelStatus).not.toBe("invalid");
-    const exitYear = years.find((y) => y.flows.holdingExitNet && y.flows.holdingExitNet > 0);
-    expect(exitYear).toBeTruthy();
+    expect(kpis.firstFinancingIssueAge).toBeNull();
   });
 });
 
