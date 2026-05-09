@@ -9,6 +9,7 @@ import Inputs from "./pages/Inputs";
 import Assumptions from "./pages/Assumptions";
 import Projection from "./pages/Projection";
 import Scenarios from "./pages/Scenarios";
+import Report from "./pages/Report";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
