@@ -5,9 +5,35 @@ import { deriveKPIs } from "@/lib/finance/kpis";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
-import { Trash2, Link2, Pencil, GitBranch } from "lucide-react";
+import { Trash2, Link2, GitBranch } from "lucide-react";
 import { resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { Badge } from "@/components/ui/badge";
+import type { Scenario } from "@/lib/finance/types";
+
+export function ScenarioTypeBadge({ scenario }: { scenario: Scenario }) {
+  if (scenario.type === "linked_stress_test") {
+    return (
+      <Badge variant="secondary" className="gap-1 text-[10px] uppercase tracking-wider">
+        <Link2 className="h-3 w-3" />
+        Linket stress-test
+      </Badge>
+    );
+  }
+  if (scenario.type === "custom") {
+    return (
+      <Badge variant="outline" className="gap-1 text-[10px] uppercase tracking-wider">
+        <GitBranch className="h-3 w-3" />
+        Custom{scenario.manuallyEdited ? " · redigeret" : ""}
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="default" className="gap-1 text-[10px] uppercase tracking-wider">
+      Base
+    </Badge>
+  );
+}
+
 
 export default function Scenarios() {
   const scenarios = useFinanceStore((s) => s.scenarios);
