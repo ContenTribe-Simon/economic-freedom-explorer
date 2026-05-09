@@ -389,3 +389,14 @@ export const useFinanceStore = create<FinanceState>()(
 export function useActiveScenario() {
   return useFinanceStore((s) => s.scenarios.find((sc) => sc.id === s.activeScenarioId) ?? s.scenarios[0]);
 }
+
+/**
+ * Hook der returnerer det aktive scenarie KLAR til beregning.
+ * For linked stress-tests rebygges scenariet ud fra aktuel basecase + modifiers.
+ */
+export function useResolvedActiveScenario() {
+  return useFinanceStore((s) => {
+    const active = s.scenarios.find((sc) => sc.id === s.activeScenarioId) ?? s.scenarios[0];
+    return resolveScenario(active, s.scenarios);
+  });
+}
