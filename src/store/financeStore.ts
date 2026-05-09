@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
-import { applyStressModifierToState, STRESS_TESTS } from "@/lib/finance/stress";
+import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 
 interface FinanceState {
   scenarios: Scenario[];
@@ -21,6 +21,12 @@ interface FinanceState {
   importJson: (json: string) => void;
   /** Tilføjer manglende standard-scenarier (Base + stress-tests) uden at overskrive eksisterende. */
   addStandardScenarios: () => { added: number; skipped: number };
+  /** Materialisér et linked stress-test til et frit redigerbart custom-scenarie. */
+  convertToCustom: (id: string) => void;
+  /** Genskab et custom/linked-scenarie ud fra aktuel basecase + modifiers (gør det igen til linked stress-test). */
+  rebaseOnCurrentBase: (id: string) => void;
+  /** Alias for rebaseOnCurrentBase — fjerner manuelle ændringer og genskaber rent linked stress-test. */
+  resetToCleanStressTest: (id: string) => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
