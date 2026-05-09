@@ -465,7 +465,7 @@ export function projectWithStopAge(
         // Overskydende cashflow ud over planlagt opsparing investeres IKKE — vises som ikke-allokeret.
         unallocatedCashflow = Math.max(0, cashflow - freeContribution);
       } else {
-        freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
+        freeContribution = planned;
         bal.free += freeContribution;
         const net = cashflow - planned;
         if (net < 0) drainShortfall(-net);
@@ -536,6 +536,9 @@ export function projectWithStopAge(
         cashflowSurplus,
         unallocatedCashflow,
         investedAmount: freeContribution,
+        plannedFreeContribution,
+        plannedContributionsActive: plannedActive,
+        plannedContributionStopAge: plannedStopAge,
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
       },
