@@ -22,7 +22,7 @@ function statusLabel(s: ReturnType<typeof deriveKPIs>["modelStatus"]) {
 }
 
 export default function Report() {
-  const scenario = useActiveScenario();
+  const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
 
   const { kpis, chartData, checks } = useMemo(() => {
