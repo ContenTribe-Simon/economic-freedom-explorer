@@ -308,6 +308,25 @@ export interface Scenario {
 /** Aktuel modelversion for lokal/eksport persistens. Bumpes ved breaking changes i datamodellen. */
 export const MODEL_VERSION = 1 as const;
 
+/**
+ * Stabilt release-label for den nuværende modelversion.
+ *
+ * personal-fire-v0.3-stable indeholder:
+ *  - modelstatus valid/invalid
+ *  - separat shortfall-logik (privat cashflow)
+ *  - separat finansieringsproblem-logik (holding/gæld)
+ *  - failure-driven robusthedsscore med hard cap ved invalid
+ *  - antagelsessikkerheds-score uafhængig af beregning
+ *  - audit-panel pr. år (cashflow-bro, faktisk investeret i fri kapital)
+ *  - scenario comparison (Modelstatus + finansieringsproblem-rækker)
+ *  - sparelogik (planned/cashflow/hybrid) med ikke-allokeret cashflow
+ *  - holding-/gældsfinansiering (holding_capital / private_cashflow / external_company)
+ *    uden falske warnings ved ekstern finansiering
+ *
+ * Bump label når en ny stabil baseline er klar.
+ */
+export const MODEL_RELEASE = "personal-fire-v0.3-stable" as const;
+
 /** Skema for eksport/import af hele modellen — forberedt til fremtidig serverlagring. */
 export interface ModelExport {
   modelVersion: number;
