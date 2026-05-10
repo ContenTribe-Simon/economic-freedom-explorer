@@ -265,6 +265,20 @@ function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: Scen
           <Row label="Vækst holding" value={f.growth.holding} indent />
         </section>
 
+        {fireYear && (
+          <section data-testid="audit-fire">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">FIRE-status i året</div>
+            <Row label="FIRE-kapitalgrundlag" value={fireYear.fireBaseCapital} indent />
+            <Row label="Standard FI mål" value={fireYear.standardFiTarget} indent />
+            <Row label="Gap til Standard FI" value={fireYear.gapToStandardFi} indent />
+            <Row label="Coast FI" value={fireYear.meets.coast ? "Ja" : "Nej"} indent />
+            <Row label="Lean FI" value={fireYear.meets.lean ? "Ja" : "Nej"} indent />
+            <Row label="Standard FI" value={fireYear.meets.standard ? "Ja" : "Nej"} indent />
+            <Row label="Fat FI" value={fireYear.meets.fat ? "Ja" : "Nej"} indent />
+            <Row label="Barista FI" value={fireYear.meets.barista ? "Ja" : "Nej"} indent />
+          </section>
+        )}
+
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Udgående saldi</div>
           <Row label="Fri kapital (slut)" value={y.closing.free} strong />
@@ -289,8 +303,10 @@ export default function Projection() {
   const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
   const years = useMemo(() => project(scenario, assumptions), [scenario, assumptions]);
+  const fire = useMemo(() => computeFireAnalysis(scenario, years, assumptions), [scenario, years, assumptions]);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const selected = years.find((y) => y.age === selectedAge) ?? null;
+  const selectedFire = selectedAge !== null ? fire.yearStatus.find((s) => s.age === selectedAge) : undefined;
 
   return (
     <div className="space-y-6">
