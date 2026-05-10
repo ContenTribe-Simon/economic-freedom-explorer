@@ -166,6 +166,7 @@ export const useFinanceStore = create<FinanceState>()(
           snapshots: importedSnapshots,
         });
       },
+      addStandardScenarios: () => {
         const existingNames = new Set(get().scenarios.map((s) => s.name));
         const toAdd: Scenario[] = [];
 
