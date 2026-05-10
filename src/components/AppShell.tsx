@@ -37,6 +37,7 @@ function formatRelative(ts: number | null): string {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { scenarios, activeScenarioId, setActive, addScenario, duplicateScenario, exportJson, importJson, addStandardScenarios } =
     useFinanceStore();
+  const snapshotCount = useFinanceStore((s) => s.snapshots.length);
   const fileRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const isReport = location.pathname === "/report";
