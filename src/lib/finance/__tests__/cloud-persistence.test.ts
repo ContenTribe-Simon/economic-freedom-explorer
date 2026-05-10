@@ -56,7 +56,7 @@ describe("cloud persistence round-trip", () => {
     // ændr basecase efter snapshot — skal ikke påvirke det indlæste snapshot
     useFinanceStore.getState().updateScenario(useFinanceStore.getState().activeScenarioId, (s) => ({
       ...s,
-      stopAge: s.stopAge + 5,
+      inputs: { ...s.inputs, stopAge: s.inputs.stopAge + 5 },
     }));
 
     applyStateToStore(json);
