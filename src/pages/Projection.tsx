@@ -204,6 +204,22 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
             })}
           </section>
         )}
+        {(() => {
+          const ignored = (resolvedScenario.inputs.lifeEvents ?? []).filter(
+            (e) => e.enabled && !isLifeEventValid(e),
+          );
+          if (ignored.length === 0) return null;
+          return (
+            <section>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Livsfaser ignoreret</div>
+              {ignored.map((e) => (
+                <div key={e.id} className="text-xs text-muted-foreground italic pl-4 py-0.5">
+                  {e.name} — ignoreret pga. ugyldig aldersperiode (slutalder før startalder).
+                </div>
+              ))}
+            </section>
+          );
+        })()}
 
         {f.debtsDetail.length > 0 && (
           <section>
