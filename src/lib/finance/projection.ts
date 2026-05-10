@@ -371,10 +371,19 @@ export function projectWithStopAge(
     bal.debt = dt.totalBalanceNW;
     bal.holding = Math.max(0, bal.holding - dt.holdingPayment);
 
-    const spending = inp.spending.desiredMonthlyNet * 12;
+    // ---- Livsfaser (life events) — aggreger effekter for året ----
+    const lifeEventEffects = computeLifeEventEffects(
+      inp.lifeEvents,
+      age,
+      inp.person.lifeExpectancy,
+    );
+
+    const baseSpending = inp.spending.desiredMonthlyNet * 12;
+    const spending = Math.max(0, baseSpending + (lifeEventEffects?.spendingDelta ?? 0));
     const pensionStreamNet = ratePension.net + lifeAnnuity.net;
     const incomeNet =
-      salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet;
+      salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet
+      + (lifeEventEffects?.incomeDelta ?? 0);
     const cashflow = incomeNet - dt.privatePayment - spending;
 
     let freeContribution = 0;
