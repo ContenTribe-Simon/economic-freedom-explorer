@@ -401,6 +401,39 @@ export default function Report() {
         );
       })()}
 
+      {(() => {
+        const fire = isSnapshotMode ? snapshotFire : liveData?.fire ?? null;
+        if (!fire) return null;
+        const types: FireType[] = ["coast", "lean", "standard", "fat", "barista"];
+        return (
+          <section className="mb-6 break-inside-avoid" data-testid="report-fire">
+            <h3 className="font-display text-base font-semibold mb-2">FIRE-status</h3>
+            <p className="text-xs text-muted-foreground mb-2">
+              Standard FI mål: {formatDKK(fire.standardFiNumber, { compact: true })} ved udtræksrate {(fire.assumptions.withdrawalRate * 100).toFixed(1)} %.
+              Nærmeste milepæl: {fire.nearestMilestone ? fire.results[fire.nearestMilestone].label : "ingen opnået"}
+              {fire.earliestFireAge ? ` (alder ${fire.earliestFireAge})` : ""}.
+            </p>
+            <table className="w-full text-sm border-collapse">
+              <tbody>
+                {types.map((t) => {
+                  const r = fire.results[t];
+                  return (
+                    <tr key={t} className="border-b border-border">
+                      <td className="py-1.5 pr-4 text-muted-foreground">{r.label}</td>
+                      <td className="py-1.5 text-right num">{fireStatusLabel(r.status, r.achievedAtAge)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-muted-foreground mt-2 italic">
+              FIRE er et analyselag oven på fremskrivningen og påvirker ikke de øvrige tal.
+              Standard-grundlaget inkluderer fri kapital{fire.assumptions.includeHoldingInFire ? " og holding" : ""}{fire.assumptions.includePensionInFire ? " og pension" : ""}.
+            </p>
+          </section>
+        );
+      })()}
+
       {view.checks.length > 0 && (
         <section className="mb-6 break-inside-avoid">
           <h3 className="font-display text-base font-semibold mb-2">Kort sanity check</h3>
