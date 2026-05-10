@@ -145,3 +145,88 @@ describe("life events — JSON export/import roundtrip", () => {
     expect(found?.amount).toBe(1234);
   });
 });
+
+describe("life events — endAge validation & rendering", () => {
+  it("empty endAge means continues to lifeExpectancy", async () => {
+    const { isLifeEventValid, formatLifeEventPeriod, effectiveEndAge } = await import("../lifeEvents");
+    const ev = makeLifeEvent({ startAge: 50, endAge: undefined, frequency: "monthly", amount: 1000, effectTarget: "privateSpending", effectDirection: "increase" });
+    expect(isLifeEventValid(ev)).toBe(true);
+    expect(effectiveEndAge(ev, 95)).toBe(95);
+    expect(formatLifeEventPeriod(ev)).toBe("fra alder 50 og frem");
+    const s = withEvents([ev]);
+    const ys = project(s, defaultAssumptions);
+    const last = ys[ys.length - 1];
+    expect(last.flows.lifeEventEffects?.items.length).toBe(1);
+  });
+
+  it("endAge = 0 is treated as empty (no end)", async () => {
+    const { isLifeEventValid, effectiveEndAge, formatLifeEventPeriod } = await import("../lifeEvents");
+    const ev = makeLifeEvent({ startAge: 50, endAge: 0 as any, frequency: "monthly", amount: 1000, effectTarget: "privateSpending", effectDirection: "increase" });
+    expect(ev.endAge).toBeUndefined();
+    expect(isLifeEventValid(ev)).toBe(true);
+    expect(effectiveEndAge(ev, 95)).toBe(95);
+    expect(formatLifeEventPeriod(ev)).toContain("og frem");
+  });
+
+  it("endAge < startAge => invalid and zero effect on projection", async () => {
+    const { isLifeEventValid, lifeEventValidationError } = await import("../lifeEvents");
+    const ev = makeLifeEvent({ startAge: 50, endAge: 23, frequency: "monthly", amount: 9999, effectTarget: "privateSpending", effectDirection: "increase" });
+    expect(isLifeEventValid(ev)).toBe(false);
+    expect(lifeEventValidationError(ev)).toMatch(/Til alder/);
+    const ys = project(withEvents([ev]), defaultAssumptions);
+    const yb = project(makeBaseScenario(), defaultAssumptions);
+    for (let i = 0; i < ys.length; i++) {
+      expect(ys[i].netWorth).toBeCloseTo(yb[i].netWorth, 2);
+      expect(ys[i].flows.lifeEventEffects).toBeUndefined();
+    }
+  });
+
+  it("invalid event triggers sanity error", async () => {
+    const { sanityChecks } = await import("../sanity");
+    const ev = makeLifeEvent({ name: "Lavere forbrug", startAge: 50, endAge: 23, frequency: "monthly", amount: 1000, effectTarget: "privateSpending", effectDirection: "decrease" });
+    const s = withEvents([ev]);
+    const ys = project(s, defaultAssumptions);
+    const checks = sanityChecks(s, ys);
+    const found = checks.find((c) => c.id === `le-end-${ev.id}`);
+    expect(found).toBeDefined();
+    expect(found?.severity).toBe("error");
+    expect(found?.title).toContain("Lavere forbrug");
+  });
+
+  it("empty endAge does NOT produce a sanity error", async () => {
+    const { sanityChecks } = await import("../sanity");
+    const ev = makeLifeEvent({ startAge: 50, endAge: undefined, frequency: "monthly", amount: 1000, effectTarget: "privateSpending", effectDirection: "increase" });
+    const s = withEvents([ev]);
+    const checks = sanityChecks(s, project(s, defaultAssumptions));
+    expect(checks.find((c) => c.id === `le-end-${ev.id}`)).toBeUndefined();
+  });
+
+  it("one_time events ignore endAge entirely", async () => {
+    const { isLifeEventValid, formatLifeEventPeriod } = await import("../lifeEvents");
+    const ev = makeLifeEvent({ startAge: 50, endAge: 10, frequency: "one_time", amount: 100000, effectTarget: "freeCapital", effectDirection: "decrease" });
+    expect(isLifeEventValid(ev)).toBe(true);
+    expect(formatLifeEventPeriod(ev)).toBe("ved alder 50");
+    const ys = project(withEvents([ev]), defaultAssumptions);
+    const y50 = ys.find((y) => y.age === 50)!;
+    expect(y50.flows.lifeEventEffects?.items.length).toBe(1);
+  });
+
+  it("legacy data with endAge=0 normalises to undefined", () => {
+    const out = normalizeLegacyLifeEvent({ id: "x", label: "L", type: "expense", startAge: 40, endAge: 0, amount: 1000 });
+    expect(out.endAge).toBeUndefined();
+  });
+
+  it("export/import preserves empty endAge", async () => {
+    const { useFinanceStore } = await import("@/store/financeStore");
+    const store = useFinanceStore.getState();
+    const sid = store.activeScenarioId;
+    const ev = makeLifeEvent({ name: "No end", startAge: 50, endAge: undefined, frequency: "monthly", amount: 1000, effectTarget: "privateSpending", effectDirection: "increase" });
+    store.addLifeEvent(sid, ev);
+    const json = useFinanceStore.getState().exportJson();
+    useFinanceStore.getState().importJson(json);
+    const after = useFinanceStore.getState().scenarios.find((s) => s.id === sid)!;
+    const found = (after.inputs.lifeEvents ?? []).find((e) => e.id === ev.id);
+    expect(found).toBeDefined();
+    expect(found?.endAge === undefined || found?.endAge === null || found?.endAge === 0).toBe(true);
+  });
+});
