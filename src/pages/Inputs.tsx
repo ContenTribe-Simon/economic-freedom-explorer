@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from "react";
-import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
+import { useActiveScenario, useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,6 +112,7 @@ const IMPACT_LABEL: Record<DebtCashflowImpact, string> = {
 
 export default function Inputs() {
   const scenario = useActiveScenario();
+  const resolved = useResolvedActiveScenario();
   const updateRaw = useFinanceStore((s) => s.updateScenario);
   const renameRaw = useFinanceStore((s) => s.renameScenario);
   const convertToCustom = useFinanceStore((s) => s.convertToCustom);
@@ -131,7 +132,9 @@ export default function Inputs() {
   const set = <K extends keyof ScenarioInputs>(key: K, value: ScenarioInputs[K]) =>
     update(scenario.id, (s) => ({ ...s, inputs: { ...s.inputs, [key]: value } }));
 
-  const inp = scenario.inputs;
+  // Display-data: for linked scenarier vises resolved.inputs (basecase + modifiers).
+  // For base/custom vises rå inputs som vanligt.
+  const inp = isLinked ? resolved.inputs : scenario.inputs;
 
   const updateDebt = (idx: number, patch: Partial<DebtItem>) => {
     const next = inp.debts.map((d, i) => (i === idx ? { ...d, ...patch } : d));
