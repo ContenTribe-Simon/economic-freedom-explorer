@@ -41,6 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { scenarios, activeScenarioId, setActive, addScenario, duplicateScenario, exportJson, importJson, addStandardScenarios } =
     useFinanceStore();
   const snapshotCount = useFinanceStore((s) => s.snapshots.length);
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const isReport = location.pathname === "/report";
