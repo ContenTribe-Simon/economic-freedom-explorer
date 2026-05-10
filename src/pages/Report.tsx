@@ -3,6 +3,7 @@ import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
+import { isLifeEventValid, formatLifeEventPeriod } from "@/lib/finance/lifeEvents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
