@@ -229,7 +229,8 @@ export default function Dashboard() {
           tone={fire.nearestMilestone ? "good" : undefined}
         />
       </div>
-        <ScoreCard
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           label="Finansiel robusthed"
           score={kpis.financialRobustness}
           tone={kpis.modelStatus === "invalid" ? "bad" : finTone}
