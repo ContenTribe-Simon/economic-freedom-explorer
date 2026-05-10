@@ -291,6 +291,49 @@ export const useFinanceStore = create<FinanceState>()(
         set((s) => ({ snapshots: [copy, ...s.snapshots] }));
         return copy.snapshotId;
       },
+
+      // -------- LifeEvents --------
+      addLifeEvent: (scenarioId, event) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: { ...sc.inputs, lifeEvents: [...(sc.inputs.lifeEvents ?? []), event] },
+        })),
+      updateLifeEvent: (scenarioId, eventId, patch) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: {
+            ...sc.inputs,
+            lifeEvents: (sc.inputs.lifeEvents ?? []).map((e) => (e.id === eventId ? { ...e, ...patch } : e)),
+          },
+        })),
+      removeLifeEvent: (scenarioId, eventId) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: {
+            ...sc.inputs,
+            lifeEvents: (sc.inputs.lifeEvents ?? []).filter((e) => e.id !== eventId),
+          },
+        })),
+      duplicateLifeEvent: (scenarioId, eventId) =>
+        get().updateScenario(scenarioId, (sc) => {
+          const events = sc.inputs.lifeEvents ?? [];
+          const orig = events.find((e) => e.id === eventId);
+          if (!orig) return sc;
+          const copy: LifeEvent = {
+            ...orig,
+            id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+            name: `${orig.name} (kopi)`,
+          };
+          return { ...sc, inputs: { ...sc.inputs, lifeEvents: [...events, copy] } };
+        }),
+      toggleLifeEvent: (scenarioId, eventId) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: {
+            ...sc.inputs,
+            lifeEvents: (sc.inputs.lifeEvents ?? []).map((e) => (e.id === eventId ? { ...e, enabled: !e.enabled } : e)),
+          },
+        })),
     }),
     {
       name: "finance-tool.v1",
