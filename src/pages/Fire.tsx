@@ -108,14 +108,75 @@ export default function FirePage() {
         </table>
       </Card>
 
-      <Card className="p-5">
-        <h2 className="font-display text-xl font-semibold mb-3">Afhængighed (slutaktiver, alder {analysis.yearStatus[analysis.yearStatus.length - 1]?.age})</h2>
-        <div className="text-sm space-y-1">
-          <div>Fri kapital: {Math.round(analysis.dependence.freeShare * 100)} %</div>
-          <div>Pension: {Math.round(analysis.dependence.pensionShare * 100)} %</div>
-          <div>Holding: {Math.round(analysis.dependence.holdingShare * 100)} %</div>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3">
+      <Card className="p-5" data-testid="fire-capital-breakdown">
+        <h2 className="font-display text-xl font-semibold mb-1">Kapitalgrundlag bag FIRE</h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Samme grundlag som FIRE-kortenes "Forventet kapital" (reference-alder {analysis.capitalBreakdown.referenceAge}).
+        </p>
+        {analysis.capitalBreakdown.totalIncluded <= 0 ? (
+          <div
+            className="text-sm text-muted-foreground italic"
+            data-testid="fire-capital-empty"
+          >
+            Der er ikke positivt FIRE-kapitalgrundlag i dette år.
+          </div>
+        ) : (
+          <div className="text-sm space-y-2" data-testid="fire-capital-rows">
+            <div className="flex justify-between" data-testid="fire-capital-free">
+              <span>Fri kapital</span>
+              <span className="num">
+                {formatDKK(analysis.capitalBreakdown.free, { compact: true })} ·{" "}
+                {Math.round(analysis.capitalBreakdown.shares.free * 100)} %
+              </span>
+            </div>
+            <div className="flex justify-between" data-testid="fire-capital-holding">
+              <span>
+                Holding{" "}
+                {!analysis.capitalBreakdown.included.holding && (
+                  <span className="text-xs text-muted-foreground">(ikke medtaget)</span>
+                )}
+              </span>
+              <span className="num">
+                {formatDKK(analysis.capitalBreakdown.holding, { compact: true })} ·{" "}
+                {Math.round(analysis.capitalBreakdown.shares.holding * 100)} %
+              </span>
+            </div>
+            <div className="flex justify-between" data-testid="fire-capital-pension">
+              <span>
+                Pension{" "}
+                {!analysis.capitalBreakdown.included.pension && (
+                  <span className="text-xs text-muted-foreground">
+                    (ikke medtaget i Standard FI — vises som fremtidig pensionsstøtte)
+                  </span>
+                )}
+              </span>
+              <span className="num">
+                {formatDKK(analysis.capitalBreakdown.pension, { compact: true })}
+                {analysis.capitalBreakdown.included.pension
+                  ? ` · ${Math.round(analysis.capitalBreakdown.shares.pension * 100)} %`
+                  : ""}
+              </span>
+            </div>
+            <div className="flex justify-between" data-testid="fire-capital-buffer">
+              <span>
+                Buffer{" "}
+                <span className="text-xs text-muted-foreground">
+                  ({analysis.capitalBreakdown.included.buffer ? "kan bruges ved shortfall" : "ikke medtaget"})
+                </span>
+              </span>
+              <span className="num">
+                {formatDKK(analysis.capitalBreakdown.buffer, { compact: true })}
+              </span>
+            </div>
+            <div className="flex justify-between border-t border-border pt-2 mt-2 font-medium">
+              <span>FIRE-kapitalgrundlag i alt</span>
+              <span className="num">
+                {formatDKK(analysis.capitalBreakdown.totalIncluded, { compact: true })}
+              </span>
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground mt-4">
           Standard FI-grundlag inkluderer fri kapital{fa.includeHoldingInFire ? " og holding" : ""}{fa.includePensionInFire ? " og pension" : ""}.
           Pension er som udgangspunkt udeladt for at give et konservativt FIRE-billede.
         </p>
@@ -123,3 +184,4 @@ export default function FirePage() {
     </div>
   );
 }
+
