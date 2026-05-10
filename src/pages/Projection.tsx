@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDKK } from "@/lib/format";
 import { ScenarioInputs, YearRow } from "@/lib/finance/types";
 import { isLifeEventValid } from "@/lib/finance/lifeEvents";
+import { computeFireAnalysis, type FireYearStatus } from "@/lib/finance/fire";
 import { X } from "lucide-react";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
@@ -45,7 +46,7 @@ export function lifeAnnuityStatusText(
   return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
 }
 
-function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs; onClose: () => void }) {
+function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void }) {
   const f = y.flows;
   const incomeTotal =
     f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
