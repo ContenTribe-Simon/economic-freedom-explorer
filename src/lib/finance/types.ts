@@ -315,7 +315,30 @@ export interface YearFlows {
   growth: { free: number; pension: number; holding: number };
   /** Manglende dækning af holdinggæld der skulle betales af holdingkapital. */
   holdingFinancingShortfall: number;
+  /** Effekt fra aktive livsfaser i året (kun udfyldt når der er aktive events). */
+  lifeEventEffects?: LifeEventYearEffect;
 }
+
+/** Aggregeret effekt af aktive livsfaser i et givent år. */
+export interface LifeEventYearEffect {
+  incomeDelta: number;
+  spendingDelta: number;
+  freeCapitalDelta: number;
+  debtDelta: number;
+  /** Per-event detaljer til audit-visning. */
+  items: LifeEventYearItem[];
+}
+
+export interface LifeEventYearItem {
+  id: string;
+  name: string;
+  category: LifeEventCategory;
+  effectTarget: LifeEventEffectTarget;
+  effectDirection: LifeEventEffectDirection;
+  /** Beløb pr. år (eller engangsbeløb) i nutidskroner, signed. */
+  signedAmount: number;
+  frequency: LifeEventFrequency;
+  notes?: string;
 
 export interface DebtYearDetail {
   id: string;
