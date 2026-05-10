@@ -365,26 +365,28 @@ export default function Report() {
         </section>
       )}
 
-      {(inputs.lifeEvents ?? []).filter((e) => e.enabled).length > 0 && (
-        <section className="mb-6 break-inside-avoid">
-          <h3 className="font-display text-base font-semibold mb-2">Aktive livsfaser</h3>
-          <ul className="space-y-1 text-sm">
-            {(inputs.lifeEvents ?? []).filter((e) => e.enabled).map((e) => {
-              const sign = e.effectDirection === "decrease" ? "−" : "+";
-              const unit = e.frequency === "monthly" ? "kr/md" : e.frequency === "annual" ? "kr/år" : "kr";
-              const period = e.frequency === "one_time"
-                ? `ved alder ${e.startAge}`
-                : `fra alder ${e.startAge}${e.endAge ? ` til ${e.endAge}` : ""}`;
-              return (
-                <li key={e.id} className="border-l-2 pl-2 border-border">
-                  <strong>{e.name}</strong> — {sign}{e.amount.toLocaleString("da-DK")} {unit} {period}
-                  {e.notes && <span className="text-muted-foreground italic"> · {e.notes}</span>}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      {(() => {
+        const { isLifeEventValid, formatLifeEventPeriod } = require("@/lib/finance/lifeEvents");
+        const activeValid = (inputs.lifeEvents ?? []).filter((e: any) => e.enabled && isLifeEventValid(e));
+        if (activeValid.length === 0) return null;
+        return (
+          <section className="mb-6 break-inside-avoid">
+            <h3 className="font-display text-base font-semibold mb-2">Aktive livsfaser</h3>
+            <ul className="space-y-1 text-sm">
+              {activeValid.map((e: any) => {
+                const sign = e.effectDirection === "decrease" ? "−" : "+";
+                const unit = e.frequency === "monthly" ? "kr/md" : e.frequency === "annual" ? "kr/år" : "kr";
+                return (
+                  <li key={e.id} className="border-l-2 pl-2 border-border">
+                    <strong>{e.name}</strong> — {sign}{e.amount.toLocaleString("da-DK")} {unit} {formatLifeEventPeriod(e)}
+                    {e.notes && <span className="text-muted-foreground italic"> · {e.notes}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })()}
 
       {view.checks.length > 0 && (
         <section className="mb-6 break-inside-avoid">
