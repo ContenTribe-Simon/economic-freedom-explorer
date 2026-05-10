@@ -13,6 +13,7 @@ import Report from "./pages/Report";
 import Snapshots from "./pages/Snapshots";
 import Auth from "./pages/Auth";
 import CloudPage from "./pages/Cloud";
+import LifeEventsPage from "./pages/LifeEvents";
 import { AuthProvider } from "@/hooks/useAuth";
 import NotFound from "./pages/NotFound.tsx";
 
