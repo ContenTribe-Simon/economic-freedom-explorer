@@ -1,14 +1,17 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
+import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
+import { buildSnapshot } from "@/lib/finance/snapshots";
 
 interface FinanceState {
   scenarios: Scenario[];
   activeScenarioId: string;
   assumptions: Assumptions;
+  /** Frosne point-in-time snapshots — bruges som dokumentation/rapportgrundlag. */
+  snapshots: Snapshot[];
   setActive: (id: string) => void;
   updateScenario: (id: string, updater: (s: Scenario) => Scenario) => void;
   addScenario: (name?: string, fromId?: string) => string;
@@ -28,6 +31,12 @@ interface FinanceState {
   rebaseOnCurrentBase: (id: string) => void;
   /** Alias for rebaseOnCurrentBase — fjerner manuelle ændringer og genskaber rent linked stress-test. */
   resetToCleanStressTest: (id: string) => void;
+  /** Snapshots — frosne point-in-time kopier af aktivt scenarie. */
+  saveSnapshot: (options?: { name?: string; notes?: string; scenarioId?: string }) => string;
+  deleteSnapshot: (snapshotId: string) => void;
+  renameSnapshot: (snapshotId: string, name: string) => void;
+  updateSnapshotNotes: (snapshotId: string, notes: string) => void;
+  duplicateSnapshot: (snapshotId: string) => string;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
