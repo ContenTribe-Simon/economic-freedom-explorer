@@ -75,6 +75,7 @@ export default function Report() {
     return {
       kpis: deriveKPIs(liveScenario, ys, liveAssumptions),
       checks: sanityChecks(liveScenario, ys),
+      fire: computeFireAnalysis(liveScenario, ys, liveAssumptions),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
@@ -85,6 +86,17 @@ export default function Report() {
       })),
     };
   }, [liveScenario, liveAssumptions, isSnapshotMode]);
+
+  const snapshotFire = useMemo(() => {
+    if (!activeSnapshot) return null;
+    const fakeScenario = {
+      id: activeSnapshot.scenarioId,
+      name: activeSnapshot.scenarioName,
+      createdAt: activeSnapshot.createdAt,
+      inputs: activeSnapshot.resolvedInputs,
+    } as Parameters<typeof computeFireAnalysis>[0];
+    return computeFireAnalysis(fakeScenario, activeSnapshot.years, activeSnapshot.assumptions);
+  }, [activeSnapshot]);
 
   const view = isSnapshotMode
     ? {
