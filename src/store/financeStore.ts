@@ -56,6 +56,7 @@ export const useFinanceStore = create<FinanceState>()(
       scenarios: [seed],
       activeScenarioId: seed.id,
       assumptions: defaultAssumptions,
+      snapshots: [],
       setActive: (id) => {
         const cur = get().activeScenarioId;
         if (cur === id) return; // no-op when same scenario clicked
