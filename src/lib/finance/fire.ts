@@ -80,6 +80,23 @@ export interface FireAnalysis {
   yearStatus: FireYearStatus[];
   /** Afhængighedsmål: andel af slutaktiverne i hver bucket (0-1). */
   dependence: { pensionShare: number; holdingShare: number; freeShare: number };
+  /**
+   * Kapitalgrundlag bag FIRE — bygger på samme reference-år som FIRE-kortenes
+   * "Forventet kapital" (Standard FI's opnået-alder, ellers stopalder, ellers
+   * sidste år). Værdier er i nutidskroner. Shares beregnes ift. totalen af
+   * de buckets, der er medtaget i Standard FI (totalIncluded).
+   */
+  capitalBreakdown: {
+    referenceAge: number;
+    free: number;
+    holding: number;
+    pension: number;
+    buffer: number;
+    totalIncluded: number;
+    totalAll: number;
+    shares: { free: number; holding: number; pension: number; buffer: number };
+    included: { free: boolean; holding: boolean; pension: boolean; buffer: boolean };
+  };
   /** Månedligt underskud efter stopalder (gennemsnit), arvet fra projection. */
   monthlyGapAfterStop: number;
 }
