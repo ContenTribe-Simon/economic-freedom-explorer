@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/NumberInput";
-import { LIFE_EVENT_TEMPLATES, makeLifeEvent } from "@/lib/finance/lifeEvents";
+import { LIFE_EVENT_TEMPLATES, lifeEventValidationError } from "@/lib/finance/lifeEvents";
 import { LifeEvent, LifeEventCategory, LifeEventEffectDirection, LifeEventEffectTarget, LifeEventFrequency } from "@/lib/finance/types";
 import { Trash2, Copy, Plus } from "lucide-react";
 import { useState } from "react";
