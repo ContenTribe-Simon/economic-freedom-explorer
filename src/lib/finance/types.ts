@@ -339,6 +339,7 @@ export interface LifeEventYearItem {
   signedAmount: number;
   frequency: LifeEventFrequency;
   notes?: string;
+}
 
 export interface DebtYearDetail {
   id: string;
