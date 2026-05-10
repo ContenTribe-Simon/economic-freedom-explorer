@@ -447,6 +447,10 @@ export const useFinanceStore = create<FinanceState>()(
             },
           }));
         }
+        // v13: snapshots-felt — sikr at det altid findes som array
+        if (!Array.isArray(state.snapshots)) {
+          state.snapshots = [];
+        }
         return state;
       },
     },
