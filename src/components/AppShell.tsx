@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/inputs", label: "Variabler", icon: Sliders },
+  { to: "/life-events", label: "Livsfaser", icon: Calendar },
   { to: "/projection", label: "År-for-år", icon: Table },
   { to: "/scenarios", label: "Scenarier", icon: GitCompareArrows },
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },
