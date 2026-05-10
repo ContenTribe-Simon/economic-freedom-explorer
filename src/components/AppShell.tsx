@@ -37,6 +37,7 @@ function formatRelative(ts: number | null): string {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { scenarios, activeScenarioId, setActive, addScenario, duplicateScenario, exportJson, importJson, addStandardScenarios } =
     useFinanceStore();
+  const snapshotCount = useFinanceStore((s) => s.snapshots.length);
   const fileRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const isReport = location.pathname === "/report";
@@ -215,6 +216,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="pt-3 mt-2 border-t border-sidebar-border space-y-1">
             <p className="text-[10px] text-sidebar-foreground/60" data-testid="last-saved">
               Sidst gemt lokalt: <span className="font-medium">{formatRelative(lastSavedAt)}</span>
+            </p>
+            <p className="text-[10px] text-sidebar-foreground/60" data-testid="snapshot-count">
+              Gemte snapshots: <span className="font-medium">{snapshotCount}</span>
             </p>
             <p className="text-[10px] text-sidebar-foreground/50 leading-relaxed">
               Data gemmes lokalt i din browser. Modellen er forsimplet og udgør ikke rådgivning.

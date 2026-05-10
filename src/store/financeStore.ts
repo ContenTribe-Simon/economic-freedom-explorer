@@ -1,14 +1,17 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
+import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
+import { buildSnapshot } from "@/lib/finance/snapshots";
 
 interface FinanceState {
   scenarios: Scenario[];
   activeScenarioId: string;
   assumptions: Assumptions;
+  /** Frosne point-in-time snapshots — bruges som dokumentation/rapportgrundlag. */
+  snapshots: Snapshot[];
   setActive: (id: string) => void;
   updateScenario: (id: string, updater: (s: Scenario) => Scenario) => void;
   addScenario: (name?: string, fromId?: string) => string;
@@ -28,6 +31,12 @@ interface FinanceState {
   rebaseOnCurrentBase: (id: string) => void;
   /** Alias for rebaseOnCurrentBase — fjerner manuelle ændringer og genskaber rent linked stress-test. */
   resetToCleanStressTest: (id: string) => void;
+  /** Snapshots — frosne point-in-time kopier af aktivt scenarie. */
+  saveSnapshot: (options?: { name?: string; notes?: string; scenarioId?: string }) => string;
+  deleteSnapshot: (snapshotId: string) => void;
+  renameSnapshot: (snapshotId: string, name: string) => void;
+  updateSnapshotNotes: (snapshotId: string, notes: string) => void;
+  duplicateSnapshot: (snapshotId: string) => string;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
@@ -47,6 +56,7 @@ export const useFinanceStore = create<FinanceState>()(
       scenarios: [seed],
       activeScenarioId: seed.id,
       assumptions: defaultAssumptions,
+      snapshots: [],
       setActive: (id) => {
         const cur = get().activeScenarioId;
         if (cur === id) return; // no-op when same scenario clicked
@@ -126,6 +136,7 @@ export const useFinanceStore = create<FinanceState>()(
           activeScenarioId: get().activeScenarioId,
           scenarios: get().scenarios.map((s) => ({ ...s, updatedAt: s.updatedAt ?? now })),
           assumptions: get().assumptions,
+          snapshots: get().snapshots,
           metadata: { source: "local", release: MODEL_RELEASE },
         };
         return JSON.stringify(payload, null, 2);
@@ -147,10 +158,12 @@ export const useFinanceStore = create<FinanceState>()(
           const cls = classifyLegacyScenario(sc, baseScenario);
           return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
+        const importedSnapshots = Array.isArray((parsed as any).snapshots) ? ((parsed as any).snapshots as Snapshot[]) : [];
         set({
           scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
           activeScenarioId: parsed.activeScenarioId ?? scenarios[0].id,
+          snapshots: importedSnapshots,
         });
       },
       addStandardScenarios: () => {
@@ -231,10 +244,50 @@ export const useFinanceStore = create<FinanceState>()(
           };
         }),
       resetToCleanStressTest: (id) => get().rebaseOnCurrentBase(id),
+
+      saveSnapshot: (options = {}) => {
+        const state = get();
+        const sourceId = options.scenarioId ?? state.activeScenarioId;
+        const scenario = state.scenarios.find((s) => s.id === sourceId);
+        if (!scenario) return "";
+        const snap = buildSnapshot(scenario, state.scenarios, state.assumptions, {
+          name: options.name,
+          notes: options.notes,
+        });
+        set((s) => ({ snapshots: [snap, ...s.snapshots] }));
+        return snap.snapshotId;
+      },
+      deleteSnapshot: (snapshotId) =>
+        set((s) => ({ snapshots: s.snapshots.filter((x) => x.snapshotId !== snapshotId) })),
+      renameSnapshot: (snapshotId, name) =>
+        set((s) => ({
+          snapshots: s.snapshots.map((x) =>
+            x.snapshotId === snapshotId ? { ...x, snapshotName: name, updatedAt: Date.now() } : x,
+          ),
+        })),
+      updateSnapshotNotes: (snapshotId, notes) =>
+        set((s) => ({
+          snapshots: s.snapshots.map((x) =>
+            x.snapshotId === snapshotId ? { ...x, notes, updatedAt: Date.now() } : x,
+          ),
+        })),
+      duplicateSnapshot: (snapshotId) => {
+        const orig = get().snapshots.find((x) => x.snapshotId === snapshotId);
+        if (!orig) return "";
+        const copy: Snapshot = structuredClone({
+          ...orig,
+          snapshotId: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+          snapshotName: `${orig.snapshotName} (kopi)`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        set((s) => ({ snapshots: [copy, ...s.snapshots] }));
+        return copy.snapshotId;
+      },
     }),
     {
       name: "finance-tool.v1",
-      version: 12,
+      version: 13,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -393,6 +446,10 @@ export const useFinanceStore = create<FinanceState>()(
               },
             },
           }));
+        }
+        // v13: snapshots-felt — sikr at det altid findes som array
+        if (!Array.isArray(state.snapshots)) {
+          state.snapshots = [];
         }
         return state;
       },
