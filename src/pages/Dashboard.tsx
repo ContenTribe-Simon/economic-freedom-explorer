@@ -215,9 +215,20 @@ export default function Dashboard() {
           tone={kpis.firstFinancingIssueAge ? "bad" : "good"}
           tooltip="Fx ufinansieret holdingbetaling eller holdinggæld der ikke kan dækkes."
         />
+        <KPI
+          label="Standard FI"
+          value={fire.results.standard.achievedAtAge ? `Alder ${fire.results.standard.achievedAtAge}` : "Ikke opnået"}
+          sub={`Mål: ${formatDKK(fire.standardFiNumber, { compact: true })}`}
+          tone={fire.results.standard.achievedAtAge ? "good" : "warn"}
+          tooltip="Tidligste alder hvor fri kapital (+holding) dækker årligt forbrug ved sikker udtræksrate."
+        />
+        <KPI
+          label="Nærmeste FIRE-milepæl"
+          value={fire.nearestMilestone ? fire.results[fire.nearestMilestone].label : "Ingen opnået"}
+          sub={fire.earliestFireAge ? `Ved alder ${fire.earliestFireAge}` : "Se FIRE-siden"}
+          tone={fire.nearestMilestone ? "good" : undefined}
+        />
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
         <ScoreCard
           label="Finansiel robusthed"
           score={kpis.financialRobustness}
