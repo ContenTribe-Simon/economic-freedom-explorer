@@ -38,6 +38,12 @@ interface FinanceState {
   renameSnapshot: (snapshotId: string, name: string) => void;
   updateSnapshotNotes: (snapshotId: string, notes: string) => void;
   duplicateSnapshot: (snapshotId: string) => string;
+  /** Livsfaser CRUD på aktivt scenarie. */
+  addLifeEvent: (scenarioId: string, event: LifeEvent) => void;
+  updateLifeEvent: (scenarioId: string, eventId: string, patch: Partial<LifeEvent>) => void;
+  removeLifeEvent: (scenarioId: string, eventId: string) => void;
+  duplicateLifeEvent: (scenarioId: string, eventId: string) => void;
+  toggleLifeEvent: (scenarioId: string, eventId: string) => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
