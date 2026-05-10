@@ -11,32 +11,72 @@ const id = () =>
 
 /** Default-shape for et nyt event. Bruges af UI-templates. */
 export function makeLifeEvent(partial: Partial<LifeEvent> = {}): LifeEvent {
-  return {
+  const merged = {
     id: id(),
     name: "Ny livsfase",
     enabled: true,
-    category: "custom",
+    category: "custom" as const,
     startAge: 40,
-    endAge: undefined,
+    endAge: undefined as number | undefined,
     amount: 0,
-    frequency: "monthly",
-    amountMode: "net",
-    effectTarget: "privateSpending",
-    effectDirection: "increase",
+    frequency: "monthly" as const,
+    amountMode: "net" as const,
+    effectTarget: "privateSpending" as const,
+    effectDirection: "increase" as const,
     growthRate: 0,
     confidenceKey: null,
     notes: undefined,
     ...partial,
-  };
+  } as LifeEvent;
+  // Normalisér endAge: 0/null tolkes som "ingen slutalder".
+  if (merged.endAge === null || (typeof merged.endAge === "number" && merged.endAge <= 0)) {
+    merged.endAge = undefined;
+  }
+  return merged;
 }
 
-/** Er eventet aktivt for det givne år (alder)? */
+/** Formatér periode til summary/audit/rapport. */
+export function formatLifeEventPeriod(event: LifeEvent): string {
+  if (event.frequency === "one_time") return `ved alder ${event.startAge}`;
+  const e = event.endAge;
+  const hasEnd = !(e === undefined || e === null || (e as number) <= 0);
+  return hasEnd
+    ? `fra alder ${event.startAge} til ${e}`
+    : `fra alder ${event.startAge} og frem`;
+}
+
+/**
+ * Effective end age — tomme/0/null/undefined tolkes som "ingen slutalder".
+ * For one_time events ignoreres endAge altid.
+ */
+export function effectiveEndAge(event: LifeEvent, lifeExpectancy: number): number {
+  if (event.frequency === "one_time") return event.startAge;
+  const e = event.endAge;
+  if (e === undefined || e === null || (e as number) <= 0) return lifeExpectancy;
+  return e as number;
+}
+
+/** Validering: en livsfase er ugyldig hvis endAge er udfyldt (>0) og < startAge. */
+export function isLifeEventValid(event: LifeEvent): boolean {
+  if (event.frequency === "one_time") return true;
+  const e = event.endAge;
+  if (e === undefined || e === null || (e as number) <= 0) return true;
+  return (e as number) >= event.startAge;
+}
+
+/** Menneskelig fejlbesked når et event er ugyldigt. */
+export function lifeEventValidationError(event: LifeEvent): string | null {
+  if (isLifeEventValid(event)) return null;
+  return "Til alder skal være højere end eller lig med Fra alder.";
+}
+
+/** Er eventet aktivt for det givne år (alder)? Ugyldige events er aldrig aktive. */
 export function isEventActiveAtAge(event: LifeEvent, age: number, lifeExpectancy: number): boolean {
   if (!event.enabled) return false;
+  if (!isLifeEventValid(event)) return false;
   if (event.frequency === "one_time") return age === event.startAge;
   if (age < event.startAge) return false;
-  const end = event.endAge ?? lifeExpectancy;
-  return age <= end;
+  return age <= effectiveEndAge(event, lifeExpectancy);
 }
 
 /** Beregn signed årligt beløb (i nutidskroner) for eventet i det givne år. */
@@ -179,7 +219,7 @@ export function normalizeLegacyLifeEvent(raw: any): LifeEvent {
     enabled: false, // legacy events deaktiveres så projektion ikke ændres
     category: isExpense ? "expense_change" : "custom",
     startAge: typeof raw.startAge === "number" ? raw.startAge : 40,
-    endAge: typeof raw.endAge === "number" ? raw.endAge : undefined,
+    endAge: typeof raw.endAge === "number" && raw.endAge > 0 ? raw.endAge : undefined,
     amount: typeof raw.amount === "number" ? raw.amount : 0,
     frequency: raw.type === "oneTime" ? "one_time" : "annual",
     amountMode: "net",

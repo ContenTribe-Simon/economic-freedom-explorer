@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDKK } from "@/lib/format";
 import { ScenarioInputs, YearRow } from "@/lib/finance/types";
+import { isLifeEventValid } from "@/lib/finance/lifeEvents";
 import { X } from "lucide-react";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
@@ -203,6 +204,22 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
             })}
           </section>
         )}
+        {(() => {
+          const ignored = (inputs.lifeEvents ?? []).filter(
+            (e) => e.enabled && !isLifeEventValid(e),
+          );
+          if (ignored.length === 0) return null;
+          return (
+            <section>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Livsfaser ignoreret</div>
+              {ignored.map((e) => (
+                <div key={e.id} className="text-xs text-muted-foreground italic pl-4 py-0.5">
+                  {e.name} — ignoreret pga. ugyldig aldersperiode (slutalder før startalder).
+                </div>
+              ))}
+            </section>
+          );
+        })()}
 
         {f.debtsDetail.length > 0 && (
           <section>

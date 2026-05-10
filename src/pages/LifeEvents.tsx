@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/NumberInput";
-import { LIFE_EVENT_TEMPLATES, makeLifeEvent } from "@/lib/finance/lifeEvents";
+import { LIFE_EVENT_TEMPLATES, lifeEventValidationError } from "@/lib/finance/lifeEvents";
 import { LifeEvent, LifeEventCategory, LifeEventEffectDirection, LifeEventEffectTarget, LifeEventFrequency } from "@/lib/finance/types";
 import { Trash2, Copy, Plus } from "lucide-react";
 import { useState } from "react";
@@ -91,7 +91,10 @@ export default function LifeEventsPage() {
       )}
 
       <div className="space-y-3">
-        {events.map((ev) => (
+        {events.map((ev) => {
+          const validationError = lifeEventValidationError(ev);
+          const isOneTime = ev.frequency === "one_time";
+          return (
           <Card key={ev.id} className={`p-4 ${ev.enabled ? "" : "opacity-60"}`}>
             <div className="flex items-start gap-3">
               <input
@@ -169,15 +172,38 @@ export default function LifeEventsPage() {
                   <NumberInput value={ev.startAge} onChange={(v) => update(ev.id, { startAge: v })} />
                 </div>
 
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">Til alder (valgfri)</Label>
-                  <NumberInput value={ev.endAge ?? 0} onChange={(v) => update(ev.id, { endAge: v > 0 ? v : undefined })} />
-                </div>
+                {!isOneTime && (
+                  <div>
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Til alder (valgfri)</Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={ev.endAge && ev.endAge > 0 ? String(ev.endAge) : ""}
+                      placeholder="Tom = fortsætter livet ud"
+                      onChange={(e) => {
+                        const raw = e.target.value.trim();
+                        if (raw === "") return update(ev.id, { endAge: undefined });
+                        const n = parseInt(raw, 10);
+                        update(ev.id, { endAge: Number.isFinite(n) && n > 0 ? n : undefined });
+                      }}
+                    />
+                  </div>
+                )}
+                {isOneTime && (
+                  <div className="text-xs text-muted-foreground self-end pb-2">
+                    Engangsbeløb bruger kun "Fra alder".
+                  </div>
+                )}
 
                 <div className="md:col-span-3">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">Note</Label>
                   <Input value={ev.notes ?? ""} onChange={(e) => update(ev.id, { notes: e.target.value })} placeholder="Intern note (påvirker ikke beregning)" />
                 </div>
+                {validationError && (
+                  <div className="md:col-span-3 text-sm text-destructive border border-destructive/40 bg-destructive/5 rounded-md px-3 py-2">
+                    {validationError} Livsfasen er ignoreret i beregningen indtil dette er rettet.
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <Button variant="ghost" size="sm" onClick={() => duplicateLifeEvent(scenario.id, ev.id)} aria-label="Duplikér">
@@ -189,7 +215,8 @@ export default function LifeEventsPage() {
               </div>
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

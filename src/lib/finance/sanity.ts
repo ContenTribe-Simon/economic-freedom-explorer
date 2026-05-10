@@ -177,8 +177,17 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
     if (ev.startAge < inp.person.currentAge) {
       out.push({ id: `le-start-${ev.id}`, severity: "info", title: `Livsfase: ${ev.name || "uden navn"} starter før nuværende alder`, detail: `Startalder ${ev.startAge} ligger før nuværende alder ${inp.person.currentAge}.` });
     }
-    if (ev.endAge !== undefined && ev.endAge < ev.startAge) {
-      out.push({ id: `le-end-${ev.id}`, severity: "warn", title: `Livsfase: ${ev.name || "uden navn"} har slutalder før startalder`, detail: "Tjek start- og slutalder." });
+    if (
+      ev.frequency !== "one_time" &&
+      ev.endAge !== undefined && ev.endAge !== null && (ev.endAge as number) > 0 &&
+      (ev.endAge as number) < ev.startAge
+    ) {
+      out.push({
+        id: `le-end-${ev.id}`,
+        severity: "error",
+        title: `Livsfasen "${ev.name || "uden navn"}" har en slutalder før startalderen`,
+        detail: "Til alder skal være højere end eller lig med Fra alder. Livsfasen er ignoreret i beregningen indtil dette er rettet.",
+      });
     }
     if ((ev.amount ?? 0) === 0) {
       out.push({ id: `le-amt-${ev.id}`, severity: "info", title: `Livsfase: ${ev.name || "uden navn"} har beløb 0`, detail: "Eventet er aktivt, men har ingen beløbsmæssig effekt." });
