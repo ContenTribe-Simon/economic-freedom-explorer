@@ -244,6 +244,46 @@ export const useFinanceStore = create<FinanceState>()(
           };
         }),
       resetToCleanStressTest: (id) => get().rebaseOnCurrentBase(id),
+
+      saveSnapshot: (options = {}) => {
+        const state = get();
+        const sourceId = options.scenarioId ?? state.activeScenarioId;
+        const scenario = state.scenarios.find((s) => s.id === sourceId);
+        if (!scenario) return "";
+        const snap = buildSnapshot(scenario, state.scenarios, state.assumptions, {
+          name: options.name,
+          notes: options.notes,
+        });
+        set((s) => ({ snapshots: [snap, ...s.snapshots] }));
+        return snap.snapshotId;
+      },
+      deleteSnapshot: (snapshotId) =>
+        set((s) => ({ snapshots: s.snapshots.filter((x) => x.snapshotId !== snapshotId) })),
+      renameSnapshot: (snapshotId, name) =>
+        set((s) => ({
+          snapshots: s.snapshots.map((x) =>
+            x.snapshotId === snapshotId ? { ...x, snapshotName: name, updatedAt: Date.now() } : x,
+          ),
+        })),
+      updateSnapshotNotes: (snapshotId, notes) =>
+        set((s) => ({
+          snapshots: s.snapshots.map((x) =>
+            x.snapshotId === snapshotId ? { ...x, notes, updatedAt: Date.now() } : x,
+          ),
+        })),
+      duplicateSnapshot: (snapshotId) => {
+        const orig = get().snapshots.find((x) => x.snapshotId === snapshotId);
+        if (!orig) return "";
+        const copy: Snapshot = structuredClone({
+          ...orig,
+          snapshotId: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+          snapshotName: `${orig.snapshotName} (kopi)`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        set((s) => ({ snapshots: [copy, ...s.snapshots] }));
+        return copy.snapshotId;
+      },
     }),
     {
       name: "finance-tool.v1",
