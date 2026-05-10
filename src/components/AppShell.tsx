@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers } from "lucide-react";
+import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera } from "lucide-react";
 import { useFinanceStore } from "@/store/financeStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,6 +23,7 @@ const navItems = [
   { to: "/scenarios", label: "Scenarier", icon: GitCompareArrows },
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },
   { to: "/report", label: "Rapport", icon: FileText },
+  { to: "/snapshots", label: "Snapshots", icon: Camera },
 ];
 
 function formatRelative(ts: number | null): string {
