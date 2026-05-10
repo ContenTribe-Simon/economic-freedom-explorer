@@ -29,6 +29,7 @@ const App = () => (
             <Route path="/projection" element={<Projection />} />
             <Route path="/scenarios" element={<Scenarios />} />
             <Route path="/report" element={<Report />} />
+            <Route path="/snapshots" element={<Snapshots />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>
