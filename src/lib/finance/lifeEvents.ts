@@ -204,7 +204,7 @@ export function normalizeLegacyLifeEvent(raw: any): LifeEvent {
     enabled: false, // legacy events deaktiveres så projektion ikke ændres
     category: isExpense ? "expense_change" : "custom",
     startAge: typeof raw.startAge === "number" ? raw.startAge : 40,
-    endAge: typeof raw.endAge === "number" ? raw.endAge : undefined,
+    endAge: typeof raw.endAge === "number" && raw.endAge > 0 ? raw.endAge : undefined,
     amount: typeof raw.amount === "number" ? raw.amount : 0,
     frequency: raw.type === "oneTime" ? "one_time" : "annual",
     amountMode: "net",
