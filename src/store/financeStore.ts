@@ -158,12 +158,15 @@ export const useFinanceStore = create<FinanceState>()(
         if (!isValidImport(parsed)) {
           throw new Error("Filen ligner ikke en gyldig model-eksport (mangler scenarios).");
         }
-        // Klassificér evt. legacy-scenarier uden `type`-felt.
+        // Klassificér evt. legacy-scenarier uden `type`-felt + normalisér lifeEvents.
         const scenarios = parsed.scenarios.map((sc) => {
-          if (sc.type) return sc;
-          const baseScenario = sc.baseScenarioId ? parsed.scenarios.find((x) => x.id === sc.baseScenarioId) : undefined;
-          const cls = classifyLegacyScenario(sc, baseScenario);
-          return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
+          const rawEvents = Array.isArray((sc as any).inputs?.lifeEvents) ? (sc as any).inputs.lifeEvents : [];
+          const lifeEvents = rawEvents.map((e: any) => normalizeLegacyLifeEvent(e));
+          const withEvents = { ...sc, inputs: { ...sc.inputs, lifeEvents } } as Scenario;
+          if (withEvents.type) return withEvents;
+          const baseScenario = withEvents.baseScenarioId ? parsed.scenarios.find((x) => x.id === withEvents.baseScenarioId) : undefined;
+          const cls = classifyLegacyScenario(withEvents, baseScenario);
+          return { ...withEvents, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
         const importedSnapshots = Array.isArray((parsed as any).snapshots) ? ((parsed as any).snapshots as Snapshot[]) : [];
         set({
