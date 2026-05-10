@@ -15,6 +15,19 @@ const SP_METHOD_LABEL = {
   manualNet: "Manuelt nettobeløb",
 } as const;
 
+const SCENARIO_TYPE_LABEL = {
+  base: "Base case",
+  linked_stress_test: "Linket stress-test",
+  custom: "Custom scenarie",
+} as const;
+
+const STOP_RULE_LABEL = {
+  stopAge: "Stop ved jobstop / stopalder",
+  fullRetireAge: "Stop ved fuld pension",
+  customAge: "Stop ved brugerdefineret alder",
+  never: "Fortsæt hele livet",
+} as const;
+
 function statusLabel(s: ReturnType<typeof deriveKPIs>["modelStatus"]) {
   if (s === "valid") return "Validt";
   if (s === "target_missed") return "Validt — minimumsmål ikke opfyldt";
@@ -58,6 +71,8 @@ export default function Report() {
           <span>Rapportdato: {reportDate}</span>
           <span>Modelversion: {MODEL_RELEASE} (skema v{MODEL_VERSION})</span>
           <span>Folkepension: {SP_METHOD_LABEL[inputs.income.statePension.mode]}</span>
+          <span>Scenarietype: {SCENARIO_TYPE_LABEL[scenario.type ?? "custom"]}{scenario.type === "linked_stress_test" && scenario.baseScenarioName ? ` (basis: ${scenario.baseScenarioName})` : ""}</span>
+          <span>Planlagt opsparing: {STOP_RULE_LABEL[inputs.free.contributionStopRule ?? "stopAge"]}{(inputs.free.contributionStopRule ?? "stopAge") === "customAge" && inputs.free.contributionStopAge ? ` (${inputs.free.contributionStopAge} år)` : ""}</span>
         </div>
       </header>
 
