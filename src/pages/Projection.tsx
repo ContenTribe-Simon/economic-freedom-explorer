@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDKK } from "@/lib/format";
 import { ScenarioInputs, YearRow } from "@/lib/finance/types";
 import { isLifeEventValid } from "@/lib/finance/lifeEvents";
+import { computeFireAnalysis, type FireYearStatus } from "@/lib/finance/fire";
 import { X } from "lucide-react";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
@@ -45,7 +46,7 @@ export function lifeAnnuityStatusText(
   return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
 }
 
-function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs; onClose: () => void }) {
+function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void }) {
   const f = y.flows;
   const incomeTotal =
     f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
@@ -264,6 +265,20 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
           <Row label="Vækst holding" value={f.growth.holding} indent />
         </section>
 
+        {fireYear && (
+          <section data-testid="audit-fire">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">FIRE-status i året</div>
+            <Row label="FIRE-kapitalgrundlag" value={fireYear.fireBaseCapital} indent />
+            <Row label="Standard FI mål" value={fireYear.standardFiTarget} indent />
+            <Row label="Gap til Standard FI" value={fireYear.gapToStandardFi} indent />
+            <Row label="Coast FI" value={fireYear.meets.coast ? "Ja" : "Nej"} indent />
+            <Row label="Lean FI" value={fireYear.meets.lean ? "Ja" : "Nej"} indent />
+            <Row label="Standard FI" value={fireYear.meets.standard ? "Ja" : "Nej"} indent />
+            <Row label="Fat FI" value={fireYear.meets.fat ? "Ja" : "Nej"} indent />
+            <Row label="Barista FI" value={fireYear.meets.barista ? "Ja" : "Nej"} indent />
+          </section>
+        )}
+
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Udgående saldi</div>
           <Row label="Fri kapital (slut)" value={y.closing.free} strong />
@@ -288,8 +303,10 @@ export default function Projection() {
   const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
   const years = useMemo(() => project(scenario, assumptions), [scenario, assumptions]);
+  const fire = useMemo(() => computeFireAnalysis(scenario, years, assumptions), [scenario, years, assumptions]);
   const [selectedAge, setSelectedAge] = useState<number | null>(null);
   const selected = years.find((y) => y.age === selectedAge) ?? null;
+  const selectedFire = selectedAge !== null ? fire.yearStatus.find((s) => s.age === selectedAge) : undefined;
 
   return (
     <div className="space-y-6">
@@ -343,7 +360,7 @@ export default function Projection() {
 
         {selected && (
           <div>
-            <AuditPanel y={selected} inputs={scenario.inputs} onClose={() => setSelectedAge(null)} />
+            <AuditPanel y={selected} inputs={scenario.inputs} fireYear={selectedFire} onClose={() => setSelectedAge(null)} />
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ import { project } from "@/lib/finance/projection";
 import { deriveKPIs } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
 import { isLifeEventValid, formatLifeEventPeriod } from "@/lib/finance/lifeEvents";
+import { computeFireAnalysis, statusLabel as fireStatusLabel, type FireType } from "@/lib/finance/fire";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,6 +75,7 @@ export default function Report() {
     return {
       kpis: deriveKPIs(liveScenario, ys, liveAssumptions),
       checks: sanityChecks(liveScenario, ys),
+      fire: computeFireAnalysis(liveScenario, ys, liveAssumptions),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
@@ -84,6 +86,17 @@ export default function Report() {
       })),
     };
   }, [liveScenario, liveAssumptions, isSnapshotMode]);
+
+  const snapshotFire = useMemo(() => {
+    if (!activeSnapshot) return null;
+    const fakeScenario = {
+      id: activeSnapshot.scenarioId,
+      name: activeSnapshot.scenarioName,
+      createdAt: activeSnapshot.createdAt,
+      inputs: activeSnapshot.resolvedInputs,
+    } as Parameters<typeof computeFireAnalysis>[0];
+    return computeFireAnalysis(fakeScenario, activeSnapshot.years, activeSnapshot.assumptions);
+  }, [activeSnapshot]);
 
   const view = isSnapshotMode
     ? {
@@ -384,6 +397,39 @@ export default function Report() {
                 );
               })}
             </ul>
+          </section>
+        );
+      })()}
+
+      {(() => {
+        const fire = isSnapshotMode ? snapshotFire : liveData?.fire ?? null;
+        if (!fire) return null;
+        const types: FireType[] = ["coast", "lean", "standard", "fat", "barista"];
+        return (
+          <section className="mb-6 break-inside-avoid" data-testid="report-fire">
+            <h3 className="font-display text-base font-semibold mb-2">FIRE-status</h3>
+            <p className="text-xs text-muted-foreground mb-2">
+              Standard FI mål: {formatDKK(fire.standardFiNumber, { compact: true })} ved udtræksrate {(fire.assumptions.withdrawalRate * 100).toFixed(1)} %.
+              Nærmeste milepæl: {fire.nearestMilestone ? fire.results[fire.nearestMilestone].label : "ingen opnået"}
+              {fire.earliestFireAge ? ` (alder ${fire.earliestFireAge})` : ""}.
+            </p>
+            <table className="w-full text-sm border-collapse">
+              <tbody>
+                {types.map((t) => {
+                  const r = fire.results[t];
+                  return (
+                    <tr key={t} className="border-b border-border">
+                      <td className="py-1.5 pr-4 text-muted-foreground">{r.label}</td>
+                      <td className="py-1.5 text-right num">{fireStatusLabel(r.status, r.achievedAtAge)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-muted-foreground mt-2 italic">
+              FIRE er et analyselag oven på fremskrivningen og påvirker ikke de øvrige tal.
+              Standard-grundlaget inkluderer fri kapital{fire.assumptions.includeHoldingInFire ? " og holding" : ""}{fire.assumptions.includePensionInFire ? " og pension" : ""}.
+            </p>
           </section>
         );
       })()}

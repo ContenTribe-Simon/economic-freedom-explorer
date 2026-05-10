@@ -3,6 +3,7 @@ import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs, scoreVerdict, LEVEL_LABELS } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
+import { computeFireAnalysis } from "@/lib/finance/fire";
 import { Card } from "@/components/ui/card";
 import { formatDKK } from "@/lib/format";
 import { ChevronDown } from "lucide-react";
@@ -117,12 +118,13 @@ export default function Dashboard() {
   const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
 
-  const { years, kpis, chartData, checks } = useMemo(() => {
+  const { years, kpis, chartData, checks, fire } = useMemo(() => {
     const ys = project(scenario, assumptions);
     return {
       years: ys,
       kpis: deriveKPIs(scenario, ys, assumptions),
       checks: sanityChecks(scenario, ys),
+      fire: computeFireAnalysis(scenario, ys, assumptions),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
@@ -212,6 +214,19 @@ export default function Dashboard() {
           sub={kpis.firstFinancingIssueAge ? `${kpis.firstFinancingIssueKind} · ${formatDKK(kpis.firstFinancingIssueAmount, { compact: true })}` : "Ingen ufinansierede betalinger"}
           tone={kpis.firstFinancingIssueAge ? "bad" : "good"}
           tooltip="Fx ufinansieret holdingbetaling eller holdinggæld der ikke kan dækkes."
+        />
+        <KPI
+          label="Standard FI"
+          value={fire.results.standard.achievedAtAge ? `Alder ${fire.results.standard.achievedAtAge}` : "Ikke opnået"}
+          sub={`Mål: ${formatDKK(fire.standardFiNumber, { compact: true })}`}
+          tone={fire.results.standard.achievedAtAge ? "good" : "warn"}
+          tooltip="Tidligste alder hvor fri kapital (+holding) dækker årligt forbrug ved sikker udtræksrate."
+        />
+        <KPI
+          label="Nærmeste FIRE-milepæl"
+          value={fire.nearestMilestone ? fire.results[fire.nearestMilestone].label : "Ingen opnået"}
+          sub={fire.earliestFireAge ? `Ved alder ${fire.earliestFireAge}` : "Se FIRE-siden"}
+          tone={fire.nearestMilestone ? "good" : undefined}
         />
       </div>
 
