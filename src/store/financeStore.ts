@@ -451,6 +451,14 @@ export const useFinanceStore = create<FinanceState>()(
         if (!Array.isArray(state.snapshots)) {
           state.snapshots = [];
         }
+        // v14: normalisér lifeEvents til ny shape (legacy events deaktiveres)
+        if (Array.isArray(state.scenarios)) {
+          state.scenarios = state.scenarios.map((sc: any) => {
+            const raw = Array.isArray(sc.inputs?.lifeEvents) ? sc.inputs.lifeEvents : [];
+            const normalized = raw.map((e: any) => normalizeLegacyLifeEvent(e));
+            return { ...sc, inputs: { ...sc.inputs, lifeEvents: normalized } };
+          });
+        }
         return state;
       },
     },
