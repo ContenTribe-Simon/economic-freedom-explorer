@@ -563,6 +563,7 @@ export function projectWithStopAge(
         plannedContributionStopAge: plannedStopAge,
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
+        lifeEventEffects: lifeEventEffects ?? undefined,
       },
       totalIncomeNet: incomeNet,
       netWorth,
