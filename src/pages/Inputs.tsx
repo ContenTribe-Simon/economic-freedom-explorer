@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from "react";
-import { useActiveScenario, useFinanceStore } from "@/store/financeStore";
+import { useActiveScenario, useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
