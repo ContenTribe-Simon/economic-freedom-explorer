@@ -14,7 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      finance_models: {
+        Row: {
+          created_at: string
+          data_json: Json
+          description: string | null
+          id: string
+          last_opened_at: string | null
+          model_release: string | null
+          model_version: string | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_json: Json
+          description?: string | null
+          id?: string
+          last_opened_at?: string | null
+          model_release?: string | null
+          model_version?: string | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_json?: Json
+          description?: string | null
+          id?: string
+          last_opened_at?: string | null
+          model_release?: string | null
+          model_version?: string | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      finance_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          model_id: string | null
+          note: string | null
+          scenario_name: string | null
+          scenario_type: string | null
+          snapshot_json: Json
+          snapshot_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model_id?: string | null
+          note?: string | null
+          scenario_name?: string | null
+          scenario_type?: string | null
+          snapshot_json: Json
+          snapshot_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model_id?: string | null
+          note?: string | null
+          scenario_name?: string | null
+          scenario_type?: string | null
+          snapshot_json?: Json
+          snapshot_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_snapshots_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "finance_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
