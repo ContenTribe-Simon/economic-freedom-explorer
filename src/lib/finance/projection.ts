@@ -14,6 +14,7 @@ import {
   pensionPayoutTax,
   shareTax,
 } from "./tax";
+import { computeLifeEventEffects } from "./lifeEvents";
 
 export function mergeAssumptions(global: Assumptions, override?: Partial<Assumptions>): Assumptions {
   if (!override) return global;
@@ -240,6 +241,9 @@ export function projectWithStopAge(
     debt: debts.filter((d) => (d.includeInNetWorth ?? d.impact !== "risk_only")).reduce((s, d) => s + (d?.balance ?? 0), 0),
   };
 
+  /** Persisterende effekt af one_time privat-gælds-events. */
+  let lifeEventDebtBalance = 0;
+
   const totalYears = inp.person.lifeExpectancy - inp.person.currentAge + 1;
 
   for (let i = 0; i < totalYears; i++) {
@@ -367,10 +371,19 @@ export function projectWithStopAge(
     bal.debt = dt.totalBalanceNW;
     bal.holding = Math.max(0, bal.holding - dt.holdingPayment);
 
-    const spending = inp.spending.desiredMonthlyNet * 12;
+    // ---- Livsfaser (life events) — aggreger effekter for året ----
+    const lifeEventEffects = computeLifeEventEffects(
+      inp.lifeEvents,
+      age,
+      inp.person.lifeExpectancy,
+    );
+
+    const baseSpending = inp.spending.desiredMonthlyNet * 12;
+    const spending = Math.max(0, baseSpending + (lifeEventEffects?.spendingDelta ?? 0));
     const pensionStreamNet = ratePension.net + lifeAnnuity.net;
     const incomeNet =
-      salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet;
+      salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet
+      + (lifeEventEffects?.incomeDelta ?? 0);
     const cashflow = incomeNet - dt.privatePayment - spending;
 
     let freeContribution = 0;
@@ -482,6 +495,12 @@ export function projectWithStopAge(
 
     if (working) bal.pension += ownPensionContribution + employerPension;
 
+    // ---- Livsfaser: engangs-effekter på fri kapital og privat gæld ----
+    if (lifeEventEffects) {
+      bal.free = Math.max(0, bal.free + lifeEventEffects.freeCapitalDelta);
+      lifeEventDebtBalance = Math.max(0, lifeEventDebtBalance + lifeEventEffects.debtDelta);
+    }
+
     const required = spending + dt.privatePayment;
     const provided =
       incomeNet + withdrawals.free + withdrawals.pension + withdrawals.holding + withdrawals.buffer;
@@ -495,6 +514,9 @@ export function projectWithStopAge(
     bal.free += growth.free;
     bal.pension += growth.pension;
     bal.holding += growth.holding;
+
+    // Tilføj persisterende livsfase-gæld til årets udgående gæld (efter processDebts).
+    bal.debt = bal.debt + lifeEventDebtBalance;
 
     const closing = { ...bal };
     const netWorth = closing.free + closing.pension + closing.holding + closing.buffer - closing.debt;
@@ -541,6 +563,7 @@ export function projectWithStopAge(
         plannedContributionStopAge: plannedStopAge,
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
+        lifeEventEffects: lifeEventEffects ?? undefined,
       },
       totalIncomeNet: incomeNet,
       netWorth,

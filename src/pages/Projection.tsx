@@ -187,6 +187,23 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
           })()}
         </section>
 
+        {f.lifeEventEffects && f.lifeEventEffects.items.length > 0 && (
+          <section>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Livsfaser aktive i året</div>
+            {f.lifeEventEffects.items.map((it) => {
+              const where =
+                it.effectTarget === "privateIncome" ? "indkomst"
+                : it.effectTarget === "privateSpending" ? "forbrug"
+                : it.effectTarget === "freeCapital" ? "fri kapital"
+                : it.effectTarget === "privateDebt" ? "privat gæld"
+                : String(it.effectTarget);
+              return (
+                <Row key={it.id} label={`${it.name} (${where})`} value={it.signedAmount} indent />
+              );
+            })}
+          </section>
+        )}
+
         {f.debtsDetail.length > 0 && (
           <section>
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Gældsposter</div>

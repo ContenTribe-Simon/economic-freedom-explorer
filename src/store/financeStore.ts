@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
+import { Assumptions, LifeEvent, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { buildSnapshot } from "@/lib/finance/snapshots";
+import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
 
 interface FinanceState {
   scenarios: Scenario[];
@@ -37,6 +38,12 @@ interface FinanceState {
   renameSnapshot: (snapshotId: string, name: string) => void;
   updateSnapshotNotes: (snapshotId: string, notes: string) => void;
   duplicateSnapshot: (snapshotId: string) => string;
+  /** Livsfaser CRUD på aktivt scenarie. */
+  addLifeEvent: (scenarioId: string, event: LifeEvent) => void;
+  updateLifeEvent: (scenarioId: string, eventId: string, patch: Partial<LifeEvent>) => void;
+  removeLifeEvent: (scenarioId: string, eventId: string) => void;
+  duplicateLifeEvent: (scenarioId: string, eventId: string) => void;
+  toggleLifeEvent: (scenarioId: string, eventId: string) => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
@@ -151,12 +158,15 @@ export const useFinanceStore = create<FinanceState>()(
         if (!isValidImport(parsed)) {
           throw new Error("Filen ligner ikke en gyldig model-eksport (mangler scenarios).");
         }
-        // Klassificér evt. legacy-scenarier uden `type`-felt.
+        // Klassificér evt. legacy-scenarier uden `type`-felt + normalisér lifeEvents.
         const scenarios = parsed.scenarios.map((sc) => {
-          if (sc.type) return sc;
-          const baseScenario = sc.baseScenarioId ? parsed.scenarios.find((x) => x.id === sc.baseScenarioId) : undefined;
-          const cls = classifyLegacyScenario(sc, baseScenario);
-          return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
+          const rawEvents = Array.isArray((sc as any).inputs?.lifeEvents) ? (sc as any).inputs.lifeEvents : [];
+          const lifeEvents = rawEvents.map((e: any) => normalizeLegacyLifeEvent(e));
+          const withEvents = { ...sc, inputs: { ...sc.inputs, lifeEvents } } as Scenario;
+          if (withEvents.type) return withEvents;
+          const baseScenario = withEvents.baseScenarioId ? parsed.scenarios.find((x) => x.id === withEvents.baseScenarioId) : undefined;
+          const cls = classifyLegacyScenario(withEvents, baseScenario);
+          return { ...withEvents, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
         const importedSnapshots = Array.isArray((parsed as any).snapshots) ? ((parsed as any).snapshots as Snapshot[]) : [];
         set({
@@ -284,10 +294,53 @@ export const useFinanceStore = create<FinanceState>()(
         set((s) => ({ snapshots: [copy, ...s.snapshots] }));
         return copy.snapshotId;
       },
+
+      // -------- LifeEvents --------
+      addLifeEvent: (scenarioId, event) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: { ...sc.inputs, lifeEvents: [...(sc.inputs.lifeEvents ?? []), event] },
+        })),
+      updateLifeEvent: (scenarioId, eventId, patch) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: {
+            ...sc.inputs,
+            lifeEvents: (sc.inputs.lifeEvents ?? []).map((e) => (e.id === eventId ? { ...e, ...patch } : e)),
+          },
+        })),
+      removeLifeEvent: (scenarioId, eventId) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: {
+            ...sc.inputs,
+            lifeEvents: (sc.inputs.lifeEvents ?? []).filter((e) => e.id !== eventId),
+          },
+        })),
+      duplicateLifeEvent: (scenarioId, eventId) =>
+        get().updateScenario(scenarioId, (sc) => {
+          const events = sc.inputs.lifeEvents ?? [];
+          const orig = events.find((e) => e.id === eventId);
+          if (!orig) return sc;
+          const copy: LifeEvent = {
+            ...orig,
+            id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+            name: `${orig.name} (kopi)`,
+          };
+          return { ...sc, inputs: { ...sc.inputs, lifeEvents: [...events, copy] } };
+        }),
+      toggleLifeEvent: (scenarioId, eventId) =>
+        get().updateScenario(scenarioId, (sc) => ({
+          ...sc,
+          inputs: {
+            ...sc.inputs,
+            lifeEvents: (sc.inputs.lifeEvents ?? []).map((e) => (e.id === eventId ? { ...e, enabled: !e.enabled } : e)),
+          },
+        })),
     }),
     {
       name: "finance-tool.v1",
-      version: 13,
+      version: 14,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -450,6 +503,14 @@ export const useFinanceStore = create<FinanceState>()(
         // v13: snapshots-felt — sikr at det altid findes som array
         if (!Array.isArray(state.snapshots)) {
           state.snapshots = [];
+        }
+        // v14: normalisér lifeEvents til ny shape (legacy events deaktiveres)
+        if (Array.isArray(state.scenarios)) {
+          state.scenarios = state.scenarios.map((sc: any) => {
+            const raw = Array.isArray(sc.inputs?.lifeEvents) ? sc.inputs.lifeEvents : [];
+            const normalized = raw.map((e: any) => normalizeLegacyLifeEvent(e));
+            return { ...sc, inputs: { ...sc.inputs, lifeEvents: normalized } };
+          });
         }
         return state;
       },

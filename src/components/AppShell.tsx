@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera, Cloud } from "lucide-react";
+import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera, Cloud, Calendar } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFinanceStore } from "@/store/financeStore";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from "react";
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/inputs", label: "Variabler", icon: Sliders },
+  { to: "/life-events", label: "Livsfaser", icon: Calendar },
   { to: "/projection", label: "År-for-år", icon: Table },
   { to: "/scenarios", label: "Scenarier", icon: GitCompareArrows },
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },

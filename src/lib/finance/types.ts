@@ -155,23 +155,62 @@ export interface TargetInputs {
 export type SavingsLogic = "planned" | "cashflow" | "hybrid";
 
 /**
- * Forberedt datastruktur til fremtidige livsfase-moduler (bolig, børn, FIRE m.v.).
- * IKKE i brug af beregningsmotoren endnu — feltet ignoreres bevidst i projection.ts.
- * Tilføjes for at scenarier kan persisteres med events allerede nu.
+ * Generisk livsfase-event — fleksibelt lag oven på basismodellen.
+ *
+ * Påvirker beregningen KUN når `enabled === true` og året ligger inden for [startAge, endAge].
+ * Tomme/utilkoblede arrays giver præcis samme projektion som tidligere.
+ *
+ * V1 understøtter beregningsmæssigt:
+ *  - privateIncome   (recurring, monthly/annual): netto-indkomstændring i cashflow
+ *  - privateSpending (recurring, monthly/annual): forbrugsændring i cashflow
+ *  - freeCapital     (one_time):                  engangsændring af fri kapital i startAge
+ *  - privateDebt     (one_time):                  engangsændring af privat gæld i startAge (persisterer)
+ *
+ * Øvrige effectTargets er gyldige i datamodellen, men har ingen beregningseffekt endnu
+ * (forberedt til senere udvidelser).
  */
-export type LifeEventType = "income" | "expense" | "asset" | "liability" | "oneTime" | "recurring";
+export type LifeEventCategory =
+  | "income_change"
+  | "expense_change"
+  | "one_time_capital"
+  | "debt_change"
+  | "housing"
+  | "children"
+  | "work_pause"
+  | "relocation"
+  | "custom";
+
+export type LifeEventFrequency = "monthly" | "annual" | "one_time";
+export type LifeEventAmountMode = "net" | "gross" | "direct";
+export type LifeEventEffectTarget =
+  | "privateIncome"
+  | "privateSpending"
+  | "freeCapital"
+  | "privateDebt"
+  | "holdingCapital"
+  | "holdingCashflow"
+  | "pensionCapital"
+  | "netWorthOnly";
+export type LifeEventEffectDirection = "increase" | "decrease";
+
 export interface LifeEvent {
   id: string;
-  label: string;
-  type: LifeEventType;
+  name: string;
+  enabled: boolean;
+  category: LifeEventCategory;
   startAge: number;
   endAge?: number;
+  /** Altid positivt — fortegn styres af effectDirection. */
   amount: number;
+  frequency: LifeEventFrequency;
+  amountMode: LifeEventAmountMode;
+  effectTarget: LifeEventEffectTarget;
+  effectDirection: LifeEventEffectDirection;
+  /** Real årlig vækstrate (default 0). Beløb forbliver i nutidskroner. */
   growthRate?: number;
-  confidenceKey?: ConfidenceKey;
-  affectsCashflow: boolean;
-  affectsNetWorth: boolean;
+  confidenceKey?: ConfidenceKey | null;
   notes?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export type ConfidenceLevel = "very_high" | "high" | "low" | "speculative";
@@ -276,6 +315,30 @@ export interface YearFlows {
   growth: { free: number; pension: number; holding: number };
   /** Manglende dækning af holdinggæld der skulle betales af holdingkapital. */
   holdingFinancingShortfall: number;
+  /** Effekt fra aktive livsfaser i året (kun udfyldt når der er aktive events). */
+  lifeEventEffects?: LifeEventYearEffect;
+}
+
+/** Aggregeret effekt af aktive livsfaser i et givent år. */
+export interface LifeEventYearEffect {
+  incomeDelta: number;
+  spendingDelta: number;
+  freeCapitalDelta: number;
+  debtDelta: number;
+  /** Per-event detaljer til audit-visning. */
+  items: LifeEventYearItem[];
+}
+
+export interface LifeEventYearItem {
+  id: string;
+  name: string;
+  category: LifeEventCategory;
+  effectTarget: LifeEventEffectTarget;
+  effectDirection: LifeEventEffectDirection;
+  /** Beløb pr. år (eller engangsbeløb) i nutidskroner, signed. */
+  signedAmount: number;
+  frequency: LifeEventFrequency;
+  notes?: string;
 }
 
 export interface DebtYearDetail {
