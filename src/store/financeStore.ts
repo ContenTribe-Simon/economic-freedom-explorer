@@ -136,6 +136,7 @@ export const useFinanceStore = create<FinanceState>()(
           activeScenarioId: get().activeScenarioId,
           scenarios: get().scenarios.map((s) => ({ ...s, updatedAt: s.updatedAt ?? now })),
           assumptions: get().assumptions,
+          snapshots: get().snapshots,
           metadata: { source: "local", release: MODEL_RELEASE },
         };
         return JSON.stringify(payload, null, 2);
@@ -157,13 +158,14 @@ export const useFinanceStore = create<FinanceState>()(
           const cls = classifyLegacyScenario(sc, baseScenario);
           return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
+        const importedSnapshots = Array.isArray((parsed as any).snapshots) ? ((parsed as any).snapshots as Snapshot[]) : [];
         set({
           scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
           activeScenarioId: parsed.activeScenarioId ?? scenarios[0].id,
+          snapshots: importedSnapshots,
         });
       },
-      addStandardScenarios: () => {
         const existingNames = new Set(get().scenarios.map((s) => s.name));
         const toAdd: Scenario[] = [];
 
