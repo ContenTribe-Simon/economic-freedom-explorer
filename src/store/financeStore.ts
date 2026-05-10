@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
+import { Assumptions, LifeEvent, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { buildSnapshot } from "@/lib/finance/snapshots";
+import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
 
 interface FinanceState {
   scenarios: Scenario[];
