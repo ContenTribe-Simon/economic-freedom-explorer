@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera } from "lucide-react";
+import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera, Cloud } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { useFinanceStore } from "@/store/financeStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,6 +25,7 @@ const navItems = [
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },
   { to: "/report", label: "Rapport", icon: FileText },
   { to: "/snapshots", label: "Snapshots", icon: Camera },
+  { to: "/cloud", label: "Cloud", icon: Cloud },
 ];
 
 function formatRelative(ts: number | null): string {
@@ -39,6 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { scenarios, activeScenarioId, setActive, addScenario, duplicateScenario, exportJson, importJson, addStandardScenarios } =
     useFinanceStore();
   const snapshotCount = useFinanceStore((s) => s.snapshots.length);
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const isReport = location.pathname === "/report";
@@ -220,6 +223,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
             <p className="text-[10px] text-sidebar-foreground/60" data-testid="snapshot-count">
               Gemte snapshots: <span className="font-medium">{snapshotCount}</span>
+            </p>
+            <p className="text-[10px] text-sidebar-foreground/60" data-testid="cloud-status">
+              {user ? <>Cloud: <span className="font-medium">{user.email}</span></> : <>Cloud: <span className="font-medium">ikke logget ind</span></>}
             </p>
             <p className="text-[10px] text-sidebar-foreground/50 leading-relaxed">
               Data gemmes lokalt i din browser. Modellen er forsimplet og udgør ikke rådgivning.

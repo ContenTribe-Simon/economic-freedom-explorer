@@ -11,6 +11,9 @@ import Projection from "./pages/Projection";
 import Scenarios from "./pages/Scenarios";
 import Report from "./pages/Report";
 import Snapshots from "./pages/Snapshots";
+import Auth from "./pages/Auth";
+import CloudPage from "./pages/Cloud";
+import { AuthProvider } from "@/hooks/useAuth";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -21,9 +24,12 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AuthProvider>
         <AppShell>
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/cloud" element={<CloudPage />} />
             <Route path="/inputs" element={<Inputs />} />
             <Route path="/assumptions" element={<Assumptions />} />
             <Route path="/projection" element={<Projection />} />
@@ -33,6 +39,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
