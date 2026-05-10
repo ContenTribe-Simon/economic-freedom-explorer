@@ -241,6 +241,9 @@ export function projectWithStopAge(
     debt: debts.filter((d) => (d.includeInNetWorth ?? d.impact !== "risk_only")).reduce((s, d) => s + (d?.balance ?? 0), 0),
   };
 
+  /** Persisterende effekt af one_time privat-gælds-events. */
+  let lifeEventDebtBalance = 0;
+
   const totalYears = inp.person.lifeExpectancy - inp.person.currentAge + 1;
 
   for (let i = 0; i < totalYears; i++) {
