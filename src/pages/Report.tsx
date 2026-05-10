@@ -71,6 +71,8 @@ export default function Report() {
           <span>Rapportdato: {reportDate}</span>
           <span>Modelversion: {MODEL_RELEASE} (skema v{MODEL_VERSION})</span>
           <span>Folkepension: {SP_METHOD_LABEL[inputs.income.statePension.mode]}</span>
+          <span>Scenarietype: {SCENARIO_TYPE_LABEL[scenario.type ?? "custom"]}{scenario.type === "linked_stress_test" && scenario.baseScenarioName ? ` (basis: ${scenario.baseScenarioName})` : ""}</span>
+          <span>Planlagt opsparing: {STOP_RULE_LABEL[inputs.free.contributionStopRule ?? "stopAge"]}{(inputs.free.contributionStopRule ?? "stopAge") === "customAge" && inputs.free.contributionStopAge ? ` (${inputs.free.contributionStopAge} år)` : ""}</span>
         </div>
       </header>
 
