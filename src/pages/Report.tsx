@@ -373,7 +373,7 @@ export default function Report() {
           <section className="mb-6 break-inside-avoid">
             <h3 className="font-display text-base font-semibold mb-2">Aktive livsfaser</h3>
             <ul className="space-y-1 text-sm">
-              {activeValid.map((e: any) => {
+              {activeValid.map((e) => {
                 const sign = e.effectDirection === "decrease" ? "−" : "+";
                 const unit = e.frequency === "monthly" ? "kr/md" : e.frequency === "annual" ? "kr/år" : "kr";
                 return (
