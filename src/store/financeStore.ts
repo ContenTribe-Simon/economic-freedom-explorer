@@ -408,8 +408,10 @@ export function useActiveScenario() {
  * For linked stress-tests rebygges scenariet ud fra aktuel basecase + modifiers.
  */
 export function useResolvedActiveScenario() {
-  return useFinanceStore((s) => {
-    const active = s.scenarios.find((sc) => sc.id === s.activeScenarioId) ?? s.scenarios[0];
-    return resolveScenario(active, s.scenarios);
-  });
+  const scenarios = useFinanceStore((s) => s.scenarios);
+  const activeScenarioId = useFinanceStore((s) => s.activeScenarioId);
+  return useMemo(() => {
+    const active = scenarios.find((sc) => sc.id === activeScenarioId) ?? scenarios[0];
+    return resolveScenario(active, scenarios);
+  }, [scenarios, activeScenarioId]);
 }
