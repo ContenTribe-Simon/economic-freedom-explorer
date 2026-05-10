@@ -3,6 +3,7 @@ import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs, scoreVerdict, LEVEL_LABELS } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
+import { computeFireAnalysis } from "@/lib/finance/fire";
 import { Card } from "@/components/ui/card";
 import { formatDKK } from "@/lib/format";
 import { ChevronDown } from "lucide-react";
@@ -117,12 +118,13 @@ export default function Dashboard() {
   const scenario = useResolvedActiveScenario();
   const assumptions = useFinanceStore((s) => s.assumptions);
 
-  const { years, kpis, chartData, checks } = useMemo(() => {
+  const { years, kpis, chartData, checks, fire } = useMemo(() => {
     const ys = project(scenario, assumptions);
     return {
       years: ys,
       kpis: deriveKPIs(scenario, ys, assumptions),
       checks: sanityChecks(scenario, ys),
+      fire: computeFireAnalysis(scenario, ys, assumptions),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
