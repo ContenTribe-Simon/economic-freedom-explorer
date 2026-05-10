@@ -224,6 +224,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-[10px] text-sidebar-foreground/60" data-testid="snapshot-count">
               Gemte snapshots: <span className="font-medium">{snapshotCount}</span>
             </p>
+            <p className="text-[10px] text-sidebar-foreground/60" data-testid="cloud-status">
+              {user ? <>Cloud: <span className="font-medium">{user.email}</span></> : <>Cloud: <span className="font-medium">ikke logget ind</span></>}
+            </p>
             <p className="text-[10px] text-sidebar-foreground/50 leading-relaxed">
               Data gemmes lokalt i din browser. Modellen er forsimplet og udgør ikke rådgivning.
             </p>
