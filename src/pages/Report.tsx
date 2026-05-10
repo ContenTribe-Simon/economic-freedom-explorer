@@ -47,6 +47,10 @@ function formatDateTime(ts: number) {
   });
 }
 
+function formatDate(ts: number) {
+  return new Date(ts).toLocaleDateString("da-DK", { year: "numeric", month: "long", day: "numeric" });
+}
+
 export default function Report() {
   const [searchParams, setSearchParams] = useSearchParams();
   const snapshotId = searchParams.get("snapshot");
@@ -63,7 +67,6 @@ export default function Report() {
   const activeSnapshot = snapshotId ? snapshots.find((s) => s.snapshotId === snapshotId) : undefined;
   const isSnapshotMode = !!activeSnapshot;
 
-  // Beregn live data hvis ikke i snapshot-mode
   const liveData = useMemo(() => {
     if (isSnapshotMode) return null;
     const ys = project(liveScenario, liveAssumptions);
@@ -81,14 +84,11 @@ export default function Report() {
     };
   }, [liveScenario, liveAssumptions, isSnapshotMode]);
 
-  // Saml fælles datagrundlag — enten fra snapshot eller live
   const view = isSnapshotMode
     ? {
         scenarioName: activeSnapshot!.scenarioName,
         scenarioType: activeSnapshot!.scenarioType,
         baseScenarioName: activeSnapshot!.baseScenarioName,
-        modifiers: activeSnapshot!.modifiers,
-        manuallyEdited: activeSnapshot!.manuallyEdited,
         inputs: activeSnapshot!.resolvedInputs,
         kpis: activeSnapshot!.kpis,
         checks: activeSnapshot!.sanityChecks,
@@ -100,8 +100,6 @@ export default function Report() {
         scenarioName: liveScenario.name,
         scenarioType: liveScenario.type ?? "custom",
         baseScenarioName: liveScenario.baseScenarioName,
-        modifiers: liveScenario.modifiers,
-        manuallyEdited: liveScenario.manuallyEdited,
         inputs: liveScenario.inputs,
         kpis: liveData!.kpis,
         checks: liveData!.checks,
@@ -110,18 +108,10 @@ export default function Report() {
         modelRelease: MODEL_RELEASE,
       };
 
-  const reportDate = new Date().toLocaleDateString("da-DK", { year: "numeric", month: "long", day: "numeric" });
+  const reportDate = formatDate(Date.now());
   const inputs = view.inputs;
   const kpis = view.kpis;
 
-  const typeNote =
-    view.scenarioType === "linked_stress_test"
-      ? "Beregnet ud fra aktuel basecase + modifiers."
-      : view.scenarioType === "custom"
-        ? "Manuelt scenarie – følger ikke automatisk basecase."
-        : "Uafhængigt basisscenarie.";
-
-  // Snapshot-form state
   const [snapName, setSnapName] = useState("");
   const [snapNotes, setSnapNotes] = useState("");
   const [compareIds, setCompareIds] = useState<string[]>([]);
@@ -146,8 +136,13 @@ export default function Report() {
     .filter((x): x is Snapshot => !!x);
 
   return (
-    <div className="report-page max-w-[820px] mx-auto p-10 print:p-0 bg-background text-foreground">
-      <div className="flex items-center justify-between mb-6 print:hidden">
+    <div
+      className="report-page max-w-[820px] mx-auto p-10 print:p-0 bg-background text-foreground"
+      data-testid="report-root"
+      data-mode={isSnapshotMode ? "snapshot" : "live"}
+    >
+      {/* Top action bar — skjules altid i print */}
+      <div className="flex items-center justify-between mb-6 print:hidden" data-testid="report-actions">
         <Link to="/" className="text-sm text-muted-foreground hover:underline">← Tilbage til dashboard</Link>
         <div className="flex gap-2">
           {isSnapshotMode && (
@@ -159,47 +154,66 @@ export default function Report() {
         </div>
       </div>
 
-      {isSnapshotMode && (
-        <div className="mb-6 p-3 rounded-md border border-primary/40 bg-primary/5 text-sm print:bg-transparent">
-          <strong>Rapport baseret på gemt snapshot.</strong>{" "}
-          Dette er et frosset point-in-time snapshot fra {formatDateTime(activeSnapshot!.createdAt)}.
-          Det ændrer sig ikke, selvom scenarier senere ændres.
-          <div className="mt-1 text-xs text-muted-foreground">
-            Snapshot: <span className="font-medium">{activeSnapshot!.snapshotName}</span>
-            {activeSnapshot!.notes ? ` · ${activeSnapshot!.notes}` : ""}
+      {/* Print-tip — vises kun lige før print, ikke i print */}
+      <div className="mb-4 text-xs text-muted-foreground italic print:hidden">
+        Tip: Slå browserens headers og footers fra i printdialogen for et rent PDF-resultat.
+      </div>
+
+      {/* === HEADER — kompakt PDF-summary header === */}
+      <header className="border-b border-border pb-4 mb-6" data-testid="report-header">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">Personlig fremskrivning</div>
+            <h1 className="font-display text-3xl font-semibold mt-1">{view.scenarioName}</h1>
+          </div>
+          <div
+            className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded border ${
+              isSnapshotMode ? "border-primary/60 text-primary" : "border-success/60 text-success"
+            }`}
+            data-testid="report-mode-badge"
+          >
+            {isSnapshotMode ? "Gemt snapshot" : "Live rapport"}
           </div>
         </div>
-      )}
 
-      <header className="border-b border-border pb-4 mb-6">
-        <div className="text-xs uppercase tracking-widest text-muted-foreground">Personlig fremskrivning · Rapport</div>
-        <h1 className="font-display text-3xl font-semibold mt-1">{view.scenarioName}</h1>
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground mt-2">
-          <span>Rapportdato: {reportDate}</span>
-          <span>Modelversion: {view.modelRelease} (skema v{view.modelVersion})</span>
+        {isSnapshotMode ? (
+          <div className="mt-3 text-xs text-muted-foreground space-y-0.5" data-testid="snapshot-meta">
+            <div>
+              Snapshot: <span className="text-foreground font-medium">{activeSnapshot!.snapshotName}</span>{" "}
+              · gemt {formatDateTime(activeSnapshot!.createdAt)}
+            </div>
+            <div>
+              Oprindeligt scenarie: {activeSnapshot!.scenarioName} · {SCENARIO_TYPE_LABEL[activeSnapshot!.scenarioType]}
+              {activeSnapshot!.baseScenarioName ? ` (basis: ${activeSnapshot!.baseScenarioName})` : ""}
+            </div>
+            {activeSnapshot!.notes ? <div className="italic">Note: {activeSnapshot!.notes}</div> : null}
+          </div>
+        ) : (
+          <div className="mt-3 text-xs text-muted-foreground">
+            Baseret på aktuelt scenarie · printet {reportDate}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-muted-foreground mt-3">
           <span>
-            Scenarietype: {SCENARIO_TYPE_LABEL[view.scenarioType]}
+            Scenarietype: <span className="text-foreground">{SCENARIO_TYPE_LABEL[view.scenarioType]}</span>
             {view.scenarioType === "linked_stress_test" && view.baseScenarioName ? ` (basis: ${view.baseScenarioName})` : ""}
           </span>
+          <span>Modelversion: {view.modelRelease} (skema v{view.modelVersion})</span>
           <span>Folkepension: {SP_METHOD_LABEL[inputs.income.statePension.mode]}</span>
-          <span>
-            Planlagt opsparing: {STOP_RULE_LABEL[inputs.free.contributionStopRule ?? "stopAge"]}
-            {(inputs.free.contributionStopRule ?? "stopAge") === "customAge" && inputs.free.contributionStopAge
-              ? ` (${inputs.free.contributionStopAge} år)`
-              : ""}
-          </span>
         </div>
-        <div className="text-xs text-muted-foreground mt-2 italic">{typeNote}</div>
       </header>
 
-      <section className="mb-6">
+      {/* === MODELSTATUS === */}
+      <section className="mb-6 break-inside-avoid">
         <h2 className="font-display text-lg font-semibold mb-2">Modelstatus</h2>
         <div className="text-sm">
           <strong>{statusLabel(kpis.modelStatus)}.</strong> {kpis.modelStatusReason}
         </div>
       </section>
 
-      <section className="mb-6">
+      {/* === NØGLETAL === */}
+      <section className="mb-6 break-inside-avoid">
         <h2 className="font-display text-lg font-semibold mb-2">Nøgletal</h2>
         <table className="w-full text-sm border-collapse">
           <tbody>
@@ -224,6 +238,7 @@ export default function Report() {
         </table>
       </section>
 
+      {/* === KAPITALUDVIKLING === */}
       <section className="mb-6 break-inside-avoid">
         <h2 className="font-display text-lg font-semibold mb-2">Kapitaludvikling</h2>
         <div className="h-[260px] w-full">
@@ -243,8 +258,12 @@ export default function Report() {
         </div>
       </section>
 
-      <section className="mb-6 break-inside-avoid">
-        <h2 className="font-display text-lg font-semibold mb-2">Vigtigste inputs</h2>
+      {/* === FORUDSÆTNINGER (side 2 i print) === */}
+      <section className="mb-6 break-inside-avoid print:break-before" data-testid="assumptions-section">
+        <h2 className="font-display text-lg font-semibold mb-2">Forudsætninger brugt i beregningen</h2>
+        <p className="text-xs text-muted-foreground mb-2">
+          Modellen bygger på følgende værdier. Rapporten ændrer ikke på disse — de redigeres på platformen.
+        </p>
         <table className="w-full text-sm border-collapse">
           <tbody>
             {[
@@ -254,16 +273,62 @@ export default function Report() {
               ["Fuldt pensioneret", `${inputs.fullRetireAge} år`],
               ["Ønsket forbrug (netto/md)", formatDKK(inputs.spending.desiredMonthlyNet)],
               ["Bruttoløn", formatDKK(inputs.income.salaryGross)],
+              ["Sparelogik", inputs.savingsLogic],
+            ].map(([label, value]) => (
+              <tr key={label} className="border-b border-border">
+                <td className="py-1.5 pr-4 text-muted-foreground">{label}</td>
+                <td className="py-1.5 text-right num">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="mb-6 break-inside-avoid">
+        <h3 className="font-display text-base font-semibold mb-2">Opsparing</h3>
+        <table className="w-full text-sm border-collapse">
+          <tbody>
+            {[
               ["Fri kapital — saldo", formatDKK(inputs.free.balance, { compact: true })],
               ["Fri kapital — månedlig opsparing", formatDKK(inputs.free.monthlyContribution)],
-              ["Stop planlagt opsparing", STOP_RULE_LABEL[inputs.free.contributionStopRule ?? "stopAge"]],
+              ["Stop planlagt opsparing", STOP_RULE_LABEL[inputs.free.contributionStopRule ?? "stopAge"]
+                + ((inputs.free.contributionStopRule ?? "stopAge") === "customAge" && inputs.free.contributionStopAge
+                  ? ` (${inputs.free.contributionStopAge} år)` : "")],
+            ].map(([label, value]) => (
+              <tr key={label} className="border-b border-border">
+                <td className="py-1.5 pr-4 text-muted-foreground">{label}</td>
+                <td className="py-1.5 text-right num">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="mb-6 break-inside-avoid">
+        <h3 className="font-display text-base font-semibold mb-2">Pension</h3>
+        <table className="w-full text-sm border-collapse">
+          <tbody>
+            {[
               ["Pension — saldo", formatDKK(inputs.pension.balance, { compact: true })],
               ["Ratepension — udbetalingsperiode", inputs.pension.ratePensionEnabled ? `${inputs.pension.ratePensionPayoutYears} år fra ${inputs.pension.payoutFromAge}` : "Ikke aktiv"],
               ["Livsvarig pension", inputs.pension.lifeAnnuity.enabled ? `Aktiv fra ${inputs.pension.lifeAnnuity.fromAge}` : "Ikke aktiv"],
+            ].map(([label, value]) => (
+              <tr key={label} className="border-b border-border">
+                <td className="py-1.5 pr-4 text-muted-foreground">{label}</td>
+                <td className="py-1.5 text-right num">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="mb-6 break-inside-avoid">
+        <h3 className="font-display text-base font-semibold mb-2">Holding</h3>
+        <table className="w-full text-sm border-collapse">
+          <tbody>
+            {[
               ["Holding — saldo", formatDKK(inputs.holding.balance, { compact: true })],
               ["Holding — forventet exit", formatDKK(inputs.holding.expectedExitValue, { compact: true })],
-              ["Sparelogik", inputs.savingsLogic],
-              ["Antal gældsposter", String(inputs.debts.length)],
             ].map(([label, value]) => (
               <tr key={label} className="border-b border-border">
                 <td className="py-1.5 pr-4 text-muted-foreground">{label}</td>
@@ -276,7 +341,7 @@ export default function Report() {
 
       {inputs.debts.length > 0 && (
         <section className="mb-6 break-inside-avoid">
-          <h2 className="font-display text-lg font-semibold mb-2">Gældsoversigt</h2>
+          <h3 className="font-display text-base font-semibold mb-2">Gældsoversigt</h3>
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
@@ -302,7 +367,7 @@ export default function Report() {
 
       {view.checks.length > 0 && (
         <section className="mb-6 break-inside-avoid">
-          <h2 className="font-display text-lg font-semibold mb-2">Input sanity check</h2>
+          <h3 className="font-display text-base font-semibold mb-2">Kort sanity check</h3>
           <ul className="space-y-1.5 text-sm">
             {view.checks.map((c) => (
               <li key={c.id} className="border-l-2 pl-2 border-border">
@@ -313,14 +378,15 @@ export default function Report() {
         </section>
       )}
 
-      <section className="mt-8 pt-4 border-t border-border text-xs text-muted-foreground leading-relaxed">
-        <strong>Disclaimer:</strong> Modellen er en personlig fremskrivning i nutidskroner og er ikke finansiel rådgivning.
-        Den indeholder forsimplinger og kan afvige væsentligt fra det faktiske forløb.
+      <section className="mt-8 pt-4 border-t border-border text-xs text-muted-foreground leading-relaxed" data-testid="disclaimer">
+        <strong>Disclaimer:</strong> Denne rapport opsummerer en personlig fremskrivning i nutidskroner.
+        Modellen bygger på de registrerede forudsætninger og er ikke finansiel rådgivning. Den indeholder
+        forsimplinger og kan afvige væsentligt fra det faktiske forløb.
       </section>
 
-      {/* SNAPSHOT MANAGER — vises kun i live-mode (skjules i snapshot og print) */}
+      {/* === SNAPSHOT MANAGER — kun on-screen, kun i live-mode === */}
       {!isSnapshotMode && (
-        <section className="mt-10 print:hidden border-t border-border pt-6">
+        <section className="mt-10 print:hidden border-t border-border pt-6" data-testid="snapshot-manager">
           <h2 className="font-display text-lg font-semibold mb-3">Gemte snapshots</h2>
           <p className="text-xs text-muted-foreground mb-4">
             Et snapshot er en frossen kopi af det aktive scenarie på gemmetidspunktet. Det ændrer sig ikke,
