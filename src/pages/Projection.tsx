@@ -205,7 +205,7 @@ function AuditPanel({ y, inputs, onClose }: { y: YearRow; inputs: ScenarioInputs
           </section>
         )}
         {(() => {
-          const ignored = (resolvedScenario.inputs.lifeEvents ?? []).filter(
+          const ignored = (inputs.lifeEvents ?? []).filter(
             (e) => e.enabled && !isLifeEventValid(e),
           );
           if (ignored.length === 0) return null;
