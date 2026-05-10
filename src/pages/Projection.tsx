@@ -360,7 +360,7 @@ export default function Projection() {
 
         {selected && (
           <div>
-            <AuditPanel y={selected} inputs={scenario.inputs} onClose={() => setSelectedAge(null)} />
+            <AuditPanel y={selected} inputs={scenario.inputs} fireYear={selectedFire} onClose={() => setSelectedAge(null)} />
           </div>
         )}
       </div>
