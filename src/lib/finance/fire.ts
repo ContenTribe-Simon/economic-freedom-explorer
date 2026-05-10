@@ -80,6 +80,23 @@ export interface FireAnalysis {
   yearStatus: FireYearStatus[];
   /** Afhængighedsmål: andel af slutaktiverne i hver bucket (0-1). */
   dependence: { pensionShare: number; holdingShare: number; freeShare: number };
+  /**
+   * Kapitalgrundlag bag FIRE — bygger på samme reference-år som FIRE-kortenes
+   * "Forventet kapital" (Standard FI's opnået-alder, ellers stopalder, ellers
+   * sidste år). Værdier er i nutidskroner. Shares beregnes ift. totalen af
+   * de buckets, der er medtaget i Standard FI (totalIncluded).
+   */
+  capitalBreakdown: {
+    referenceAge: number;
+    free: number;
+    holding: number;
+    pension: number;
+    buffer: number;
+    totalIncluded: number;
+    totalAll: number;
+    shares: { free: number; holding: number; pension: number; buffer: number };
+    included: { free: boolean; holding: boolean; pension: boolean; buffer: boolean };
+  };
   /** Månedligt underskud efter stopalder (gennemsnit), arvet fra projection. */
   monthlyGapAfterStop: number;
 }
@@ -230,13 +247,55 @@ export function computeFireAnalysis(
   const nearestMilestone = achievedAges.length > 0 ? achievedAges[0].type : null;
   const earliestFireAge = achievedAges.length > 0 ? achievedAges[0].age : null;
 
-  // Dependence — andel ved 95
+  // Dependence — andel ved 95 (slutaktiver, primært til legacy/visning)
   const yEnd = years[years.length - 1];
   const totalEnd = Math.max(1, yEnd.closing.free + yEnd.closing.pension + yEnd.closing.holding);
   const dependence = {
     freeShare: yEnd.closing.free / totalEnd,
     pensionShare: yEnd.closing.pension / totalEnd,
     holdingShare: yEnd.closing.holding / totalEnd,
+  };
+
+  // Kapitalgrundlag bag FIRE — match cards' "Forventet kapital" reference år.
+  // Brug Standard FI's reference: opnået-alder hvis muligt, ellers stopalder,
+  // ellers sidste år (samme logik som buildResult).
+  const refY =
+    (standardAge !== null ? years.find((y) => y.age === standardAge) : undefined) ??
+    years.find((y) => y.age === inp.stopAge) ??
+    years[years.length - 1];
+  const cb_free = refY ? Math.max(0, refY.closing.free) : 0;
+  const cb_holding = refY ? Math.max(0, refY.closing.holding) : 0;
+  const cb_pension = refY ? Math.max(0, refY.closing.pension) : 0;
+  const cb_buffer = refY ? Math.max(0, refY.closing.buffer ?? 0) : 0;
+  const incl = {
+    free: true,
+    holding: fireAssumptions.includeHoldingInFire,
+    pension: fireAssumptions.includePensionInFire,
+    // Buffer er informationsmæssigt — kan bruges ved shortfall hvis modelvalget tillader det.
+    buffer: !!inp.free.bufferUsableForShortfall,
+  };
+  const totalIncluded =
+    (incl.free ? cb_free : 0) +
+    (incl.holding ? cb_holding : 0) +
+    (incl.pension ? cb_pension : 0);
+  const totalAll = cb_free + cb_holding + cb_pension + cb_buffer;
+  const shareDen = totalIncluded > 0 ? totalIncluded : 0;
+  const shares = {
+    free: shareDen > 0 ? (incl.free ? cb_free : 0) / shareDen : 0,
+    holding: shareDen > 0 ? (incl.holding ? cb_holding : 0) / shareDen : 0,
+    pension: shareDen > 0 ? (incl.pension ? cb_pension : 0) / shareDen : 0,
+    buffer: 0, // buffer indgår ikke i FIRE-grundlaget
+  };
+  const capitalBreakdown = {
+    referenceAge: refY?.age ?? inp.person.currentAge,
+    free: cb_free,
+    holding: cb_holding,
+    pension: cb_pension,
+    buffer: cb_buffer,
+    totalIncluded,
+    totalAll,
+    shares,
+    included: incl,
   };
 
   const afterStop = years.filter((y) => y.age >= inp.stopAge);
@@ -253,6 +312,7 @@ export function computeFireAnalysis(
     earliestFireAge,
     yearStatus,
     dependence,
+    capitalBreakdown,
     monthlyGapAfterStop,
   };
 }

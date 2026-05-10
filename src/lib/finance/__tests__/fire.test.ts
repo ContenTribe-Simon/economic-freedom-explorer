@@ -137,3 +137,57 @@ describe("FIRE — works for custom scenarios independently", () => {
     expect(fb.standardFiNumber).toBeLessThan(fa.standardFiNumber);
   });
 });
+
+describe("FIRE — capitalBreakdown for dependence section", () => {
+  it("does not return all-zero shares when FIRE base capital is positive", () => {
+    const s = withScenario((sc) => {
+      sc.inputs.spending.desiredMonthlyNet = 10000;
+      sc.inputs.free.balance = 5_000_000;
+      sc.inputs.holding.balance = 1_000_000;
+    });
+    const years = project(s, defaultAssumptions);
+    const fire = computeFireAnalysis(s, years, defaultAssumptions);
+    expect(fire.capitalBreakdown.totalIncluded).toBeGreaterThan(0);
+    const sum = fire.capitalBreakdown.shares.free + fire.capitalBreakdown.shares.holding + fire.capitalBreakdown.shares.pension;
+    expect(sum).toBeGreaterThan(0.99);
+    expect(sum).toBeLessThan(1.01);
+  });
+
+  it("free + holding shares sum to 1 when pension is excluded (default)", () => {
+    const s = withScenario((sc) => {
+      sc.inputs.free.balance = 4_000_000;
+      sc.inputs.holding.balance = 2_000_000;
+      sc.inputs.pension.balance = 3_000_000;
+    });
+    const years = project(s, defaultAssumptions);
+    const fire = computeFireAnalysis(s, years, defaultAssumptions);
+    expect(fire.capitalBreakdown.included.pension).toBe(false);
+    expect(fire.capitalBreakdown.shares.pension).toBe(0);
+    const fhSum = fire.capitalBreakdown.shares.free + fire.capitalBreakdown.shares.holding;
+    expect(fhSum).toBeCloseTo(1, 2);
+  });
+
+  it("pension is shown but excluded from Standard FI when default config is used", () => {
+    const s = withScenario((sc) => { sc.inputs.pension.balance = 2_000_000; });
+    const years = project(s, defaultAssumptions);
+    const fire = computeFireAnalysis(s, years, defaultAssumptions);
+    expect(fire.capitalBreakdown.included.pension).toBe(false);
+    expect(fire.capitalBreakdown.pension).toBeGreaterThanOrEqual(0);
+  });
+
+  it("breakdown matches Standard FI capitalAvailable on FIRE card", () => {
+    const s = makeBaseScenario();
+    const years = project(s, defaultAssumptions);
+    const fire = computeFireAnalysis(s, years, defaultAssumptions);
+    expect(fire.capitalBreakdown.totalIncluded).toBeCloseTo(fire.results.standard.capitalAvailable, 0);
+  });
+
+  it("capitalBreakdown does not change projection results", () => {
+    const s = makeBaseScenario();
+    const ys1 = project(s, defaultAssumptions);
+    const before = JSON.stringify(ys1);
+    computeFireAnalysis(s, ys1, defaultAssumptions);
+    const ys2 = project(s, defaultAssumptions);
+    expect(JSON.stringify(ys2)).toBe(before);
+  });
+});
