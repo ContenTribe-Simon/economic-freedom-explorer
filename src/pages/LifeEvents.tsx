@@ -91,7 +91,10 @@ export default function LifeEventsPage() {
       )}
 
       <div className="space-y-3">
-        {events.map((ev) => (
+        {events.map((ev) => {
+          const validationError = lifeEventValidationError(ev);
+          const isOneTime = ev.frequency === "one_time";
+          return (
           <Card key={ev.id} className={`p-4 ${ev.enabled ? "" : "opacity-60"}`}>
             <div className="flex items-start gap-3">
               <input
