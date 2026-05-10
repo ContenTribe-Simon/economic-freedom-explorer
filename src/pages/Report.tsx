@@ -367,8 +367,7 @@ export default function Report() {
       )}
 
       {(() => {
-        const { isLifeEventValid, formatLifeEventPeriod } = require("@/lib/finance/lifeEvents");
-        const activeValid = (inputs.lifeEvents ?? []).filter((e: any) => e.enabled && isLifeEventValid(e));
+        const activeValid = (inputs.lifeEvents ?? []).filter((e) => e.enabled && isLifeEventValid(e));
         if (activeValid.length === 0) return null;
         return (
           <section className="mb-6 break-inside-avoid">
