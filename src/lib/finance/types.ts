@@ -363,6 +363,44 @@ export const MODEL_VERSION = 1 as const;
  */
 export const MODEL_RELEASE = "personal-fire-v0.3-stable" as const;
 
+/**
+ * Frosset point-in-time kopi af et beregnet scenarie. Bruges som dokumentation
+ * og rapportgrundlag — ændres ALDRIG når basecase eller scenarier senere ændres.
+ *
+ * Linkede stress-tests materialiseres som resolved data ved snapshot-tidspunktet.
+ */
+export interface Snapshot {
+  snapshotId: string;
+  snapshotName: string;
+  createdAt: number;
+  updatedAt: number;
+  modelVersion: number;
+  modelRelease: string;
+
+  // Scenario identitet ved snapshot-tidspunktet
+  scenarioId: string;
+  scenarioName: string;
+  scenarioType: ScenarioType;
+  baseScenarioId?: string;
+  baseScenarioName?: string;
+  modifiers?: Partial<ScenarioModifiers>;
+  manuallyEdited?: boolean;
+
+  // Resolved beregningsgrundlag
+  resolvedInputs: ScenarioInputs;
+  assumptionsOverride?: Partial<Assumptions>;
+  assumptions: Assumptions;
+
+  // Beregnet output (frosset)
+  kpis: KPIs;
+  sanityChecks: SanityCheck[];
+  years: YearRow[];
+  chartData: { age: number; Fri: number; Buffer: number; Pension: number; Holding: number; Nettoformue: number }[];
+
+  notes?: string;
+  metadata?: Record<string, unknown>;
+}
+
 /** Skema for eksport/import af hele modellen — forberedt til fremtidig serverlagring. */
 export interface ModelExport {
   modelVersion: number;
@@ -371,6 +409,8 @@ export interface ModelExport {
   activeScenarioId: string;
   scenarios: Scenario[];
   assumptions: Assumptions;
+  /** Gemte snapshots — frosne point-in-time rapporter. Valgfri for bagudkompatibilitet. */
+  snapshots?: Snapshot[];
   metadata?: Record<string, unknown>;
 }
 
