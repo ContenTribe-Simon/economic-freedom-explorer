@@ -495,6 +495,12 @@ export function projectWithStopAge(
 
     if (working) bal.pension += ownPensionContribution + employerPension;
 
+    // ---- Livsfaser: engangs-effekter på fri kapital og privat gæld ----
+    if (lifeEventEffects) {
+      bal.free = Math.max(0, bal.free + lifeEventEffects.freeCapitalDelta);
+      lifeEventDebtBalance = Math.max(0, lifeEventDebtBalance + lifeEventEffects.debtDelta);
+    }
+
     const required = spending + dt.privatePayment;
     const provided =
       incomeNet + withdrawals.free + withdrawals.pension + withdrawals.holding + withdrawals.buffer;
@@ -508,6 +514,9 @@ export function projectWithStopAge(
     bal.free += growth.free;
     bal.pension += growth.pension;
     bal.holding += growth.holding;
+
+    // Tilføj persisterende livsfase-gæld til årets udgående gæld (efter processDebts).
+    bal.debt = bal.debt + lifeEventDebtBalance;
 
     const closing = { ...bal };
     const netWorth = closing.free + closing.pension + closing.holding + closing.buffer - closing.debt;
