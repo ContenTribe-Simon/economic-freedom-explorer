@@ -167,5 +167,34 @@ export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[
     detail: `${rateLine} ${laLine}`,
   });
 
+  // ---- Livsfaser ----
+  const events = inp.lifeEvents ?? [];
+  for (const ev of events) {
+    if (!ev.enabled) continue;
+    if (!ev.name?.trim()) {
+      out.push({ id: `le-name-${ev.id}`, severity: "warn", title: "Livsfase uden navn", detail: "En aktiv livsfase mangler navn." });
+    }
+    if (ev.startAge < inp.person.currentAge) {
+      out.push({ id: `le-start-${ev.id}`, severity: "info", title: `Livsfase: ${ev.name || "uden navn"} starter før nuværende alder`, detail: `Startalder ${ev.startAge} ligger før nuværende alder ${inp.person.currentAge}.` });
+    }
+    if (ev.endAge !== undefined && ev.endAge < ev.startAge) {
+      out.push({ id: `le-end-${ev.id}`, severity: "warn", title: `Livsfase: ${ev.name || "uden navn"} har slutalder før startalder`, detail: "Tjek start- og slutalder." });
+    }
+    if ((ev.amount ?? 0) === 0) {
+      out.push({ id: `le-amt-${ev.id}`, severity: "info", title: `Livsfase: ${ev.name || "uden navn"} har beløb 0`, detail: "Eventet er aktivt, men har ingen beløbsmæssig effekt." });
+    }
+    const valid = ["privateIncome","privateSpending","freeCapital","privateDebt","holdingCapital","holdingCashflow","pensionCapital","netWorthOnly"];
+    if (!valid.includes(ev.effectTarget as string)) {
+      out.push({ id: `le-target-${ev.id}`, severity: "warn", title: `Livsfase: ${ev.name || "uden navn"} har ukendt effektmål`, detail: `effectTarget = ${ev.effectTarget}` });
+    }
+    // Stor effekt heuristik: monthly > 50k/md eller one_time > 1M
+    const big = (ev.frequency === "monthly" && ev.amount > 50000)
+      || (ev.frequency === "one_time" && ev.amount > 1_000_000)
+      || (ev.frequency === "annual" && ev.amount > 600_000);
+    if (big) {
+      out.push({ id: `le-big-${ev.id}`, severity: "info", title: `Livsfase: ${ev.name || "uden navn"} har meget stor effekt`, detail: "Mulig modelrisiko — tjek beløb og periode." });
+    }
+  }
+
   return out;
 }
