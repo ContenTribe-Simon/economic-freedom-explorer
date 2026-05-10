@@ -23,6 +23,7 @@ const navItems = [
   { to: "/scenarios", label: "Scenarier", icon: GitCompareArrows },
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },
   { to: "/report", label: "Rapport", icon: FileText },
+  { to: "/snapshots", label: "Snapshots", icon: Camera },
 ];
 
 function formatRelative(ts: number | null): string {
