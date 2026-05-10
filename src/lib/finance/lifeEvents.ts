@@ -30,13 +30,38 @@ export function makeLifeEvent(partial: Partial<LifeEvent> = {}): LifeEvent {
   };
 }
 
-/** Er eventet aktivt for det givne år (alder)? */
+/**
+ * Effective end age — tomme/0/null/undefined tolkes som "ingen slutalder".
+ * For one_time events ignoreres endAge altid.
+ */
+export function effectiveEndAge(event: LifeEvent, lifeExpectancy: number): number {
+  if (event.frequency === "one_time") return event.startAge;
+  const e = event.endAge;
+  if (e === undefined || e === null || (e as number) <= 0) return lifeExpectancy;
+  return e as number;
+}
+
+/** Validering: en livsfase er ugyldig hvis endAge er udfyldt (>0) og < startAge. */
+export function isLifeEventValid(event: LifeEvent): boolean {
+  if (event.frequency === "one_time") return true;
+  const e = event.endAge;
+  if (e === undefined || e === null || (e as number) <= 0) return true;
+  return (e as number) >= event.startAge;
+}
+
+/** Menneskelig fejlbesked når et event er ugyldigt. */
+export function lifeEventValidationError(event: LifeEvent): string | null {
+  if (isLifeEventValid(event)) return null;
+  return "Til alder skal være højere end eller lig med Fra alder.";
+}
+
+/** Er eventet aktivt for det givne år (alder)? Ugyldige events er aldrig aktive. */
 export function isEventActiveAtAge(event: LifeEvent, age: number, lifeExpectancy: number): boolean {
   if (!event.enabled) return false;
+  if (!isLifeEventValid(event)) return false;
   if (event.frequency === "one_time") return age === event.startAge;
   if (age < event.startAge) return false;
-  const end = event.endAge ?? lifeExpectancy;
-  return age <= end;
+  return age <= effectiveEndAge(event, lifeExpectancy);
 }
 
 /** Beregn signed årligt beløb (i nutidskroner) for eventet i det givne år. */
