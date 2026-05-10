@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Assumptions, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, StressModifierKey } from "@/lib/finance/types";
