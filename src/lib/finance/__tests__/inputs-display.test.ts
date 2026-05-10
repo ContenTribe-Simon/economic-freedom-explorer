@@ -75,13 +75,14 @@ describe("Inputs display-data for linked stress-tests", () => {
   it("efter convertToCustom følger scenariet ikke længere basecase", () => {
     const { baseId, linkedId } = setupLinkedNoBarma();
     useFinanceStore.getState().convertToCustom(linkedId);
+    const before = useFinanceStore.getState().scenarios.find((s) => s.id === linkedId)!.inputs.person.currentAge;
     useFinanceStore.getState().updateScenario(baseId, (s) => ({
       ...s,
-      inputs: { ...s.inputs, person: { ...s.inputs.person, currentAge: 40 } },
+      inputs: { ...s.inputs, person: { ...s.inputs.person, currentAge: before + 7 } },
     }));
     const all = useFinanceStore.getState().scenarios;
     const sc = all.find((s) => s.id === linkedId)!;
     expect(sc.type).toBe("custom");
-    expect(sc.inputs.person.currentAge).not.toBe(40);
+    expect(sc.inputs.person.currentAge).toBe(before);
   });
 });
