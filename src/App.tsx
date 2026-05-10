@@ -37,6 +37,7 @@ const App = () => (
             <Route path="/scenarios" element={<Scenarios />} />
             <Route path="/report" element={<Report />} />
             <Route path="/snapshots" element={<Snapshots />} />
+            <Route path="/life-events" element={<LifeEventsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>
