@@ -115,19 +115,22 @@ describe("model export shape (modelVersion + metadata)", () => {
   });
 });
 
-describe("lifeEvents is a forward-compat placeholder", () => {
-  it("populating lifeEvents does NOT change projection results", () => {
+describe("lifeEvents — disabled events do not change projection", () => {
+  it("populating disabled lifeEvents does NOT change projection results", () => {
     const a = makeBaseScenario();
     const b = makeBaseScenario();
     b.inputs.lifeEvents = [
       {
         id: "evt-1",
-        label: "Boligkøb",
-        type: "expense",
+        name: "Boligkøb",
+        enabled: false,
+        category: "one_time_capital",
         startAge: 45,
         amount: 200_000,
-        affectsCashflow: true,
-        affectsNetWorth: true,
+        frequency: "one_time",
+        amountMode: "net",
+        effectTarget: "freeCapital",
+        effectDirection: "decrease",
       },
     ];
     const ya = project(a, defaultAssumptions);
