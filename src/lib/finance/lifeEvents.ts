@@ -11,23 +11,38 @@ const id = () =>
 
 /** Default-shape for et nyt event. Bruges af UI-templates. */
 export function makeLifeEvent(partial: Partial<LifeEvent> = {}): LifeEvent {
-  return {
+  const merged = {
     id: id(),
     name: "Ny livsfase",
     enabled: true,
-    category: "custom",
+    category: "custom" as const,
     startAge: 40,
-    endAge: undefined,
+    endAge: undefined as number | undefined,
     amount: 0,
-    frequency: "monthly",
-    amountMode: "net",
-    effectTarget: "privateSpending",
-    effectDirection: "increase",
+    frequency: "monthly" as const,
+    amountMode: "net" as const,
+    effectTarget: "privateSpending" as const,
+    effectDirection: "increase" as const,
     growthRate: 0,
     confidenceKey: null,
     notes: undefined,
     ...partial,
-  };
+  } as LifeEvent;
+  // Normalisér endAge: 0/null tolkes som "ingen slutalder".
+  if (merged.endAge === null || (typeof merged.endAge === "number" && merged.endAge <= 0)) {
+    merged.endAge = undefined;
+  }
+  return merged;
+}
+
+/** Formatér periode til summary/audit/rapport. */
+export function formatLifeEventPeriod(event: LifeEvent): string {
+  if (event.frequency === "one_time") return `ved alder ${event.startAge}`;
+  const e = event.endAge;
+  const hasEnd = !(e === undefined || e === null || (e as number) <= 0);
+  return hasEnd
+    ? `fra alder ${event.startAge} til ${e}`
+    : `fra alder ${event.startAge} og frem`;
 }
 
 /**
