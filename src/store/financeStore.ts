@@ -185,11 +185,17 @@ export const useFinanceStore = create<FinanceState>()(
           return { ...withEvents, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
         const importedSnapshots = Array.isArray((parsed as any).snapshots) ? ((parsed as any).snapshots as Snapshot[]) : [];
+        const importedCountriesRaw = Array.isArray((parsed as any).countryProfiles)
+          ? (parsed as any).countryProfiles
+          : null;
         set({
           scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
           activeScenarioId: parsed.activeScenarioId ?? scenarios[0].id,
           snapshots: importedSnapshots,
+          countryProfiles: importedCountriesRaw
+            ? importedCountriesRaw.map((c: any) => normalizeCountryProfile(c))
+            : get().countryProfiles,
         });
       },
       addStandardScenarios: () => {
