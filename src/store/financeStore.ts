@@ -50,6 +50,14 @@ interface FinanceState {
   removeLifeEvent: (scenarioId: string, eventId: string) => void;
   duplicateLifeEvent: (scenarioId: string, eventId: string) => void;
   toggleLifeEvent: (scenarioId: string, eventId: string) => void;
+  /** Landeprofiler (model-niveau) — bruges af Country FIRE-modulet. */
+  countryProfiles: CountryProfile[];
+  addCountryProfile: (profile?: Partial<CountryProfile>) => string;
+  updateCountryProfile: (id: string, patch: Partial<CountryProfile>) => void;
+  removeCountryProfile: (id: string) => void;
+  duplicateCountryProfile: (id: string) => string;
+  toggleCountryProfile: (id: string) => void;
+  resetCountryProfilesToDefaults: () => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
