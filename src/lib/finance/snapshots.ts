@@ -65,6 +65,7 @@ export function buildSnapshot(
 
     notes: options.notes,
     metadata: {},
+    countryProfiles: options.countryProfiles ?? [],
   });
   return snap;
 }
