@@ -3,6 +3,7 @@ import { resolveScenario } from "./stress";
 import { project } from "./projection";
 import { deriveKPIs } from "./kpis";
 import { sanityChecks } from "./sanity";
+import type { CountryProfile } from "./country";
 
 const id = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -17,7 +18,7 @@ export function buildSnapshot(
   scenario: Scenario,
   scenarios: Scenario[],
   assumptions: Assumptions,
-  options: { name?: string; notes?: string } = {},
+  options: { name?: string; notes?: string; countryProfiles?: CountryProfile[] } = {},
 ): Snapshot {
   const resolved = resolveScenario(scenario, scenarios);
   const years = project(resolved, assumptions);
