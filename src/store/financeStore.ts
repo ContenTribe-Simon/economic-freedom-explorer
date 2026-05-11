@@ -359,10 +359,38 @@ export const useFinanceStore = create<FinanceState>()(
             lifeEvents: (sc.inputs.lifeEvents ?? []).map((e) => (e.id === eventId ? { ...e, enabled: !e.enabled } : e)),
           },
         })),
+
+      // -------- CountryProfiles (model-niveau) --------
+      addCountryProfile: (profile) => {
+        const blank = makeBlankCountryProfile(profile?.name);
+        const next: CountryProfile = { ...blank, ...(profile ?? {}), id: blank.id };
+        set((s) => ({ countryProfiles: [...s.countryProfiles, next] }));
+        return next.id;
+      },
+      updateCountryProfile: (id, patch) =>
+        set((s) => ({
+          countryProfiles: s.countryProfiles.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        })),
+      removeCountryProfile: (id) =>
+        set((s) => ({ countryProfiles: s.countryProfiles.filter((c) => c.id !== id) })),
+      duplicateCountryProfile: (id) => {
+        const orig = get().countryProfiles.find((c) => c.id === id);
+        if (!orig) return id;
+        const blank = makeBlankCountryProfile();
+        const copy: CountryProfile = { ...structuredClone(orig), id: blank.id, name: `${orig.name} (kopi)` };
+        set((s) => ({ countryProfiles: [...s.countryProfiles, copy] }));
+        return copy.id;
+      },
+      toggleCountryProfile: (id) =>
+        set((s) => ({
+          countryProfiles: s.countryProfiles.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c)),
+        })),
+      resetCountryProfilesToDefaults: () =>
+        set({ countryProfiles: structuredClone(DEFAULT_COUNTRY_PROFILES) }),
     }),
     {
       name: "finance-tool.v1",
-      version: 14,
+      version: 15,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
