@@ -6,6 +6,12 @@ import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finan
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { buildSnapshot } from "@/lib/finance/snapshots";
 import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
+import {
+  CountryProfile,
+  DEFAULT_COUNTRY_PROFILES,
+  makeBlankCountryProfile,
+  normalizeCountryProfile,
+} from "@/lib/finance/country";
 
 interface FinanceState {
   scenarios: Scenario[];
