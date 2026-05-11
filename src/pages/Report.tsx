@@ -410,6 +410,8 @@ export default function Report() {
             <h3 className="font-display text-base font-semibold mb-2">FIRE-status</h3>
             <p className="text-xs text-muted-foreground mb-2">
               Standard FI mål: {formatDKK(fire.standardFiNumber, { compact: true })} ved udtræksrate {(fire.assumptions.withdrawalRate * 100).toFixed(1)} %.
+              Forventet kapitalgrundlag: {formatDKK(fire.results.standard.capitalAvailable, { compact: true })}
+              {fire.results.standard.gap > 0 ? ` — gap ${formatDKK(fire.results.standard.gap, { compact: true })}` : " — opnået"}.
               Nærmeste milepæl: {fire.nearestMilestone ? fire.results[fire.nearestMilestone].label : "ingen opnået"}
               {fire.earliestFireAge ? ` (alder ${fire.earliestFireAge})` : ""}.
             </p>
@@ -427,8 +429,9 @@ export default function Report() {
               </tbody>
             </table>
             <p className="text-[11px] text-muted-foreground mt-2 italic">
-              FIRE er et analyselag oven på fremskrivningen og påvirker ikke de øvrige tal.
+              FIRE er et benchmark-/analyselag oven på fremskrivningen og påvirker ikke de øvrige tal.
               Standard-grundlaget inkluderer fri kapital{fire.assumptions.includeHoldingInFire ? " og holding" : ""}{fire.assumptions.includePensionInFire ? " og pension" : ""}.
+              Detaljer (benchmarks, skattejusteret grovestimat, følsomhed) findes på FIRE-siden i platformen.
             </p>
           </section>
         );

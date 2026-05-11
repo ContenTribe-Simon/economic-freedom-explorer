@@ -29,6 +29,12 @@ export interface FireAssumptions {
   includePensionInFire: boolean;
   /** Tæller holding med i FIRE-kapitalgrundlaget? Default true. */
   includeHoldingInFire: boolean;
+  /**
+   * Forenklet effektiv skat på FIRE-udtræk, brugt KUN til skattejusteret
+   * grovestimat på FIRE-siden. Påvirker ikke projection eller scenarie.
+   * Default 27 % (forenklet — ikke en faktisk dansk skatteberegning).
+   */
+  effectiveTaxOnWithdrawal: number;
 }
 
 export const FIRE_DEFAULTS: FireAssumptions = {
@@ -37,6 +43,7 @@ export const FIRE_DEFAULTS: FireAssumptions = {
   fatSpendingFactor: 1.30,
   includePensionInFire: false,
   includeHoldingInFire: true,
+  effectiveTaxOnWithdrawal: 0.27,
 };
 
 export type FireType = "coast" | "lean" | "standard" | "fat" | "barista";
@@ -54,6 +61,13 @@ export interface FireResult {
   achievedAtAge: number | null;
   /** Gap i kr (positivt = mangler). */
   gap: number;
+  /** Gap i procent af capitalRequired (0 hvis opnået). */
+  gapPct: number;
+  /**
+   * Bedste punkt i fremskrivningen ift. denne FIRE-type — det år hvor
+   * kapitalgrundlaget kommer tættest på målet (mindst gap).
+   */
+  bestPoint: { age: number; capital: number; gap: number } | null;
   status: FireStatus;
 }
 
@@ -65,27 +79,38 @@ export interface FireYearStatus {
   meets: { coast: boolean; lean: boolean; standard: boolean; fat: boolean; barista: boolean };
 }
 
+export interface FireBenchmark {
+  rate: number;
+  label: string;
+  capitalRequiredNet: number;
+  capitalRequiredGross: number;
+}
+
+export interface SustainableWithdrawalAtRate {
+  rate: number;
+  annual: number;
+  monthly: number;
+}
+
+export interface SpendingReductionRow {
+  pct: number;
+  newMonthlyNet: number;
+  newAnnualNet: number;
+  capitalRequiredAt3_5: number;
+  capitalRequiredAt4: number;
+  savingsAt3_5: number;
+  achievedAge: number | null;
+}
+
 export interface FireAnalysis {
   assumptions: FireAssumptions;
-  /** Årligt forbrug i nutidskroner brugt som FIRE-grundlag. */
   annualSpending: number;
-  /** Standard FI number (= annualSpending / withdrawalRate). */
   standardFiNumber: number;
   results: Record<FireType, FireResult>;
-  /** Nærmeste opnåede milepæl (eller null hvis intet opnås). */
   nearestMilestone: FireType | null;
-  /** Tidligste alder hvor noget FIRE-niveau opnås. */
   earliestFireAge: number | null;
-  /** År-for-år status til audit. */
   yearStatus: FireYearStatus[];
-  /** Afhængighedsmål: andel af slutaktiverne i hver bucket (0-1). */
   dependence: { pensionShare: number; holdingShare: number; freeShare: number };
-  /**
-   * Kapitalgrundlag bag FIRE — bygger på samme reference-år som FIRE-kortenes
-   * "Forventet kapital" (Standard FI's opnået-alder, ellers stopalder, ellers
-   * sidste år). Værdier er i nutidskroner. Shares beregnes ift. totalen af
-   * de buckets, der er medtaget i Standard FI (totalIncluded).
-   */
   capitalBreakdown: {
     referenceAge: number;
     free: number;
@@ -97,7 +122,19 @@ export interface FireAnalysis {
     shares: { free: number; holding: number; pension: number; buffer: number };
     included: { free: boolean; holding: boolean; pension: boolean; buffer: boolean };
   };
-  /** Månedligt underskud efter stopalder (gennemsnit), arvet fra projection. */
+  benchmarks: FireBenchmark[];
+  sustainableNow: {
+    referenceAge: number;
+    capitalIncluded: number;
+    rates: SustainableWithdrawalAtRate[];
+  };
+  spendingReductions: SpendingReductionRow[];
+  summary: {
+    nearestType: FireType | null;
+    nearestAge: number | null;
+    smallestUnachievedGap: { type: FireType; age: number; gap: number } | null;
+    keyDriver: "spending" | "freeCapital" | "pension" | "holding" | "withdrawalRate";
+  };
   monthlyGapAfterStop: number;
 }
 
@@ -213,10 +250,19 @@ export function computeFireAnalysis(
     const yAtStop = years.find((y) => y.age === inp.stopAge);
     const refY = yAtAge ?? yAtStop ?? years[years.length - 1];
     const cap = refY ? fireBaseCapitalAtYear(refY, fireAssumptions) : 0;
-    const sustainable = age !== null;
     const status: FireStatus = age !== null
       ? (age <= inp.person.currentAge ? "achieved" : "achieved_at_age")
       : (cap >= target ? "not_sustainable" : "not_achieved");
+    const gap = Math.max(0, target - cap);
+    const gapPct = target > 0 ? gap / target : 0;
+    // Bedste punkt: året med højeste fireBaseCapital (mindste gap til target)
+    let best: { age: number; capital: number; gap: number } | null = null;
+    for (const s of yearStatus) {
+      const g = Math.max(0, target - s.fireBaseCapital);
+      if (best === null || g < best.gap) {
+        best = { age: s.age, capital: s.fireBaseCapital, gap: g };
+      }
+    }
     return {
       type,
       label: TYPE_LABEL[type],
@@ -224,7 +270,9 @@ export function computeFireAnalysis(
       capitalRequired: target,
       capitalAvailable: cap,
       achievedAtAge: age,
-      gap: Math.max(0, target - cap),
+      gap,
+      gapPct,
+      bestPoint: best,
       status,
     };
   }
@@ -303,6 +351,95 @@ export function computeFireAnalysis(
     ? afterStop.reduce((s, y) => s + y.monthlyGap, 0) / afterStop.length
     : 0;
 
+  // ---- Benchmarks (4 %, 3,5 %, valgt rate) ----
+  const tax = Math.min(0.95, Math.max(0, fireAssumptions.effectiveTaxOnWithdrawal));
+  const grossFactor = tax > 0 ? 1 / (1 - tax) : 1;
+  const benchmarkRates: { rate: number; label: string }[] = [
+    { rate: 0.04, label: "4 %-reglen (Trinity-inspireret)" },
+    { rate: 0.035, label: "3,5 % (konservativ)" },
+  ];
+  if (fireAssumptions.withdrawalRate !== 0.04 && fireAssumptions.withdrawalRate !== 0.035) {
+    benchmarkRates.push({ rate: fireAssumptions.withdrawalRate, label: `Valgt udtræksrate (${(fireAssumptions.withdrawalRate * 100).toFixed(1)} %)` });
+  }
+  const benchmarks: FireBenchmark[] = benchmarkRates.map((b) => {
+    const net = b.rate > 0 ? annualSpending / b.rate : 0;
+    return {
+      rate: b.rate,
+      label: b.label,
+      capitalRequiredNet: net,
+      capitalRequiredGross: net * grossFactor,
+    };
+  });
+
+  // ---- Bæredygtigt udtræk fra nuværende kapital ----
+  const currentCapitalIncluded =
+    inp.free.balance +
+    (fireAssumptions.includeHoldingInFire ? inp.holding.balance : 0) +
+    (fireAssumptions.includePensionInFire ? inp.pension.balance : 0);
+  const sustainableRates: SustainableWithdrawalAtRate[] = [0.035, 0.04].map((rate) => {
+    const annual = currentCapitalIncluded * rate;
+    return { rate, annual, monthly: annual / 12 };
+  });
+  const sustainableNow = {
+    referenceAge: inp.person.currentAge,
+    capitalIncluded: currentCapitalIncluded,
+    rates: sustainableRates,
+  };
+
+  // ---- Effekt af lavere forbrug ----
+  const reductions = [0.05, 0.10, 0.15, 0.20];
+  const spendingReductions: SpendingReductionRow[] = reductions.map((pct) => {
+    const newAnnual = annualSpending * (1 - pct);
+    const cap35 = newAnnual / 0.035;
+    const cap4 = newAnnual / 0.04;
+    // Tidligere opnået alder: første år hvor fireBaseCapital >= cap@valgt rate
+    const target = newAnnual / fireAssumptions.withdrawalRate;
+    let achievedAge: number | null = null;
+    for (const s of yearStatus) {
+      if (s.fireBaseCapital >= target && noShortfallFromAge(years, s.age)) {
+        achievedAge = s.age;
+        break;
+      }
+    }
+    return {
+      pct,
+      newMonthlyNet: (annualSpending / 12) * (1 - pct),
+      newAnnualNet: newAnnual,
+      capitalRequiredAt3_5: cap35,
+      capitalRequiredAt4: cap4,
+      savingsAt3_5: standardTarget - cap35,
+      achievedAge,
+    };
+  });
+
+  // ---- Summary / nøglefaktor ----
+  const unachieved = (Object.keys(results) as FireType[])
+    .filter((t) => results[t].achievedAtAge === null && results[t].bestPoint !== null)
+    .map((t) => ({ type: t, age: results[t].bestPoint!.age, gap: results[t].bestPoint!.gap }));
+  unachieved.sort((a, b) => a.gap - b.gap);
+  const smallestUnachievedGap = unachieved[0] ?? null;
+
+  // KeyDriver: simpel sensitivitet — hvad reducerer Standard FI gap mest?
+  const baseGap = results.standard.gap;
+  const reduceSpending10 = standardTarget * 0.9; // -10% spending
+  const sensitivities: { key: FireAnalysis["summary"]["keyDriver"]; gainKr: number }[] = [
+    { key: "spending", gainKr: standardTarget - reduceSpending10 },
+    { key: "freeCapital", gainKr: inp.free.balance * 0.10 },
+    { key: "holding", gainKr: (fireAssumptions.includeHoldingInFire ? inp.holding.balance : 0) * 0.10 },
+    { key: "pension", gainKr: (fireAssumptions.includePensionInFire ? inp.pension.balance : 0) * 0.10 },
+    { key: "withdrawalRate", gainKr: standardTarget - annualSpending / (fireAssumptions.withdrawalRate + 0.005) },
+  ];
+  sensitivities.sort((a, b) => Math.abs(b.gainKr) - Math.abs(a.gainKr));
+  const keyDriver = sensitivities[0]?.key ?? "spending";
+
+  const summary: FireAnalysis["summary"] = {
+    nearestType: nearestMilestone,
+    nearestAge: earliestFireAge,
+    smallestUnachievedGap,
+    keyDriver,
+  };
+  void baseGap;
+
   return {
     assumptions: fireAssumptions,
     annualSpending,
@@ -313,6 +450,10 @@ export function computeFireAnalysis(
     yearStatus,
     dependence,
     capitalBreakdown,
+    benchmarks,
+    sustainableNow,
+    spendingReductions,
+    summary,
     monthlyGapAfterStop,
   };
 }
