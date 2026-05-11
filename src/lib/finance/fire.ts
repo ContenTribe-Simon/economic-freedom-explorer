@@ -250,10 +250,19 @@ export function computeFireAnalysis(
     const yAtStop = years.find((y) => y.age === inp.stopAge);
     const refY = yAtAge ?? yAtStop ?? years[years.length - 1];
     const cap = refY ? fireBaseCapitalAtYear(refY, fireAssumptions) : 0;
-    const sustainable = age !== null;
     const status: FireStatus = age !== null
       ? (age <= inp.person.currentAge ? "achieved" : "achieved_at_age")
       : (cap >= target ? "not_sustainable" : "not_achieved");
+    const gap = Math.max(0, target - cap);
+    const gapPct = target > 0 ? gap / target : 0;
+    // Bedste punkt: året med højeste fireBaseCapital (mindste gap til target)
+    let best: { age: number; capital: number; gap: number } | null = null;
+    for (const s of yearStatus) {
+      const g = Math.max(0, target - s.fireBaseCapital);
+      if (best === null || g < best.gap) {
+        best = { age: s.age, capital: s.fireBaseCapital, gap: g };
+      }
+    }
     return {
       type,
       label: TYPE_LABEL[type],
@@ -261,7 +270,9 @@ export function computeFireAnalysis(
       capitalRequired: target,
       capitalAvailable: cap,
       achievedAtAge: age,
-      gap: Math.max(0, target - cap),
+      gap,
+      gapPct,
+      bestPoint: best,
       status,
     };
   }
