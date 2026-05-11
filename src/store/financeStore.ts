@@ -562,6 +562,12 @@ export const useFinanceStore = create<FinanceState>()(
             return { ...sc, inputs: { ...sc.inputs, lifeEvents: normalized } };
           });
         }
+        // v15: tilføj countryProfiles på model-niveau (default-profiler hvis mangler)
+        if (!Array.isArray(state.countryProfiles) || state.countryProfiles.length === 0) {
+          state.countryProfiles = structuredClone(DEFAULT_COUNTRY_PROFILES);
+        } else {
+          state.countryProfiles = state.countryProfiles.map((c: any) => normalizeCountryProfile(c));
+        }
         return state;
       },
     },
