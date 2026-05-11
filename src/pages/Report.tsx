@@ -464,6 +464,57 @@ export default function Report() {
         );
       })()}
 
+      {(() => {
+        const countries = isSnapshotMode ? snapshotCountries : liveData?.countries ?? null;
+        if (!countries || countries.length === 0) return null;
+        const standardOnly = countries.filter((r) => r.lifestyle === "standard");
+        const order = { achieved: 0, near: 1, not_achieved: 2 } as const;
+        const sorted = [...standardOnly].sort((a, b) => {
+          const sa = order[a.status] - order[b.status];
+          return sa !== 0 ? sa : a.gap - b.gap;
+        });
+        if (sorted.length === 0) return null;
+        const best = sorted[0];
+        const top = sorted.slice(0, 5);
+        return (
+          <section className="mb-6 break-inside-avoid" data-testid="report-countries">
+            <h3 className="font-display text-base font-semibold mb-2">Landeanalyse (kort)</h3>
+            <p className="text-xs text-muted-foreground mb-2">
+              Bedste/nærmeste land: <strong>{best.countryName}</strong> ({lifestyleLabel(best.lifestyle)}) — kapitalbehov {formatDKK(best.selectedCapitalNeed, { compact: true })}
+              {best.gap > 0 ? `, gap ${formatDKK(best.gap, { compact: true })}` : ", opnået"}
+              {best.achievedAge !== null ? `, alder ${best.achievedAge}` : ""}.
+            </p>
+            <table className="w-full text-sm border-collapse">
+              <thead className="text-xs text-muted-foreground">
+                <tr className="border-b border-border">
+                  <th className="text-left py-1">Land</th>
+                  <th className="text-right py-1">Kapitalbehov</th>
+                  <th className="text-right py-1">Gap</th>
+                  <th className="text-right py-1">Opnået alder</th>
+                  <th className="text-left py-1 pl-2">Status</th>
+                  <th className="text-left py-1 pl-2">Usikkerhed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top.map((r) => (
+                  <tr key={r.countryId} className="border-b border-border">
+                    <td className="py-1.5">{r.countryName}</td>
+                    <td className="py-1.5 text-right num">{formatDKK(r.selectedCapitalNeed, { compact: true })}</td>
+                    <td className="py-1.5 text-right num">{r.gap > 0 ? formatDKK(r.gap, { compact: true }) : "—"}</td>
+                    <td className="py-1.5 text-right num">{r.achievedAge ?? "—"}</td>
+                    <td className="py-1.5 pl-2">{countryStatusLabel(r.status)}</td>
+                    <td className="py-1.5 pl-2">{uncertaintyLabel(r.uncertaintyScore)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-muted-foreground mt-2 italic">
+              Landeprofiler er brugerredigerbare modelantagelser i nutidskroner. Ikke skat-/visumrådgivning.
+            </p>
+          </section>
+        );
+      })()}
+
       {view.checks.length > 0 && (
         <section className="mb-6 break-inside-avoid">
           <h3 className="font-display text-base font-semibold mb-2">Kort sanity check</h3>
