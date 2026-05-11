@@ -5,6 +5,12 @@ import { deriveKPIs } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
 import { isLifeEventValid, formatLifeEventPeriod } from "@/lib/finance/lifeEvents";
 import { computeFireAnalysis, statusLabel as fireStatusLabel, type FireType } from "@/lib/finance/fire";
+import {
+  computeCountryFireResults,
+  lifestyleLabel,
+  statusLabel as countryStatusLabel,
+  uncertaintyLabel,
+} from "@/lib/finance/country";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
