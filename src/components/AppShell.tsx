@@ -24,6 +24,7 @@ const navItems = [
   { to: "/projection", label: "År-for-år", icon: Table },
   { to: "/scenarios", label: "Scenarier", icon: GitCompareArrows },
   { to: "/fire", label: "FIRE", icon: Flame },
+  { to: "/countries", label: "Lande", icon: Globe },
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },
   { to: "/report", label: "Rapport", icon: FileText },
   { to: "/snapshots", label: "Snapshots", icon: Camera },
