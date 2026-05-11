@@ -159,6 +159,7 @@ export const useFinanceStore = create<FinanceState>()(
           scenarios: get().scenarios.map((s) => ({ ...s, updatedAt: s.updatedAt ?? now })),
           assumptions: get().assumptions,
           snapshots: get().snapshots,
+          countryProfiles: get().countryProfiles,
           metadata: { source: "local", release: MODEL_RELEASE },
         };
         return JSON.stringify(payload, null, 2);
