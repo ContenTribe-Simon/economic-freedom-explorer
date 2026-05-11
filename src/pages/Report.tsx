@@ -429,8 +429,9 @@ export default function Report() {
               </tbody>
             </table>
             <p className="text-[11px] text-muted-foreground mt-2 italic">
-              FIRE er et analyselag oven på fremskrivningen og påvirker ikke de øvrige tal.
+              FIRE er et benchmark-/analyselag oven på fremskrivningen og påvirker ikke de øvrige tal.
               Standard-grundlaget inkluderer fri kapital{fire.assumptions.includeHoldingInFire ? " og holding" : ""}{fire.assumptions.includePensionInFire ? " og pension" : ""}.
+              Detaljer (benchmarks, skattejusteret grovestimat, følsomhed) findes på FIRE-siden i platformen.
             </p>
           </section>
         );
