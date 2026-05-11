@@ -285,6 +285,7 @@ export const useFinanceStore = create<FinanceState>()(
         const snap = buildSnapshot(scenario, state.scenarios, state.assumptions, {
           name: options.name,
           notes: options.notes,
+          countryProfiles: state.countryProfiles,
         });
         set((s) => ({ snapshots: [snap, ...s.snapshots] }));
         return snap.snapshotId;
