@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera, Cloud, Calendar, Flame } from "lucide-react";
+import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera, Cloud, Calendar, Flame, Globe } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFinanceStore } from "@/store/financeStore";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ const navItems = [
   { to: "/projection", label: "År-for-år", icon: Table },
   { to: "/scenarios", label: "Scenarier", icon: GitCompareArrows },
   { to: "/fire", label: "FIRE", icon: Flame },
+  { to: "/countries", label: "Lande", icon: Globe },
   { to: "/assumptions", label: "Antagelser", icon: Settings2 },
   { to: "/report", label: "Rapport", icon: FileText },
   { to: "/snapshots", label: "Snapshots", icon: Camera },

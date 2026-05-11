@@ -462,6 +462,11 @@ export interface Snapshot {
 
   notes?: string;
   metadata?: Record<string, unknown>;
+  /**
+   * Frosset kopi af landeprofiler på snapshot-tidspunktet. Bagudkompatibel
+   * (kan mangle på ældre snapshots — Country-modulet håndterer det).
+   */
+  countryProfiles?: import("./country").CountryProfile[];
 }
 
 /** Skema for eksport/import af hele modellen — forberedt til fremtidig serverlagring. */
@@ -474,6 +479,8 @@ export interface ModelExport {
   assumptions: Assumptions;
   /** Gemte snapshots — frosne point-in-time rapporter. Valgfri for bagudkompatibilitet. */
   snapshots?: Snapshot[];
+  /** Brugerredigerbare landeprofiler på model-niveau (Country FIRE-modul). */
+  countryProfiles?: import("./country").CountryProfile[];
   metadata?: Record<string, unknown>;
 }
 

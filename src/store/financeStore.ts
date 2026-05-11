@@ -6,6 +6,12 @@ import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finan
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { buildSnapshot } from "@/lib/finance/snapshots";
 import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
+import {
+  CountryProfile,
+  DEFAULT_COUNTRY_PROFILES,
+  makeBlankCountryProfile,
+  normalizeCountryProfile,
+} from "@/lib/finance/country";
 
 interface FinanceState {
   scenarios: Scenario[];
@@ -44,6 +50,14 @@ interface FinanceState {
   removeLifeEvent: (scenarioId: string, eventId: string) => void;
   duplicateLifeEvent: (scenarioId: string, eventId: string) => void;
   toggleLifeEvent: (scenarioId: string, eventId: string) => void;
+  /** Landeprofiler (model-niveau) — bruges af Country FIRE-modulet. */
+  countryProfiles: CountryProfile[];
+  addCountryProfile: (profile?: Partial<CountryProfile>) => string;
+  updateCountryProfile: (id: string, patch: Partial<CountryProfile>) => void;
+  removeCountryProfile: (id: string) => void;
+  duplicateCountryProfile: (id: string) => string;
+  toggleCountryProfile: (id: string) => void;
+  resetCountryProfilesToDefaults: () => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
@@ -64,6 +78,7 @@ export const useFinanceStore = create<FinanceState>()(
       activeScenarioId: seed.id,
       assumptions: defaultAssumptions,
       snapshots: [],
+      countryProfiles: structuredClone(DEFAULT_COUNTRY_PROFILES),
       setActive: (id) => {
         const cur = get().activeScenarioId;
         if (cur === id) return; // no-op when same scenario clicked
@@ -144,6 +159,7 @@ export const useFinanceStore = create<FinanceState>()(
           scenarios: get().scenarios.map((s) => ({ ...s, updatedAt: s.updatedAt ?? now })),
           assumptions: get().assumptions,
           snapshots: get().snapshots,
+          countryProfiles: get().countryProfiles,
           metadata: { source: "local", release: MODEL_RELEASE },
         };
         return JSON.stringify(payload, null, 2);
@@ -169,11 +185,17 @@ export const useFinanceStore = create<FinanceState>()(
           return { ...withEvents, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
         const importedSnapshots = Array.isArray((parsed as any).snapshots) ? ((parsed as any).snapshots as Snapshot[]) : [];
+        const importedCountriesRaw = Array.isArray((parsed as any).countryProfiles)
+          ? (parsed as any).countryProfiles
+          : null;
         set({
           scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
           activeScenarioId: parsed.activeScenarioId ?? scenarios[0].id,
           snapshots: importedSnapshots,
+          countryProfiles: importedCountriesRaw
+            ? importedCountriesRaw.map((c: any) => normalizeCountryProfile(c))
+            : get().countryProfiles,
         });
       },
       addStandardScenarios: () => {
@@ -263,6 +285,7 @@ export const useFinanceStore = create<FinanceState>()(
         const snap = buildSnapshot(scenario, state.scenarios, state.assumptions, {
           name: options.name,
           notes: options.notes,
+          countryProfiles: state.countryProfiles,
         });
         set((s) => ({ snapshots: [snap, ...s.snapshots] }));
         return snap.snapshotId;
@@ -337,10 +360,38 @@ export const useFinanceStore = create<FinanceState>()(
             lifeEvents: (sc.inputs.lifeEvents ?? []).map((e) => (e.id === eventId ? { ...e, enabled: !e.enabled } : e)),
           },
         })),
+
+      // -------- CountryProfiles (model-niveau) --------
+      addCountryProfile: (profile) => {
+        const blank = makeBlankCountryProfile(profile?.name);
+        const next: CountryProfile = { ...blank, ...(profile ?? {}), id: blank.id };
+        set((s) => ({ countryProfiles: [...s.countryProfiles, next] }));
+        return next.id;
+      },
+      updateCountryProfile: (id, patch) =>
+        set((s) => ({
+          countryProfiles: s.countryProfiles.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        })),
+      removeCountryProfile: (id) =>
+        set((s) => ({ countryProfiles: s.countryProfiles.filter((c) => c.id !== id) })),
+      duplicateCountryProfile: (id) => {
+        const orig = get().countryProfiles.find((c) => c.id === id);
+        if (!orig) return id;
+        const blank = makeBlankCountryProfile();
+        const copy: CountryProfile = { ...structuredClone(orig), id: blank.id, name: `${orig.name} (kopi)` };
+        set((s) => ({ countryProfiles: [...s.countryProfiles, copy] }));
+        return copy.id;
+      },
+      toggleCountryProfile: (id) =>
+        set((s) => ({
+          countryProfiles: s.countryProfiles.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c)),
+        })),
+      resetCountryProfilesToDefaults: () =>
+        set({ countryProfiles: structuredClone(DEFAULT_COUNTRY_PROFILES) }),
     }),
     {
       name: "finance-tool.v1",
-      version: 14,
+      version: 15,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -511,6 +562,12 @@ export const useFinanceStore = create<FinanceState>()(
             const normalized = raw.map((e: any) => normalizeLegacyLifeEvent(e));
             return { ...sc, inputs: { ...sc.inputs, lifeEvents: normalized } };
           });
+        }
+        // v15: tilføj countryProfiles på model-niveau (default-profiler hvis mangler)
+        if (!Array.isArray(state.countryProfiles) || state.countryProfiles.length === 0) {
+          state.countryProfiles = structuredClone(DEFAULT_COUNTRY_PROFILES);
+        } else {
+          state.countryProfiles = state.countryProfiles.map((c: any) => normalizeCountryProfile(c));
         }
         return state;
       },
