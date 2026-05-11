@@ -29,6 +29,12 @@ export interface FireAssumptions {
   includePensionInFire: boolean;
   /** Tæller holding med i FIRE-kapitalgrundlaget? Default true. */
   includeHoldingInFire: boolean;
+  /**
+   * Forenklet effektiv skat på FIRE-udtræk, brugt KUN til skattejusteret
+   * grovestimat på FIRE-siden. Påvirker ikke projection eller scenarie.
+   * Default 27 % (forenklet — ikke en faktisk dansk skatteberegning).
+   */
+  effectiveTaxOnWithdrawal: number;
 }
 
 export const FIRE_DEFAULTS: FireAssumptions = {
@@ -37,6 +43,7 @@ export const FIRE_DEFAULTS: FireAssumptions = {
   fatSpendingFactor: 1.30,
   includePensionInFire: false,
   includeHoldingInFire: true,
+  effectiveTaxOnWithdrawal: 0.27,
 };
 
 export type FireType = "coast" | "lean" | "standard" | "fat" | "barista";
