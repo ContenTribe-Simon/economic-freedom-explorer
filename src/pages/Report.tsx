@@ -410,6 +410,8 @@ export default function Report() {
             <h3 className="font-display text-base font-semibold mb-2">FIRE-status</h3>
             <p className="text-xs text-muted-foreground mb-2">
               Standard FI mål: {formatDKK(fire.standardFiNumber, { compact: true })} ved udtræksrate {(fire.assumptions.withdrawalRate * 100).toFixed(1)} %.
+              Forventet kapitalgrundlag: {formatDKK(fire.results.standard.capitalAvailable, { compact: true })}
+              {fire.results.standard.gap > 0 ? ` — gap ${formatDKK(fire.results.standard.gap, { compact: true })}` : " — opnået"}.
               Nærmeste milepæl: {fire.nearestMilestone ? fire.results[fire.nearestMilestone].label : "ingen opnået"}
               {fire.earliestFireAge ? ` (alder ${fire.earliestFireAge})` : ""}.
             </p>
