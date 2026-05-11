@@ -75,6 +75,8 @@ export default function Report() {
   const activeSnapshot = snapshotId ? snapshots.find((s) => s.snapshotId === snapshotId) : undefined;
   const isSnapshotMode = !!activeSnapshot;
 
+  const liveCountryProfiles = useFinanceStore((s) => s.countryProfiles);
+
   const liveData = useMemo(() => {
     if (isSnapshotMode) return null;
     const ys = project(liveScenario, liveAssumptions);
@@ -82,6 +84,7 @@ export default function Report() {
       kpis: deriveKPIs(liveScenario, ys, liveAssumptions),
       checks: sanityChecks(liveScenario, ys),
       fire: computeFireAnalysis(liveScenario, ys, liveAssumptions),
+      countries: computeCountryFireResults(liveScenario, ys, liveAssumptions, liveCountryProfiles),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
@@ -91,7 +94,25 @@ export default function Report() {
         Nettoformue: Math.round(y.netWorth),
       })),
     };
-  }, [liveScenario, liveAssumptions, isSnapshotMode]);
+  }, [liveScenario, liveAssumptions, liveCountryProfiles, isSnapshotMode]);
+
+  const snapshotCountries = useMemo(() => {
+    if (!activeSnapshot) return null;
+    const profiles = activeSnapshot.countryProfiles ?? [];
+    if (profiles.length === 0) return [];
+    const fakeScenario = {
+      id: activeSnapshot.scenarioId,
+      name: activeSnapshot.scenarioName,
+      createdAt: activeSnapshot.createdAt,
+      inputs: activeSnapshot.resolvedInputs,
+    } as Parameters<typeof computeCountryFireResults>[0];
+    return computeCountryFireResults(
+      fakeScenario,
+      activeSnapshot.years,
+      activeSnapshot.assumptions,
+      profiles,
+    );
+  }, [activeSnapshot]);
 
   const snapshotFire = useMemo(() => {
     if (!activeSnapshot) return null;
