@@ -61,6 +61,13 @@ export interface FireResult {
   achievedAtAge: number | null;
   /** Gap i kr (positivt = mangler). */
   gap: number;
+  /** Gap i procent af capitalRequired (0 hvis opnået). */
+  gapPct: number;
+  /**
+   * Bedste punkt i fremskrivningen ift. denne FIRE-type — det år hvor
+   * kapitalgrundlaget kommer tættest på målet (mindst gap).
+   */
+  bestPoint: { age: number; capital: number; gap: number } | null;
   status: FireStatus;
 }
 
@@ -72,27 +79,38 @@ export interface FireYearStatus {
   meets: { coast: boolean; lean: boolean; standard: boolean; fat: boolean; barista: boolean };
 }
 
+export interface FireBenchmark {
+  rate: number;
+  label: string;
+  capitalRequiredNet: number;
+  capitalRequiredGross: number;
+}
+
+export interface SustainableWithdrawalAtRate {
+  rate: number;
+  annual: number;
+  monthly: number;
+}
+
+export interface SpendingReductionRow {
+  pct: number;
+  newMonthlyNet: number;
+  newAnnualNet: number;
+  capitalRequiredAt3_5: number;
+  capitalRequiredAt4: number;
+  savingsAt3_5: number;
+  achievedAge: number | null;
+}
+
 export interface FireAnalysis {
   assumptions: FireAssumptions;
-  /** Årligt forbrug i nutidskroner brugt som FIRE-grundlag. */
   annualSpending: number;
-  /** Standard FI number (= annualSpending / withdrawalRate). */
   standardFiNumber: number;
   results: Record<FireType, FireResult>;
-  /** Nærmeste opnåede milepæl (eller null hvis intet opnås). */
   nearestMilestone: FireType | null;
-  /** Tidligste alder hvor noget FIRE-niveau opnås. */
   earliestFireAge: number | null;
-  /** År-for-år status til audit. */
   yearStatus: FireYearStatus[];
-  /** Afhængighedsmål: andel af slutaktiverne i hver bucket (0-1). */
   dependence: { pensionShare: number; holdingShare: number; freeShare: number };
-  /**
-   * Kapitalgrundlag bag FIRE — bygger på samme reference-år som FIRE-kortenes
-   * "Forventet kapital" (Standard FI's opnået-alder, ellers stopalder, ellers
-   * sidste år). Værdier er i nutidskroner. Shares beregnes ift. totalen af
-   * de buckets, der er medtaget i Standard FI (totalIncluded).
-   */
   capitalBreakdown: {
     referenceAge: number;
     free: number;
@@ -104,7 +122,19 @@ export interface FireAnalysis {
     shares: { free: number; holding: number; pension: number; buffer: number };
     included: { free: boolean; holding: boolean; pension: boolean; buffer: boolean };
   };
-  /** Månedligt underskud efter stopalder (gennemsnit), arvet fra projection. */
+  benchmarks: FireBenchmark[];
+  sustainableNow: {
+    referenceAge: number;
+    capitalIncluded: number;
+    rates: SustainableWithdrawalAtRate[];
+  };
+  spendingReductions: SpendingReductionRow[];
+  summary: {
+    nearestType: FireType | null;
+    nearestAge: number | null;
+    smallestUnachievedGap: { type: FireType; age: number; gap: number } | null;
+    keyDriver: "spending" | "freeCapital" | "pension" | "holding" | "withdrawalRate";
+  };
   monthlyGapAfterStop: number;
 }
 
