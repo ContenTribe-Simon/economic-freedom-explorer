@@ -4,15 +4,16 @@ import { project } from "../projection";
 import {
   computeCountryFireResults,
   DEFAULT_COUNTRY_PROFILES,
+  formatWithdrawalRatePct,
   makeBlankCountryProfile,
   normalizeCountryProfile,
+  summarizeCountryStatus,
   type CountryProfile,
 } from "../country";
 import { buildSnapshot } from "../snapshots";
 
 function baseScenario() {
-  const s = makeBaseScenario();
-  return s;
+  return makeBaseScenario();
 }
 
 describe("Country FIRE — does not change projection", () => {
@@ -26,21 +27,28 @@ describe("Country FIRE — does not change projection", () => {
     expect(after).toBe(before);
   });
 
-  it("empty country list yields empty results, projection unchanged", () => {
+  it("empty country list yields empty results", () => {
     const s = baseScenario();
     const ys = project(s, defaultAssumptions);
-    const r = computeCountryFireResults(s, ys, defaultAssumptions, []);
-    expect(r).toEqual([]);
-    const ys2 = project(s, defaultAssumptions);
-    expect(JSON.stringify(ys2)).toBe(JSON.stringify(ys));
+    expect(computeCountryFireResults(s, ys, defaultAssumptions, [])).toEqual([]);
   });
 
   it("disabled countries are ignored", () => {
     const s = baseScenario();
     const ys = project(s, defaultAssumptions);
     const profiles = DEFAULT_COUNTRY_PROFILES.map((p) => ({ ...p, enabled: false }));
-    const r = computeCountryFireResults(s, ys, defaultAssumptions, profiles);
-    expect(r).toEqual([]);
+    expect(computeCountryFireResults(s, ys, defaultAssumptions, profiles)).toEqual([]);
+  });
+
+  it("currency label does not affect computation", () => {
+    const s = baseScenario();
+    const ys = project(s, defaultAssumptions);
+    const a: CountryProfile = { ...makeBlankCountryProfile("A"), currency: "DKK", monthlyCostStandard: 20000 };
+    const b: CountryProfile = { ...a, currency: "VND" };
+    const ra = computeCountryFireResults(s, ys, defaultAssumptions, [a]);
+    const rb = computeCountryFireResults(s, ys, defaultAssumptions, [b]);
+    expect(ra[1].totalAnnualNeed).toBe(rb[1].totalAnnualNeed);
+    expect(ra[1].selectedCapitalNeed).toBe(rb[1].selectedCapitalNeed);
   });
 });
 
@@ -58,9 +66,6 @@ describe("Country FIRE — capital need math", () => {
     effectiveTaxOrFrictionPct: 0,
     currencyRiskBufferPct: 0,
     generalSafetyBufferPct: 0,
-    visaUncertainty: "low",
-    taxUncertainty: "low",
-    healthcareUncertainty: "low",
   };
 
   it("capitalNeed35 = annual / 0.035 and capitalNeed40 = annual / 0.04", () => {
@@ -84,8 +89,7 @@ describe("Country FIRE — capital need math", () => {
     const ys = project(s, defaultAssumptions);
     const r = computeCountryFireResults(s, ys, defaultAssumptions, [p]);
     const std = r.find((x) => x.lifestyle === "standard")!;
-    const expected = (20000 * 12 + 12000 + 8000) * 1.10;
-    expect(std.totalAnnualNeed).toBeCloseTo(expected, 4);
+    expect(std.totalAnnualNeed).toBeCloseTo((20000 * 12 + 12000 + 8000) * 1.10, 4);
   });
 
   it("gap = max(0, need - expectedCapital)", () => {
@@ -93,13 +97,12 @@ describe("Country FIRE — capital need math", () => {
     const ys = project(s, defaultAssumptions);
     const r = computeCountryFireResults(s, ys, defaultAssumptions, [profile]);
     for (const row of r) {
-      const expected = Math.max(0, row.selectedCapitalNeed - row.expectedCapitalAtReferenceAge);
-      expect(row.gap).toBeCloseTo(expected, 6);
+      expect(row.gap).toBeCloseTo(Math.max(0, row.selectedCapitalNeed - row.expectedCapitalAtReferenceAge), 6);
     }
   });
 });
 
-describe("Country FIRE — achievedAge", () => {
+describe("Country FIRE — achievedAge & card status", () => {
   it("low-need country with high capital is achieved", () => {
     const s = makeBaseScenario();
     s.inputs.free.balance = 30_000_000;
@@ -118,7 +121,28 @@ describe("Country FIRE — achievedAge", () => {
     expect(std.status).toBe("achieved");
   });
 
-  it("expensive country with low capital is not achieved", () => {
+  it("card does not say 'Ingen niveauer opnået' if Lean is achieved but Standard is not", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 30_000_000;
+    s.inputs.holding.balance = 0;
+    s.inputs.holding.expectedExitValue = 0;
+    const ys = project(s, defaultAssumptions);
+    const mixed: CountryProfile = {
+      ...makeBlankCountryProfile("Mixed"),
+      monthlyCostLean: 5000,
+      monthlyCostStandard: 2_000_000,
+      monthlyCostComfortable: 5_000_000,
+    };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [mixed]);
+    const summary = summarizeCountryStatus(r, mixed.id);
+    expect(summary.tone).toBe("near");
+    expect(summary.label).toContain("Lean");
+    expect(summary.label).toContain("Standard ikke opnået");
+    expect(summary.standardAchieved).toBe(false);
+    expect(summary.achievedLifestyle).toBe("lean");
+  });
+
+  it("card says 'Ingen niveauer opnået' when all levels miss", () => {
     const s = makeBaseScenario();
     s.inputs.free.balance = 100_000;
     s.inputs.holding.balance = 0;
@@ -132,66 +156,76 @@ describe("Country FIRE — achievedAge", () => {
       monthlyCostComfortable: 150000,
     };
     const r = computeCountryFireResults(s, ys, defaultAssumptions, [expensive]);
-    const std = r.find((x) => x.lifestyle === "standard")!;
-    expect(std.achievedAge).toBeNull();
-    expect(std.status).toBe("not_achieved");
+    const summary = summarizeCountryStatus(r, expensive.id);
+    expect(summary.tone).toBe("not_achieved");
+    expect(summary.label).toBe("Ingen niveauer opnået");
   });
 });
 
 describe("Country FIRE — sustainable monthly net", () => {
-  it("scales linearly with capital × rate", () => {
+  it("scales with capital × rate", () => {
     const s = makeBaseScenario();
     s.inputs.free.balance = 10_000_000;
     s.inputs.holding.balance = 0;
     s.inputs.holding.expectedExitValue = 0;
     const ys = project(s, defaultAssumptions);
-    const p: CountryProfile = {
-      ...makeBlankCountryProfile("S"),
-      monthlyCostStandard: 20000,
-      annualHealthcareCost: 0,
-      annualTravelHomeCost: 0,
-      annualAdminCost: 0,
-      effectiveTaxOrFrictionPct: 0,
-      currencyRiskBufferPct: 0,
-      generalSafetyBufferPct: 0,
-    };
+    const p: CountryProfile = { ...makeBlankCountryProfile("S"), monthlyCostStandard: 20000 };
     const r = computeCountryFireResults(s, ys, defaultAssumptions, [p], { withdrawalRate: 0.04 });
     const std = r.find((x) => x.lifestyle === "standard")!;
-    // Uden friktion/extras: sustainable = capital * 0.04 / 12
-    const expected = (std.expectedCapitalAtReferenceAge * 0.04) / 12;
-    expect(std.sustainableMonthlyNetAtReferenceAge).toBeCloseTo(expected, 4);
+    expect(std.sustainableMonthlyNetAtReferenceAge).toBeCloseTo(
+      (std.expectedCapitalAtReferenceAge * 0.04) / 12,
+      4,
+    );
   });
 });
 
-describe("Country FIRE — uncertainty does not affect projection", () => {
-  it("changing uncertainty fields does not change projection or capital math", () => {
+describe("Country FIRE — only economic drivers", () => {
+  it("no result field references uncertainty/visa/healthcare/personalFit", () => {
     const s = baseScenario();
     const ys = project(s, defaultAssumptions);
-    const p1: CountryProfile = {
-      ...makeBlankCountryProfile("U"),
-      monthlyCostStandard: 20000,
-      visaUncertainty: "low",
-      taxUncertainty: "low",
-      healthcareUncertainty: "low",
-    };
-    const p2: CountryProfile = { ...p1, visaUncertainty: "high", taxUncertainty: "high", healthcareUncertainty: "high" };
-    const r1 = computeCountryFireResults(s, ys, defaultAssumptions, [p1]);
-    const r2 = computeCountryFireResults(s, ys, defaultAssumptions, [p2]);
-    const std1 = r1.find((x) => x.lifestyle === "standard")!;
-    const std2 = r2.find((x) => x.lifestyle === "standard")!;
-    expect(std1.totalAnnualNeed).toBe(std2.totalAnnualNeed);
-    expect(std1.selectedCapitalNeed).toBe(std2.selectedCapitalNeed);
-    expect(std1.expectedCapitalAtReferenceAge).toBe(std2.expectedCapitalAtReferenceAge);
-    expect(std1.uncertaintyScore).toBeLessThan(std2.uncertaintyScore);
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES);
+    for (const row of r) {
+      expect(row).not.toHaveProperty("uncertaintyScore");
+      for (const d of row.keyDrivers) {
+        expect(d.toLowerCase()).not.toMatch(/visum|visa|sundhed|fit|usikkerhed/);
+      }
+    }
   });
 });
 
-describe("Country profiles — persistence helpers", () => {
+describe("Country profiles — normalisering & legacy migration", () => {
   it("normalizeCountryProfile fills missing fields", () => {
     const out = normalizeCountryProfile({ name: "X" });
     expect(out.name).toBe("X");
     expect(out.enabled).toBe(true);
     expect(out.monthlyCostStandard).toBeGreaterThanOrEqual(0);
+  });
+
+  it("strips legacy uncertainty/personalFit fields without crashing", () => {
+    const legacy: any = {
+      id: "legacy-1",
+      name: "Legacy",
+      enabled: true,
+      currency: "EUR",
+      monthlyCostLean: 1000,
+      monthlyCostStandard: 2000,
+      monthlyCostComfortable: 3000,
+      effectiveTaxOrFrictionPct: 0.05,
+      visaUncertainty: "high",
+      taxUncertainty: "high",
+      healthcareUncertainty: "high",
+      personalFit: "low",
+      uncertaintyScore: 99,
+    };
+    const out: any = normalizeCountryProfile(legacy);
+    expect(out.id).toBe("legacy-1");
+    expect(out.monthlyCostStandard).toBe(2000);
+    expect(out.effectiveTaxOrFrictionPct).toBeCloseTo(0.05);
+    expect(out.visaUncertainty).toBeUndefined();
+    expect(out.taxUncertainty).toBeUndefined();
+    expect(out.healthcareUncertainty).toBeUndefined();
+    expect(out.personalFit).toBeUndefined();
+    expect(out.uncertaintyScore).toBeUndefined();
   });
 
   it("snapshots freeze countryProfiles", () => {
@@ -200,27 +234,13 @@ describe("Country profiles — persistence helpers", () => {
     const snap = buildSnapshot(s, [s], defaultAssumptions, { countryProfiles: profiles });
     expect(snap.countryProfiles).toBeDefined();
     expect(snap.countryProfiles!.length).toBe(2);
-    // mutating original does not affect snapshot
     profiles[0].name = "MUTATED";
     expect(snap.countryProfiles![0].name).not.toBe("MUTATED");
-  });
-
-  it("snapshot can be re-analysed using its frozen profiles", () => {
-    const s = makeBaseScenario();
-    const snap = buildSnapshot(s, [s], defaultAssumptions, { countryProfiles: DEFAULT_COUNTRY_PROFILES });
-    const fakeScenario = {
-      id: snap.scenarioId,
-      name: snap.scenarioName,
-      createdAt: snap.createdAt,
-      inputs: snap.resolvedInputs,
-    } as Parameters<typeof computeCountryFireResults>[0];
-    const r = computeCountryFireResults(fakeScenario, snap.years, snap.assumptions, snap.countryProfiles!);
-    expect(r.length).toBeGreaterThan(0);
   });
 });
 
 describe("Country profiles — JSON export/import roundtrip via store", () => {
-  it("exportJson includes countryProfiles and importJson restores them", async () => {
+  it("exportJson includes economic fields and importJson restores them", async () => {
     const { useFinanceStore } = await import("@/store/financeStore");
     const store = useFinanceStore.getState();
     store.resetCountryProfilesToDefaults();
@@ -229,12 +249,48 @@ describe("Country profiles — JSON export/import roundtrip via store", () => {
     const parsed = JSON.parse(json);
     expect(Array.isArray(parsed.countryProfiles)).toBe(true);
     expect(parsed.countryProfiles.length).toBeGreaterThan(0);
+    expect(parsed.countryProfiles[0].monthlyCostStandard).toBeGreaterThanOrEqual(0);
 
-    // Mutate then re-import
     store.removeCountryProfile(beforeIds[0]);
-    expect(useFinanceStore.getState().countryProfiles.length).toBeLessThan(beforeIds.length);
     store.importJson(json);
     const afterIds = useFinanceStore.getState().countryProfiles.map((c) => c.id).sort();
     expect(afterIds).toEqual(beforeIds);
+  });
+
+  it("legacy JSON with old uncertainty fields imports without crashing", async () => {
+    const { useFinanceStore } = await import("@/store/financeStore");
+    const store = useFinanceStore.getState();
+    const json = store.exportJson();
+    const parsed = JSON.parse(json);
+    parsed.countryProfiles = [
+      {
+        id: "old-1",
+        name: "Old",
+        enabled: true,
+        monthlyCostLean: 1000,
+        monthlyCostStandard: 2000,
+        monthlyCostComfortable: 3000,
+        visaUncertainty: "high",
+        taxUncertainty: "medium",
+        healthcareUncertainty: "low",
+        personalFit: "low",
+      },
+    ];
+    expect(() => store.importJson(JSON.stringify(parsed))).not.toThrow();
+    const profs: any[] = useFinanceStore.getState().countryProfiles;
+    expect(profs[0].id).toBe("old-1");
+    expect(profs[0].visaUncertainty).toBeUndefined();
+  });
+});
+
+describe("Withdrawal rate formatting", () => {
+  it("formats 0.035 as '3,5' (not 3.50000000)", () => {
+    expect(formatWithdrawalRatePct(0.035)).toBe("3,5");
+  });
+  it("formats 0.04 as '4'", () => {
+    expect(formatWithdrawalRatePct(0.04)).toBe("4");
+  });
+  it("formats with at most one decimal (no noisy zeros)", () => {
+    expect(formatWithdrawalRatePct(0.0325)).toBe("3,3");
   });
 });

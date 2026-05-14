@@ -4,28 +4,25 @@
  *
  * VIGTIGT:
  *  - Dette modul ÆNDRER IKKE projection, scenarier eller snapshots.
- *  - Alle beløb er i nutidskroner (real value), som resten af modellen.
+ *  - Alle beløb er i DKK / nutidskroner (real value), som resten af modellen.
+ *    Felter som `currency` er kun reference-/visningsetiketter.
  *  - Landeprofiler er brugerredigerbare modelantagelser — ikke officielle data.
- *
- * Arkitekturvalg: countryProfiles ligger på MODEL-niveau (ikke pr. scenario)
- * i denne første version. Det er enklest, mest stabilt og matcher den
- * eksisterende cloud-/JSON-eksportstruktur, hvor model_data_json bærer alle
- * scenarier, antagelser og snapshots samlet. Linkede stress-tests og custom
- * scenarier deler dermed automatisk samme landeprofiler — uden at skulle
- * eskalere til "custom" når brugeren ændrer en landeprofil.
+ *  - Modulet er økonomisk fokuseret. Ikke-økonomiske vurderinger som visum,
+ *    personligt fit, sundhedssystem-vurderinger og samlet usikkerhedsscore
+ *    indgår IKKE her. Legacy-felter af den slags ignoreres ved normalisering.
  */
 import type { Scenario, YearRow } from "./types";
 import { computeFireAnalysis, FIRE_DEFAULTS, type FireAssumptions, type FireAnalysis } from "./fire";
 import type { Assumptions } from "./types";
 
 export type CountryLifestyle = "lean" | "standard" | "comfortable";
-export type CountryUncertainty = "low" | "medium" | "high";
 export type CountryFireStatus = "achieved" | "near" | "not_achieved";
 
 export interface CountryProfile {
   id: string;
   name: string;
   enabled: boolean;
+  /** Reference-etiket — ALLE beløb i modellen er i DKK/nutidskroner. */
   currency?: string;
   monthlyCostLean: number;
   monthlyCostStandard: number;
@@ -37,10 +34,6 @@ export interface CountryProfile {
   effectiveTaxOrFrictionPct?: number;
   currencyRiskBufferPct?: number;
   generalSafetyBufferPct?: number;
-  visaUncertainty: CountryUncertainty;
-  taxUncertainty: CountryUncertainty;
-  healthcareUncertainty: CountryUncertainty;
-  personalFit?: CountryUncertainty;
   notes?: string;
 }
 
@@ -63,7 +56,7 @@ export interface CountryFireResult {
   status: CountryFireStatus;
   sustainableMonthlyNetAtReferenceAge: number;
   sustainableMonthlyNetAtStopAge: number;
-  uncertaintyScore: number;
+  /** Kun økonomiske drivere. */
   keyDrivers: string[];
 }
 
@@ -83,9 +76,6 @@ const u = (id: string, p: Partial<CountryProfile>): CountryProfile => ({
   monthlyCostLean: 0,
   monthlyCostStandard: 0,
   monthlyCostComfortable: 0,
-  visaUncertainty: "low",
-  taxUncertainty: "low",
-  healthcareUncertainty: "low",
   ...p,
 });
 
@@ -102,11 +92,7 @@ export const DEFAULT_COUNTRY_PROFILES: CountryProfile[] = [
     effectiveTaxOrFrictionPct: 0,
     currencyRiskBufferPct: 0,
     generalSafetyBufferPct: 0.05,
-    visaUncertainty: "low",
-    taxUncertainty: "low",
-    healthcareUncertainty: "low",
-    personalFit: "high",
-    notes: "Hjemland — bruges som baseline.",
+    notes: "Demo-tal — skal erstattes med egne antagelser. Hjemland — bruges som baseline.",
   }),
   u("pt", {
     name: "Portugal",
@@ -120,11 +106,7 @@ export const DEFAULT_COUNTRY_PROFILES: CountryProfile[] = [
     effectiveTaxOrFrictionPct: 0.10,
     currencyRiskBufferPct: 0.02,
     generalSafetyBufferPct: 0.05,
-    visaUncertainty: "medium",
-    taxUncertainty: "medium",
-    healthcareUncertainty: "medium",
-    personalFit: "medium",
-    notes: "Modelantagelse — ikke officiel skat/visumvejledning.",
+    notes: "Demo-tal — skal erstattes med egne antagelser.",
   }),
   u("es", {
     name: "Spanien",
@@ -138,10 +120,7 @@ export const DEFAULT_COUNTRY_PROFILES: CountryProfile[] = [
     effectiveTaxOrFrictionPct: 0.12,
     currencyRiskBufferPct: 0.02,
     generalSafetyBufferPct: 0.05,
-    visaUncertainty: "medium",
-    taxUncertainty: "high",
-    healthcareUncertainty: "medium",
-    personalFit: "medium",
+    notes: "Demo-tal — skal erstattes med egne antagelser.",
   }),
   u("vn", {
     name: "Vietnam",
@@ -155,10 +134,7 @@ export const DEFAULT_COUNTRY_PROFILES: CountryProfile[] = [
     effectiveTaxOrFrictionPct: 0.05,
     currencyRiskBufferPct: 0.08,
     generalSafetyBufferPct: 0.10,
-    visaUncertainty: "high",
-    taxUncertainty: "high",
-    healthcareUncertainty: "high",
-    personalFit: "low",
+    notes: "Demo-tal — skal erstattes med egne antagelser.",
   }),
   u("th", {
     name: "Thailand",
@@ -172,10 +148,7 @@ export const DEFAULT_COUNTRY_PROFILES: CountryProfile[] = [
     effectiveTaxOrFrictionPct: 0.05,
     currencyRiskBufferPct: 0.06,
     generalSafetyBufferPct: 0.08,
-    visaUncertainty: "high",
-    taxUncertainty: "medium",
-    healthcareUncertainty: "medium",
-    personalFit: "medium",
+    notes: "Demo-tal — skal erstattes med egne antagelser.",
   }),
 ];
 
@@ -192,6 +165,7 @@ export function makeBlankCountryProfile(name = "Nyt land"): CountryProfile {
     id,
     name,
     enabled: true,
+    currency: "DKK",
     monthlyCostLean: 10000,
     monthlyCostStandard: 18000,
     monthlyCostComfortable: 28000,
@@ -201,48 +175,42 @@ export function makeBlankCountryProfile(name = "Nyt land"): CountryProfile {
     effectiveTaxOrFrictionPct: 0,
     currencyRiskBufferPct: 0,
     generalSafetyBufferPct: 0,
-    visaUncertainty: "medium",
-    taxUncertainty: "medium",
-    healthcareUncertainty: "medium",
-    personalFit: "medium",
   };
 }
 
+/**
+ * Normalisér rå profildata. Legacy-felter (visaUncertainty, taxUncertainty,
+ * healthcareUncertainty, personalFit, uncertaintyScore) ignoreres så
+ * gamle gemte modeller / JSON-import / cloud-load ikke crasher.
+ */
 export function normalizeCountryProfile(raw: any): CountryProfile {
   const blank = makeBlankCountryProfile();
   if (!raw || typeof raw !== "object") return blank;
+  const num = (v: any, fallback = 0) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+  };
   return {
-    ...blank,
-    ...raw,
     id: typeof raw.id === "string" && raw.id ? raw.id : blank.id,
     name: typeof raw.name === "string" ? raw.name : blank.name,
     enabled: raw.enabled !== false,
-    monthlyCostLean: Number(raw.monthlyCostLean) || 0,
-    monthlyCostStandard: Number(raw.monthlyCostStandard) || 0,
-    monthlyCostComfortable: Number(raw.monthlyCostComfortable) || 0,
+    currency: typeof raw.currency === "string" ? raw.currency : blank.currency,
+    monthlyCostLean: Math.max(0, num(raw.monthlyCostLean)),
+    monthlyCostStandard: Math.max(0, num(raw.monthlyCostStandard)),
+    monthlyCostComfortable: Math.max(0, num(raw.monthlyCostComfortable)),
+    annualHealthcareCost: Math.max(0, num(raw.annualHealthcareCost)),
+    annualTravelHomeCost: Math.max(0, num(raw.annualTravelHomeCost)),
+    annualAdminCost: Math.max(0, num(raw.annualAdminCost)),
+    effectiveTaxOrFrictionPct: Math.max(0, num(raw.effectiveTaxOrFrictionPct)),
+    currencyRiskBufferPct: Math.max(0, num(raw.currencyRiskBufferPct)),
+    generalSafetyBufferPct: Math.max(0, num(raw.generalSafetyBufferPct)),
+    notes: typeof raw.notes === "string" ? raw.notes : undefined,
   };
 }
 
 /* ------------------------------------------------------------------ */
 /*  Beregning                                                          */
 /* ------------------------------------------------------------------ */
-
-const UNC_VALUE: Record<CountryUncertainty, number> = { low: 0, medium: 1, high: 2 };
-
-function uncertaintyScore(p: CountryProfile): number {
-  // 0..100, højere = mere usikker. Vægtning: visa/skat/sundhed tæller mest,
-  // currency/safety-buffere giver et lille tillæg, personalFit kan trække ned.
-  const base =
-    UNC_VALUE[p.visaUncertainty] * 1.5 +
-    UNC_VALUE[p.taxUncertainty] * 1.5 +
-    UNC_VALUE[p.healthcareUncertainty] * 1.0;
-  const bufferAdd =
-    Math.min(0.20, p.currencyRiskBufferPct ?? 0) * 25 +
-    Math.min(0.20, p.generalSafetyBufferPct ?? 0) * 15;
-  const fitAdj = p.personalFit ? (UNC_VALUE[p.personalFit] - 1) * -3 : 0; // high fit reducerer
-  const raw = base * 10 + bufferAdd - fitAdj;
-  return Math.round(Math.max(0, Math.min(100, raw)));
-}
 
 function frictionFactor(p: CountryProfile): number {
   return (
@@ -288,7 +256,6 @@ function findAchievedAge(
   for (const y of years) {
     const cap = fireBaseCapitalAt(y, fa);
     if (cap >= capitalNeed) {
-      // bekræft ingen shortfall fra dette år og frem
       const noShortfall = !years.some((x) => x.age >= y.age && x.shortfall);
       if (noShortfall) return y.age;
     }
@@ -297,16 +264,15 @@ function findAchievedAge(
 }
 
 function pickKeyDrivers(p: CountryProfile, totalAnnualNeed: number, monthlyAnnualPart: number): string[] {
-  const drivers: string[] = [];
-  drivers.push("Forbrug");
+  const drivers: string[] = ["Forbrug"];
   const extras = annualExtras(p);
-  if (extras > 0) drivers.push("Sundhed/rejser/admin");
-  const friction = (p.effectiveTaxOrFrictionPct ?? 0) + (p.generalSafetyBufferPct ?? 0);
-  if (friction >= 0.05) drivers.push("Friktion/skat/buffer");
-  if ((p.currencyRiskBufferPct ?? 0) >= 0.02) drivers.push("Valutarisiko");
-  // Hvis ekstras + friktion udgør >25 % af behovet, fremhæv det
-  const baseAnnual = monthlyAnnualPart;
-  if (totalAnnualNeed > 0 && (totalAnnualNeed - baseAnnual) / totalAnnualNeed > 0.25) {
+  if (extras > 0) drivers.push("Årlige ekstraomkostninger");
+  if ((p.effectiveTaxOrFrictionPct ?? 0) > 0) drivers.push("Økonomisk friktion/skat");
+  if ((p.currencyRiskBufferPct ?? 0) > 0) drivers.push("Valutabuffer");
+  if ((p.generalSafetyBufferPct ?? 0) > 0) drivers.push("Ekstra buffer");
+  drivers.push("Kapitalgrundlag");
+  drivers.push("Udtræksrate");
+  if (totalAnnualNeed > 0 && (totalAnnualNeed - monthlyAnnualPart) / totalAnnualNeed > 0.25) {
     drivers.push("Tillæg dominerer behovet");
   }
   return drivers;
@@ -326,7 +292,6 @@ export function computeCountryFireResults(
   const fa: FireAssumptions = options.fireAssumptions ?? FIRE_DEFAULTS;
   const wr = options.withdrawalRate ?? fa.withdrawalRate ?? 0.035;
 
-  // Brug FIRE-analysen til at finde reference-alder (samme som FIRE-side)
   const fire: FireAnalysis = computeFireAnalysis(scenario, years, globalAssumptions, fa);
   const refAge = fire.capitalBreakdown.referenceAge;
   const refYear = years.find((y) => y.age === refAge);
@@ -356,8 +321,6 @@ export function computeCountryFireResults(
       if (achievedAge !== null) status = "achieved";
       else if (selectedCapitalNeed > 0 && refCapital / selectedCapitalNeed >= 0.85) status = "near";
 
-      // Bæredygtigt månedligt netto: kapital * rate / 12, derefter trækkes
-      // ekstras/12 fra og divideres med friktionsfaktor (omvendt vej).
       function sustainableMonthly(capital: number): number {
         const grossAnnual = capital * wr;
         const afterExtras = grossAnnual - extras;
@@ -384,7 +347,6 @@ export function computeCountryFireResults(
         status,
         sustainableMonthlyNetAtReferenceAge: sustainableMonthly(refCapital),
         sustainableMonthlyNetAtStopAge: sustainableMonthly(stopCapital),
-        uncertaintyScore: uncertaintyScore(p),
         keyDrivers: pickKeyDrivers(p, totalAnnualNeed, annual),
       });
     }
@@ -405,17 +367,80 @@ export function nearestForCountry(
     const sa = order.indexOf(a.status);
     const sb = order.indexOf(b.status);
     if (sa !== sb) return sa - sb;
-    // Foretræk standard > lean > comfortable
     const lvl = (l: CountryLifestyle) => (l === "standard" ? 0 : l === "lean" ? 1 : 2);
     return lvl(a.lifestyle) - lvl(b.lifestyle);
   });
   return sorted[0];
 }
 
-export function uncertaintyLabel(score: number): "Lav" | "Middel" | "Høj" {
-  if (score < 25) return "Lav";
-  if (score < 55) return "Middel";
-  return "Høj";
+/**
+ * Sammenfattende status for et land på tværs af alle livsstilsniveauer.
+ * Sikrer at kortet ikke siger "Ikke opnået", hvis fx Lean faktisk er opnået.
+ */
+export interface CountryCardStatus {
+  label: string;
+  tone: "achieved" | "near" | "not_achieved";
+  achievedLifestyle: CountryLifestyle | null;
+  achievedAge: number | null;
+  standardAchieved: boolean;
+  standardNear: boolean;
+}
+
+const LIFESTYLE_PRIORITY: CountryLifestyle[] = ["standard", "lean", "comfortable"];
+
+export function summarizeCountryStatus(
+  results: CountryFireResult[],
+  countryId: string,
+): CountryCardStatus {
+  const own = results.filter((r) => r.countryId === countryId);
+  const standard = own.find((r) => r.lifestyle === "standard");
+  const standardAchieved = standard?.status === "achieved";
+  const standardNear = standard?.status === "near";
+
+  // Find tidligst opnåede niveau (mindste alder vinder; tie-break: Standard > Lean > Comfortable)
+  const achieved = own.filter((r) => r.achievedAge !== null) as (CountryFireResult & {
+    achievedAge: number;
+  })[];
+  if (achieved.length > 0) {
+    achieved.sort((a, b) => {
+      if (a.achievedAge !== b.achievedAge) return a.achievedAge - b.achievedAge;
+      return LIFESTYLE_PRIORITY.indexOf(a.lifestyle) - LIFESTYLE_PRIORITY.indexOf(b.lifestyle);
+    });
+    const best = achieved[0];
+    let label: string;
+    if (standardAchieved) {
+      label = `Standard opnået ved alder ${standard!.achievedAge}`;
+    } else {
+      label = `${lifestyleLabel(best.lifestyle)} opnået ved alder ${best.achievedAge} · Standard ikke opnået`;
+    }
+    return {
+      label,
+      tone: standardAchieved ? "achieved" : "near",
+      achievedLifestyle: best.lifestyle,
+      achievedAge: best.achievedAge,
+      standardAchieved,
+      standardNear,
+    };
+  }
+
+  if (standardNear) {
+    return {
+      label: "Tæt på Standard",
+      tone: "near",
+      achievedLifestyle: null,
+      achievedAge: null,
+      standardAchieved: false,
+      standardNear: true,
+    };
+  }
+  return {
+    label: "Ingen niveauer opnået",
+    tone: "not_achieved",
+    achievedLifestyle: null,
+    achievedAge: null,
+    standardAchieved: false,
+    standardNear: false,
+  };
 }
 
 export function lifestyleLabel(l: CountryLifestyle): string {
@@ -424,4 +449,19 @@ export function lifestyleLabel(l: CountryLifestyle): string {
 
 export function statusLabel(s: CountryFireStatus): string {
   return s === "achieved" ? "Opnået" : s === "near" ? "Tæt på" : "Ikke opnået";
+}
+
+/**
+ * Format en udtræksrate (fx 0.035) som dansk procent uden støjende
+ * decimaler. Returnerer fx "3,5" eller "4". Bruges KUN til visning;
+ * intern beregning bruger fortsat den fulde decimalværdi.
+ */
+export function formatWithdrawalRatePct(rate: number): string {
+  if (!Number.isFinite(rate)) return "";
+  const pct = rate * 100;
+  const rounded = Math.round(pct * 100) / 100;
+  const s = (Math.abs(rounded - Math.round(rounded)) < 1e-9
+    ? rounded.toFixed(0)
+    : rounded.toFixed(1));
+  return s.replace(".", ",");
 }

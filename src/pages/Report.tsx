@@ -9,7 +9,7 @@ import {
   computeCountryFireResults,
   lifestyleLabel,
   statusLabel as countryStatusLabel,
-  uncertaintyLabel,
+  
 } from "@/lib/finance/country";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -492,7 +492,6 @@ export default function Report() {
                   <th className="text-right py-1">Gap</th>
                   <th className="text-right py-1">Opnået alder</th>
                   <th className="text-left py-1 pl-2">Status</th>
-                  <th className="text-left py-1 pl-2">Usikkerhed</th>
                 </tr>
               </thead>
               <tbody>
@@ -503,7 +502,6 @@ export default function Report() {
                     <td className="py-1.5 text-right num">{r.gap > 0 ? formatDKK(r.gap, { compact: true }) : "—"}</td>
                     <td className="py-1.5 text-right num">{r.achievedAge ?? "—"}</td>
                     <td className="py-1.5 pl-2">{countryStatusLabel(r.status)}</td>
-                    <td className="py-1.5 pl-2">{uncertaintyLabel(r.uncertaintyScore)}</td>
                   </tr>
                 ))}
               </tbody>
