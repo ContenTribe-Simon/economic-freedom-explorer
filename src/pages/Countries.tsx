@@ -180,6 +180,8 @@ export default function CountriesPage() {
                 <th className="text-right p-2">Forventet kapital</th>
                 <th className="text-right p-2">Gap</th>
                 <th className="text-right p-2">Opnået alder</th>
+                <th className="text-right p-2" title="Kapitalgrundlag × valgt udtræksrate / 12. Uafhængigt af land.">Brutto udtræk/md.</th>
+                <th className="text-right p-2" title="Efter faste landeomkostninger og buffer/friktion.">Rådighedsbeløb/md.</th>
                 <th className="text-left p-2">Status</th>
               </tr>
             </thead>
@@ -195,6 +197,8 @@ export default function CountriesPage() {
                   <td className="p-2 text-right num">{formatDKK(r.expectedCapitalAtReferenceAge, { compact: true })}</td>
                   <td className="p-2 text-right num">{r.gap > 0 ? formatDKK(r.gap, { compact: true }) : "—"}</td>
                   <td className="p-2 text-right num">{r.achievedAge ?? "—"}</td>
+                  <td className="p-2 text-right num">{formatDKK(r.grossSustainableMonthlyAtReferenceAge, { compact: true })}</td>
+                  <td className="p-2 text-right num">{formatDKK(r.sustainableMonthlyNetAtReferenceAge, { compact: true })}</td>
                   <td className={`p-2 ${statusTone(r.status)}`}>{statusLabel(r.status)}</td>
                 </tr>
               ))}
