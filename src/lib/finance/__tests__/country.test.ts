@@ -130,8 +130,8 @@ describe("Country FIRE — achievedAge & card status", () => {
     const mixed: CountryProfile = {
       ...makeBlankCountryProfile("Mixed"),
       monthlyCostLean: 5000,
-      monthlyCostStandard: 200000,
-      monthlyCostComfortable: 300000,
+      monthlyCostStandard: 2_000_000,
+      monthlyCostComfortable: 5_000_000,
     };
     const r = computeCountryFireResults(s, ys, defaultAssumptions, [mixed]);
     const summary = summarizeCountryStatus(r, mixed.id);
@@ -290,7 +290,7 @@ describe("Withdrawal rate formatting", () => {
   it("formats 0.04 as '4'", () => {
     expect(formatWithdrawalRatePct(0.04)).toBe("4");
   });
-  it("formats 0.0325 as '3,25'", () => {
-    expect(formatWithdrawalRatePct(0.0325)).toBe("3,25");
+  it("formats with at most one decimal (no noisy zeros)", () => {
+    expect(formatWithdrawalRatePct(0.0325)).toBe("3,3");
   });
 });
