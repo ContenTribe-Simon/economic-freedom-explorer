@@ -179,6 +179,110 @@ describe("Country FIRE — sustainable monthly net", () => {
   });
 });
 
+describe("Country FIRE — gross vs country-specific sustainable", () => {
+  it("gross sustainable = capital × rate / 12", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 10_000_000;
+    const ys = project(s, defaultAssumptions);
+    const p: CountryProfile = {
+      ...makeBlankCountryProfile("X"),
+      monthlyCostStandard: 20000,
+      annualHealthcareCost: 30000,
+      effectiveTaxOrFrictionPct: 0.10,
+      generalSafetyBufferPct: 0.05,
+    };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [p], { withdrawalRate: 0.035 });
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    expect(std.grossSustainableMonthlyAtReferenceAge).toBeCloseTo(
+      (std.expectedCapitalAtReferenceAge * 0.035) / 12,
+      4,
+    );
+  });
+
+  it("gross sustainable is identical across countries with same capital base", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const a: CountryProfile = {
+      ...makeBlankCountryProfile("A"),
+      monthlyCostStandard: 10000,
+      annualHealthcareCost: 0,
+      effectiveTaxOrFrictionPct: 0,
+      currencyRiskBufferPct: 0,
+      generalSafetyBufferPct: 0,
+    };
+    const b: CountryProfile = {
+      ...makeBlankCountryProfile("B"),
+      monthlyCostStandard: 50000,
+      annualHealthcareCost: 80000,
+      effectiveTaxOrFrictionPct: 0.20,
+      currencyRiskBufferPct: 0.05,
+      generalSafetyBufferPct: 0.05,
+    };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [a, b], { withdrawalRate: 0.035 });
+    const ra = r.find((x) => x.countryId === a.id && x.lifestyle === "standard")!;
+    const rb = r.find((x) => x.countryId === b.id && x.lifestyle === "standard")!;
+    expect(ra.grossSustainableMonthlyAtReferenceAge).toBeCloseTo(
+      rb.grossSustainableMonthlyAtReferenceAge,
+      6,
+    );
+  });
+
+  it("country-specific sustainable falls when annual extras rise", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 10_000_000;
+    const ys = project(s, defaultAssumptions);
+    const lo: CountryProfile = { ...makeBlankCountryProfile("Lo"), monthlyCostStandard: 10000, annualHealthcareCost: 0 };
+    const hi: CountryProfile = { ...makeBlankCountryProfile("Hi"), monthlyCostStandard: 10000, annualHealthcareCost: 100000 };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [lo, hi]);
+    const sLo = r.find((x) => x.countryId === lo.id && x.lifestyle === "standard")!;
+    const sHi = r.find((x) => x.countryId === hi.id && x.lifestyle === "standard")!;
+    expect(sHi.sustainableMonthlyNetAtReferenceAge).toBeLessThan(sLo.sustainableMonthlyNetAtReferenceAge);
+  });
+
+  it("country-specific sustainable falls when friction/buffers rise", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 10_000_000;
+    const ys = project(s, defaultAssumptions);
+    const lo: CountryProfile = { ...makeBlankCountryProfile("Lo"), monthlyCostStandard: 10000 };
+    const hi: CountryProfile = {
+      ...makeBlankCountryProfile("Hi"),
+      monthlyCostStandard: 10000,
+      effectiveTaxOrFrictionPct: 0.20,
+      generalSafetyBufferPct: 0.10,
+    };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [lo, hi]);
+    const sLo = r.find((x) => x.countryId === lo.id && x.lifestyle === "standard")!;
+    const sHi = r.find((x) => x.countryId === hi.id && x.lifestyle === "standard")!;
+    expect(sHi.sustainableMonthlyNetAtReferenceAge).toBeLessThan(sLo.sustainableMonthlyNetAtReferenceAge);
+  });
+
+  it("monthlyShortfall when sustainable < desired, else 0; surplus mirror", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 100_000;
+    const ys = project(s, defaultAssumptions);
+    const p: CountryProfile = { ...makeBlankCountryProfile("Tight"), monthlyCostStandard: 50000 };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [p]);
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    expect(std.monthlyShortfall).toBeGreaterThan(0);
+    expect(std.monthlySurplus).toBe(0);
+    const diff = std.sustainableMonthlyNetAtReferenceAge - std.monthlyNetCost;
+    expect(std.monthlyShortfall).toBeCloseTo(-diff, 4);
+  });
+
+  it("monthlySurplus when sustainable > desired", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 30_000_000;
+    s.inputs.holding.balance = 0;
+    s.inputs.holding.expectedExitValue = 0;
+    const ys = project(s, defaultAssumptions);
+    const p: CountryProfile = { ...makeBlankCountryProfile("Cheap"), monthlyCostStandard: 5000 };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [p]);
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    expect(std.monthlySurplus).toBeGreaterThan(0);
+    expect(std.monthlyShortfall).toBe(0);
+  });
+});
+
 describe("Country FIRE — only economic drivers", () => {
   it("no result field references uncertainty/visa/healthcare/personalFit", () => {
     const s = baseScenario();
