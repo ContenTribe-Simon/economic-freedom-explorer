@@ -132,19 +132,19 @@ export default function CountriesPage() {
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
-                    <div>Lean (DKK/md.): {formatDKK(c.monthlyCostLean, { compact: true })}</div>
-                    <div>Standard (DKK/md.): {formatDKK(c.monthlyCostStandard, { compact: true })}</div>
-                    <div>Comfortable (DKK/md.): {formatDKK(c.monthlyCostComfortable, { compact: true })}</div>
+                    <div>Lean: {formatDKK(c.monthlyCostLean, { compact: true })}/md.</div>
+                    <div>Standard: {formatDKK(c.monthlyCostStandard, { compact: true })}/md.</div>
+                    <div>Comfortable: {formatDKK(c.monthlyCostComfortable, { compact: true })}/md.</div>
                   </div>
                   <div className="mt-3 pt-2 border-t border-border text-xs space-y-1">
                     <div>
-                      Kapitalbehov (Std):{" "}
+                      Standard kapitalbehov:{" "}
                       <span className="font-medium">
                         {formatDKK(std.selectedCapitalNeed, { compact: true })}
                       </span>
                     </div>
                     <div>
-                      Gap (Std):{" "}
+                      Standard gap:{" "}
                       <span className="font-medium">
                         {std.gap > 0 ? formatDKK(std.gap, { compact: true }) : "—"}
                       </span>
@@ -180,6 +180,8 @@ export default function CountriesPage() {
                 <th className="text-right p-2">Forventet kapital</th>
                 <th className="text-right p-2">Gap</th>
                 <th className="text-right p-2">Opnået alder</th>
+                <th className="text-right p-2" title="Kapitalgrundlag × valgt udtræksrate / 12. Uafhængigt af land.">Brutto udtræk/md.</th>
+                <th className="text-right p-2" title="Efter faste landeomkostninger og buffer/friktion.">Rådighedsbeløb/md.</th>
                 <th className="text-left p-2">Status</th>
               </tr>
             </thead>
@@ -195,6 +197,8 @@ export default function CountriesPage() {
                   <td className="p-2 text-right num">{formatDKK(r.expectedCapitalAtReferenceAge, { compact: true })}</td>
                   <td className="p-2 text-right num">{r.gap > 0 ? formatDKK(r.gap, { compact: true }) : "—"}</td>
                   <td className="p-2 text-right num">{r.achievedAge ?? "—"}</td>
+                  <td className="p-2 text-right num">{formatDKK(r.grossSustainableMonthlyAtReferenceAge, { compact: true })}</td>
+                  <td className="p-2 text-right num">{formatDKK(r.sustainableMonthlyNetAtReferenceAge, { compact: true })}</td>
                   <td className={`p-2 ${statusTone(r.status)}`}>{statusLabel(r.status)}</td>
                 </tr>
               ))}
@@ -217,7 +221,7 @@ export default function CountriesPage() {
                 <Card key={lvl} className="p-4">
                   <div className="font-semibold mb-1">{lifestyleLabel(lvl)}</div>
                   <div className="text-xs text-muted-foreground mb-3">
-                    {formatDKK(r.monthlyNetCost, { compact: true })}/md ·{" "}
+                    Ønsket: {formatDKK(r.monthlyNetCost, { compact: true })}/md. ·{" "}
                     {formatDKK(r.annualNetCost, { compact: true })}/år
                   </div>
                   <div className="space-y-1 text-sm">
@@ -238,29 +242,117 @@ export default function CountriesPage() {
                       <span className="num">{r.achievedAge ?? "Ikke opnået"}</span>
                     </div>
                     <div
-                      className="flex justify-between"
-                      title="Estimeret månedligt forbrug, som det nuværende kapitalgrundlag kan bære ved valgt udtræksrate, justeret for friktion/skattebuffer/valutabuffer/ekstra buffer. Et groft modelestimat — ikke rådgivning."
+                      className="flex justify-between pt-1 border-t border-border/50"
+                      title="Kapitalgrundlag × valgt udtræksrate / 12. Uafhængigt af landeomkostninger og buffere."
                     >
-                      <span className="text-muted-foreground">Bæredygtigt md.</span>
+                      <span className="text-muted-foreground">Brutto bæredygtigt udtræk</span>
                       <span className="num">
-                        {formatDKK(r.sustainableMonthlyNetAtReferenceAge, { compact: true })}
+                        {formatDKK(r.grossSustainableMonthlyAtReferenceAge, { compact: true })}/md.
+                      </span>
+                    </div>
+                    <div
+                      className="flex justify-between"
+                      title="Estimeret månedligt beløb efter faste landeomkostninger og valgte buffer-/friktionsantagelser. Groft modelestimat — ikke rådgivning."
+                    >
+                      <span className="text-muted-foreground">Landespecifikt rådighedsbeløb</span>
+                      <span className="num">
+                        {formatDKK(r.sustainableMonthlyNetAtReferenceAge, { compact: true })}/md.
+                      </span>
+                    </div>
+                    <div
+                      className="flex justify-between"
+                      title="Forskel mellem landespecifikt rådighedsbeløb og ønsket månedligt forbrug."
+                    >
+                      <span className="text-muted-foreground">
+                        {r.monthlySurplus > 0 ? "Overskud" : "Mangler"} pr. md.
+                      </span>
+                      <span className={`num ${r.monthlySurplus > 0 ? "text-success" : r.monthlyShortfall > 0 ? "text-warning" : ""}`}>
+                        {r.monthlySurplus > 0
+                          ? formatDKK(r.monthlySurplus, { compact: true })
+                          : r.monthlyShortfall > 0
+                          ? formatDKK(r.monthlyShortfall, { compact: true })
+                          : "—"}
                       </span>
                     </div>
                   </div>
                   {r.keyDrivers.length > 0 && (
-                    <div className="mt-3 text-[11px] text-muted-foreground">
-                      Økonomiske drivere: {r.keyDrivers.join(", ")}
+                    <div className="mt-3 pt-2 border-t border-border/50">
+                      <div className="text-[11px] text-muted-foreground mb-1">Økonomiske drivere</div>
+                      <div className="flex flex-wrap gap-1">
+                        {r.keyDrivers.map((d) => (
+                          <span
+                            key={d}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </Card>
               );
             })}
           </div>
-          <p className="text-[11px] text-muted-foreground italic">
-            "Bæredygtigt md." er et groft modelestimat — det nuværende kapitalgrundlag × valgt
-            udtræksrate, fratrukket årlige ekstraomkostninger og delt med friktions-/buffer-faktor.
-            Ikke rådgivning.
-          </p>
+
+          {/* Mellemregning for valgt land — Standard-niveau */}
+          {(() => {
+            const std = results.find(
+              (x) => x.countryId === selectedCountry.id && x.lifestyle === "standard",
+            );
+            if (!std) return null;
+            const grossAnnual = std.expectedCapitalAtReferenceAge * std.selectedWithdrawalRate;
+            return (
+              <Card className="p-4">
+                <div className="text-sm font-semibold mb-2">
+                  Mellemregning — {selectedCountry.name} (Standard)
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Kapitalgrundlag</span>
+                    <span className="num">{formatDKK(std.expectedCapitalAtReferenceAge, { compact: true })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Valgt udtræksrate</span>
+                    <span className="num">{formatWithdrawalRatePct(std.selectedWithdrawalRate)} %</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Årligt brutto udtræk</span>
+                    <span className="num">{formatDKK(grossAnnual, { compact: true })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Faste årlige landeomkostninger</span>
+                    <span className="num">−{formatDKK(std.annualExtras, { compact: true })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Økonomisk friktion/skat</span>
+                    <span className="num">{pctInputValue(selectedCountry.effectiveTaxOrFrictionPct)} %</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Valutabuffer</span>
+                    <span className="num">{pctInputValue(selectedCountry.currencyRiskBufferPct)} %</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ekstra buffer</span>
+                    <span className="num">{pctInputValue(selectedCountry.generalSafetyBufferPct)} %</span>
+                  </div>
+                  <div className="flex justify-between border-t border-border pt-1 mt-1 md:col-span-2">
+                    <span className="font-medium">Landespecifikt rådighedsbeløb pr. md.</span>
+                    <span className="num font-medium">
+                      {formatDKK(std.sustainableMonthlyNetAtReferenceAge, { compact: true })}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground italic mt-2">
+                  Brutto udtræk er {formatDKK(grossAnnual, { compact: true })}/år. Efter{" "}
+                  {formatDKK(std.annualExtras, { compact: true })} i årlige landeomkostninger og
+                  buffer/friktion svarer det til ca.{" "}
+                  {formatDKK(std.sustainableMonthlyNetAtReferenceAge, { compact: true })}/md.
+                  Groft modelestimat — ikke rådgivning.
+                </p>
+              </Card>
+            );
+          })()}
 
           {/* Sensitivity */}
           {(() => {
