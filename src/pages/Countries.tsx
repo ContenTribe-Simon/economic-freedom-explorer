@@ -132,19 +132,19 @@ export default function CountriesPage() {
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
-                    <div>Lean (DKK/md.): {formatDKK(c.monthlyCostLean, { compact: true })}</div>
-                    <div>Standard (DKK/md.): {formatDKK(c.monthlyCostStandard, { compact: true })}</div>
-                    <div>Comfortable (DKK/md.): {formatDKK(c.monthlyCostComfortable, { compact: true })}</div>
+                    <div>Lean: {formatDKK(c.monthlyCostLean, { compact: true })}/md.</div>
+                    <div>Standard: {formatDKK(c.monthlyCostStandard, { compact: true })}/md.</div>
+                    <div>Comfortable: {formatDKK(c.monthlyCostComfortable, { compact: true })}/md.</div>
                   </div>
                   <div className="mt-3 pt-2 border-t border-border text-xs space-y-1">
                     <div>
-                      Kapitalbehov (Std):{" "}
+                      Standard kapitalbehov:{" "}
                       <span className="font-medium">
                         {formatDKK(std.selectedCapitalNeed, { compact: true })}
                       </span>
                     </div>
                     <div>
-                      Gap (Std):{" "}
+                      Standard gap:{" "}
                       <span className="font-medium">
                         {std.gap > 0 ? formatDKK(std.gap, { compact: true }) : "—"}
                       </span>
