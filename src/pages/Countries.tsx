@@ -4,10 +4,11 @@ import { project } from "@/lib/finance/projection";
 import { FIRE_DEFAULTS } from "@/lib/finance/fire";
 import {
   computeCountryFireResults,
+  formatWithdrawalRatePct,
   lifestyleLabel,
   nearestForCountry,
   statusLabel,
-  uncertaintyLabel,
+  summarizeCountryStatus,
   type CountryLifestyle,
   type CountryProfile,
 } from "@/lib/finance/country";
@@ -16,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumberInput } from "@/components/NumberInput";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDKK } from "@/lib/format";
 import { Trash2, Copy, Plus, RotateCcw } from "lucide-react";
 
@@ -26,6 +26,12 @@ function statusTone(status: string): string {
   if (status === "achieved") return "text-success";
   if (status === "near") return "text-warning";
   return "text-muted-foreground";
+}
+
+function pctInputValue(decimal: number | undefined): string {
+  const n = (decimal ?? 0) * 100;
+  if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+  return n.toFixed(1).replace(".", ",");
 }
 
 export default function CountriesPage() {
@@ -39,7 +45,7 @@ export default function CountriesPage() {
   const toggleCountryProfile = useFinanceStore((s) => s.toggleCountryProfile);
   const resetCountryProfilesToDefaults = useFinanceStore((s) => s.resetCountryProfilesToDefaults);
 
-  const [wrInput, setWrInput] = useState<string>(String(FIRE_DEFAULTS.withdrawalRate * 100));
+  const [wrInput, setWrInput] = useState<string>(formatWithdrawalRatePct(FIRE_DEFAULTS.withdrawalRate));
   const wr = useMemo(() => {
     const n = parseFloat(wrInput.replace(",", "."));
     return Number.isFinite(n) && n > 0 ? n / 100 : FIRE_DEFAULTS.withdrawalRate;
@@ -64,13 +70,16 @@ export default function CountriesPage() {
         <div className="text-xs uppercase tracking-widest text-muted-foreground">Lande</div>
         <h1 className="font-display text-4xl font-semibold mt-1">Landeanalyse</h1>
         <p className="text-muted-foreground mt-2 max-w-3xl">
-          Sammenlign hvordan forskellige lande og livsstilsniveauer påvirker dit FIRE-behov. Alle
-          værdier er <strong>modelantagelser i nutidskroner</strong> — ikke officielle skatte-,
-          visum- eller pensionsdata.
+          Sammenlign hvordan forskellige lande og livsstilsniveauer påvirker dit FIRE-behov.
+          Modulet er økonomisk fokuseret — visum, sundhedssystem og personligt fit indgår ikke.
+        </p>
+        <p className="text-xs text-muted-foreground mt-2 max-w-3xl">
+          <strong>Alle beløb indtastes og beregnes i DKK / nutidskroner.</strong> Valuta er kun en referenceetiket.
         </p>
         <div className="mt-3 text-xs text-muted-foreground">
           Aktivt scenarie: <span className="text-foreground font-medium">{scenario.name}</span>{" "}
-          · Udtræksrate: <span className="text-foreground font-medium">{(wr * 100).toFixed(1)} %</span>
+          · Udtræksrate:{" "}
+          <span className="text-foreground font-medium">{formatWithdrawalRatePct(wr)} %</span>
         </div>
       </header>
 
@@ -83,7 +92,9 @@ export default function CountriesPage() {
               id="wr"
               value={wrInput}
               onChange={(e) => setWrInput(e.target.value)}
+              onBlur={() => setWrInput(formatWithdrawalRatePct(wr))}
               className="w-28"
+              data-testid="wr-input"
             />
           </div>
           <div className="text-xs text-muted-foreground max-w-md">
@@ -102,27 +113,28 @@ export default function CountriesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {enabled.map((c) => {
-              const nearest = nearestForCountry(results, c.id);
               const std = results.find((r) => r.countryId === c.id && r.lifestyle === "standard");
               if (!std) return null;
+              const summary = summarizeCountryStatus(results, c.id);
               return (
                 <Card
                   key={c.id}
+                  data-testid={`country-card-${c.id}`}
                   className={`p-4 cursor-pointer transition-colors ${
                     selectedCountry?.id === c.id ? "border-primary" : ""
                   }`}
                   onClick={() => setSelectedId(c.id)}
                 >
-                  <div className="flex items-baseline justify-between mb-2">
+                  <div className="flex items-baseline justify-between mb-2 gap-2">
                     <div className="font-semibold">{c.name}</div>
-                    <div className={`text-xs ${statusTone(std.status)}`}>
-                      {statusLabel(std.status)}
+                    <div className={`text-xs text-right ${statusTone(summary.tone)}`}>
+                      {summary.label}
                     </div>
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
-                    <div>Lean: {formatDKK(c.monthlyCostLean, { compact: true })}/md</div>
-                    <div>Standard: {formatDKK(c.monthlyCostStandard, { compact: true })}/md</div>
-                    <div>Comfortable: {formatDKK(c.monthlyCostComfortable, { compact: true })}/md</div>
+                    <div>Lean (DKK/md.): {formatDKK(c.monthlyCostLean, { compact: true })}</div>
+                    <div>Standard (DKK/md.): {formatDKK(c.monthlyCostStandard, { compact: true })}</div>
+                    <div>Comfortable (DKK/md.): {formatDKK(c.monthlyCostComfortable, { compact: true })}</div>
                   </div>
                   <div className="mt-3 pt-2 border-t border-border text-xs space-y-1">
                     <div>
@@ -132,22 +144,18 @@ export default function CountriesPage() {
                       </span>
                     </div>
                     <div>
-                      Gap:{" "}
+                      Gap (Std):{" "}
                       <span className="font-medium">
                         {std.gap > 0 ? formatDKK(std.gap, { compact: true }) : "—"}
                       </span>
                     </div>
-                    {nearest && nearest.achievedAge !== null && (
+                    {summary.achievedAge !== null && (
                       <div>
                         Tidligst opnået: alder{" "}
-                        <span className="font-medium">{nearest.achievedAge}</span>{" "}
-                        ({lifestyleLabel(nearest.lifestyle)})
+                        <span className="font-medium">{summary.achievedAge}</span>{" "}
+                        ({lifestyleLabel(summary.achievedLifestyle!)})
                       </div>
                     )}
-                    <div>
-                      Usikkerhed:{" "}
-                      <span className="font-medium">{uncertaintyLabel(std.uncertaintyScore)}</span>
-                    </div>
                   </div>
                 </Card>
               );
@@ -173,7 +181,6 @@ export default function CountriesPage() {
                 <th className="text-right p-2">Gap</th>
                 <th className="text-right p-2">Opnået alder</th>
                 <th className="text-left p-2">Status</th>
-                <th className="text-left p-2">Usikkerhed</th>
               </tr>
             </thead>
             <tbody>
@@ -189,7 +196,6 @@ export default function CountriesPage() {
                   <td className="p-2 text-right num">{r.gap > 0 ? formatDKK(r.gap, { compact: true }) : "—"}</td>
                   <td className="p-2 text-right num">{r.achievedAge ?? "—"}</td>
                   <td className={`p-2 ${statusTone(r.status)}`}>{statusLabel(r.status)}</td>
-                  <td className="p-2">{uncertaintyLabel(r.uncertaintyScore)}</td>
                 </tr>
               ))}
             </tbody>
@@ -231,7 +237,10 @@ export default function CountriesPage() {
                       <span className="text-muted-foreground">Opnået alder</span>
                       <span className="num">{r.achievedAge ?? "Ikke opnået"}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div
+                      className="flex justify-between"
+                      title="Estimeret månedligt forbrug, som det nuværende kapitalgrundlag kan bære ved valgt udtræksrate, justeret for friktion/skattebuffer/valutabuffer/ekstra buffer. Et groft modelestimat — ikke rådgivning."
+                    >
                       <span className="text-muted-foreground">Bæredygtigt md.</span>
                       <span className="num">
                         {formatDKK(r.sustainableMonthlyNetAtReferenceAge, { compact: true })}
@@ -240,13 +249,18 @@ export default function CountriesPage() {
                   </div>
                   {r.keyDrivers.length > 0 && (
                     <div className="mt-3 text-[11px] text-muted-foreground">
-                      Drivere: {r.keyDrivers.join(", ")}
+                      Økonomiske drivere: {r.keyDrivers.join(", ")}
                     </div>
                   )}
                 </Card>
               );
             })}
           </div>
+          <p className="text-[11px] text-muted-foreground italic">
+            "Bæredygtigt md." er et groft modelestimat — det nuværende kapitalgrundlag × valgt
+            udtræksrate, fratrukket årlige ekstraomkostninger og delt med friktions-/buffer-faktor.
+            Ikke rådgivning.
+          </p>
 
           {/* Sensitivity */}
           {(() => {
@@ -306,8 +320,8 @@ export default function CountriesPage() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Profilerne er <strong>redigerbare modelantagelser</strong> — ikke officielle data.
-          Brug egne tal hvor du har dem.
+          Alle tal er <strong>økonomiske modelantagelser i DKK / nutidskroner</strong>.
+          Referencevaluta bruges kun som label og påvirker ikke beregningen.
         </p>
         <div className="space-y-3">
           {countryProfiles.map((c) => (
@@ -321,8 +335,8 @@ export default function CountriesPage() {
                 <Input
                   value={c.currency ?? ""}
                   onChange={(e) => updateCountryProfile(c.id, { currency: e.target.value })}
-                  placeholder="Valuta"
-                  className="w-24"
+                  placeholder="Referencevaluta"
+                  className="w-32"
                 />
                 <Button
                   size="sm"
@@ -340,51 +354,51 @@ export default function CountriesPage() {
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
-                  <Label>Lean (md.)</Label>
+                  <Label>Lean (DKK/md.)</Label>
                   <NumberInput
                     value={c.monthlyCostLean}
                     onChange={(v) => updateCountryProfile(c.id, { monthlyCostLean: v })}
                   />
                 </div>
                 <div>
-                  <Label>Standard (md.)</Label>
+                  <Label>Standard (DKK/md.)</Label>
                   <NumberInput
                     value={c.monthlyCostStandard}
                     onChange={(v) => updateCountryProfile(c.id, { monthlyCostStandard: v })}
                   />
                 </div>
                 <div>
-                  <Label>Comfortable (md.)</Label>
+                  <Label>Comfortable (DKK/md.)</Label>
                   <NumberInput
                     value={c.monthlyCostComfortable}
                     onChange={(v) => updateCountryProfile(c.id, { monthlyCostComfortable: v })}
                   />
                 </div>
                 <div>
-                  <Label>Sundhed/år</Label>
+                  <Label>Sundhed/forsikring pr. år</Label>
                   <NumberInput
                     value={c.annualHealthcareCost ?? 0}
                     onChange={(v) => updateCountryProfile(c.id, { annualHealthcareCost: v })}
                   />
                 </div>
                 <div>
-                  <Label>Hjemrejser/år</Label>
+                  <Label>Rejser/hjemrejser pr. år</Label>
                   <NumberInput
                     value={c.annualTravelHomeCost ?? 0}
                     onChange={(v) => updateCountryProfile(c.id, { annualTravelHomeCost: v })}
                   />
                 </div>
                 <div>
-                  <Label>Admin/år</Label>
+                  <Label>Admin/ophold pr. år</Label>
                   <NumberInput
                     value={c.annualAdminCost ?? 0}
                     onChange={(v) => updateCountryProfile(c.id, { annualAdminCost: v })}
                   />
                 </div>
                 <div>
-                  <Label>Friktion/skat (%)</Label>
+                  <Label>Økonomisk friktion/skat (%)</Label>
                   <Input
-                    value={String(((c.effectiveTaxOrFrictionPct ?? 0) * 100).toFixed(1))}
+                    value={pctInputValue(c.effectiveTaxOrFrictionPct)}
                     onChange={(e) => {
                       const n = parseFloat(e.target.value.replace(",", "."));
                       updateCountryProfile(c.id, {
@@ -394,9 +408,9 @@ export default function CountriesPage() {
                   />
                 </div>
                 <div>
-                  <Label>Valutarisiko (%)</Label>
+                  <Label>Valutabuffer (%)</Label>
                   <Input
-                    value={String(((c.currencyRiskBufferPct ?? 0) * 100).toFixed(1))}
+                    value={pctInputValue(c.currencyRiskBufferPct)}
                     onChange={(e) => {
                       const n = parseFloat(e.target.value.replace(",", "."));
                       updateCountryProfile(c.id, {
@@ -406,9 +420,9 @@ export default function CountriesPage() {
                   />
                 </div>
                 <div>
-                  <Label>Sikkerhedsbuffer (%)</Label>
+                  <Label>Ekstra buffer (%)</Label>
                   <Input
-                    value={String(((c.generalSafetyBufferPct ?? 0) * 100).toFixed(1))}
+                    value={pctInputValue(c.generalSafetyBufferPct)}
                     onChange={(e) => {
                       const n = parseFloat(e.target.value.replace(",", "."));
                       updateCountryProfile(c.id, {
@@ -418,35 +432,12 @@ export default function CountriesPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {(["visaUncertainty", "taxUncertainty", "healthcareUncertainty", "personalFit"] as const).map(
-                  (k) => (
-                    <div key={k}>
-                      <Label className="capitalize">
-                        {k === "personalFit" ? "Personligt fit" : k.replace("Uncertainty", " usikkerhed")}
-                      </Label>
-                      <Select
-                        value={(c[k] as string) ?? "medium"}
-                        onValueChange={(v) => updateCountryProfile(c.id, { [k]: v } as any)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Lav</SelectItem>
-                          <SelectItem value="medium">Middel</SelectItem>
-                          <SelectItem value="high">Høj</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ),
-                )}
-              </div>
               <div>
                 <Label>Noter</Label>
                 <Input
                   value={c.notes ?? ""}
                   onChange={(e) => updateCountryProfile(c.id, { notes: e.target.value })}
+                  placeholder="Demo-tal — skal erstattes med egne antagelser."
                 />
               </div>
             </Card>
@@ -456,9 +447,9 @@ export default function CountriesPage() {
 
       {/* Disclaimer */}
       <section className="text-xs text-muted-foreground border-t border-border pt-4 leading-relaxed">
-        Landeanalysen er et groft modelværktøj. Den tager ikke højde for individuel skat, visum,
-        sundhedsdækning eller juridiske forhold. Brug værdierne som egne antagelser, ikke som
-        rådgivning.
+        Landeanalysen er et groft økonomisk modelværktøj. Den tager ikke højde for individuel skat,
+        visum, sundhedsdækning eller juridiske forhold. Brug værdierne som egne antagelser, ikke
+        som rådgivning. Alle beløb er i DKK / nutidskroner.
       </section>
     </div>
   );
