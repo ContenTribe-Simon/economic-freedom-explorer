@@ -51,11 +51,19 @@ export interface CountryFireResult {
   selectedWithdrawalRate: number;
   selectedCapitalNeed: number;
   expectedCapitalAtReferenceAge: number;
+  expectedCapitalAtStopAge: number;
   gap: number;
   achievedAge: number | null;
   status: CountryFireStatus;
+  /** Brutto bæredygtigt udtræk: kapitalgrundlag × valgt udtræksrate / 12. Uafhængigt af land. */
+  grossSustainableMonthlyAtReferenceAge: number;
+  grossSustainableMonthlyAtStopAge: number;
+  /** Landespecifikt rådighedsbeløb pr. md. — efter ekstras og buffere. */
   sustainableMonthlyNetAtReferenceAge: number;
   sustainableMonthlyNetAtStopAge: number;
+  /** Mangler (positivt) eller overskud (negativt) pr. md. ift. ønsket forbrug. */
+  monthlyShortfall: number;
+  monthlySurplus: number;
   /** Kun økonomiske drivere. */
   keyDrivers: string[];
 }
