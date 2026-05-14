@@ -329,6 +329,9 @@ export function computeCountryFireResults(
       if (achievedAge !== null) status = "achieved";
       else if (selectedCapitalNeed > 0 && refCapital / selectedCapitalNeed >= 0.85) status = "near";
 
+      function grossSustainableMonthly(capital: number): number {
+        return Math.max(0, (capital * wr) / 12);
+      }
       function sustainableMonthly(capital: number): number {
         const grossAnnual = capital * wr;
         const afterExtras = grossAnnual - extras;
@@ -336,6 +339,9 @@ export function computeCountryFireResults(
         const netAnnual = afterExtras / friction;
         return Math.max(0, netAnnual / 12);
       }
+
+      const sustainRef = sustainableMonthly(refCapital);
+      const diff = sustainRef - monthly;
 
       out.push({
         countryId: p.id,
@@ -350,11 +356,16 @@ export function computeCountryFireResults(
         selectedWithdrawalRate: wr,
         selectedCapitalNeed,
         expectedCapitalAtReferenceAge: refCapital,
+        expectedCapitalAtStopAge: stopCapital,
         gap,
         achievedAge,
         status,
-        sustainableMonthlyNetAtReferenceAge: sustainableMonthly(refCapital),
+        grossSustainableMonthlyAtReferenceAge: grossSustainableMonthly(refCapital),
+        grossSustainableMonthlyAtStopAge: grossSustainableMonthly(stopCapital),
+        sustainableMonthlyNetAtReferenceAge: sustainRef,
         sustainableMonthlyNetAtStopAge: sustainableMonthly(stopCapital),
+        monthlyShortfall: diff < 0 ? -diff : 0,
+        monthlySurplus: diff > 0 ? diff : 0,
         keyDrivers: pickKeyDrivers(p, totalAnnualNeed, annual),
       });
     }
