@@ -177,6 +177,7 @@ export const useFinanceStore = create<FinanceState>()(
           assumptions: get().assumptions,
           snapshots: get().snapshots,
           countryProfiles: get().countryProfiles,
+          countryAnalysisSettings: get().countryAnalysisSettings,
           metadata: { source: "local", release: MODEL_RELEASE },
         };
         return JSON.stringify(payload, null, 2);
