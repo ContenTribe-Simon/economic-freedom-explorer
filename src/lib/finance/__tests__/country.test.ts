@@ -401,3 +401,122 @@ describe("Withdrawal rate formatting", () => {
     expect(formatWithdrawalRatePct(0.0325)).toBe("3,3");
   });
 });
+
+describe("Country FIRE — analysis age / reference mode", () => {
+  it("default fireReference mode keeps prior behavior", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const a = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES);
+    const b = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "fireReference" },
+    });
+    expect(a[0].expectedCapitalAtReferenceAge).toBeCloseTo(b[0].expectedCapitalAtReferenceAge, 4);
+  });
+
+  it("'now' uses current age", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "now" },
+    });
+    expect(r[0].analysisAge).toBe(s.inputs.person.currentAge);
+  });
+
+  it("'inYears' adds yearsFromNow to current age", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "inYears", yearsFromNow: 5 },
+    });
+    expect(r[0].analysisAge).toBe(s.inputs.person.currentAge + 5);
+  });
+
+  it("'plannedStopAge' uses scenario stopAge", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "plannedStopAge" },
+    });
+    expect(r[0].analysisAge).toBe(s.inputs.stopAge);
+  });
+
+  it("'manualAge' uses provided age", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const target = s.inputs.person.currentAge + 7;
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "manualAge", manualReferenceAge: target },
+    });
+    expect(r[0].analysisAge).toBe(target);
+  });
+
+  it("expectedCapital and gap change when analysis age changes", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const now = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "now" },
+    })[0];
+    const stop = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "plannedStopAge" },
+    })[0];
+    expect(now.expectedCapitalAtReferenceAge).not.toBe(stop.expectedCapitalAtReferenceAge);
+  });
+
+  it("earliestAchievedAge stays stable regardless of analysis age", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 30_000_000;
+    const ys = project(s, defaultAssumptions);
+    const cheap: CountryProfile = { ...makeBlankCountryProfile("C"), monthlyCostStandard: 5000 };
+    const a = computeCountryFireResults(s, ys, defaultAssumptions, [cheap], {
+      analysisSettings: { referenceMode: "now" },
+    })[1];
+    const b = computeCountryFireResults(s, ys, defaultAssumptions, [cheap], {
+      analysisSettings: { referenceMode: "plannedStopAge" },
+    })[1];
+    expect(a.earliestAchievedAge).toBe(b.earliestAchievedAge);
+  });
+
+  it("resolveAnalysisAge clamps within projection range", () => {
+    const s = makeBaseScenario();
+    const ys = project(s, defaultAssumptions);
+    const out = resolveAnalysisAge(
+      s, ys, { referenceMode: "manualAge", manualReferenceAge: 9999 }, 50,
+    );
+    expect(out).toBe(ys[ys.length - 1].age);
+  });
+
+  it("normalizeCountryAnalysisSettings filters bad input", () => {
+    const out = normalizeCountryAnalysisSettings({ referenceMode: "garbage", yearsFromNow: -5 });
+    expect(out.referenceMode).toBe("fireReference");
+    expect(out.yearsFromNow).toBeUndefined();
+  });
+
+  it("DEFAULT_COUNTRY_ANALYSIS_SETTINGS uses fireReference", () => {
+    expect(DEFAULT_COUNTRY_ANALYSIS_SETTINGS.referenceMode).toBe("fireReference");
+  });
+});
+
+describe("Country analysis settings — persistence", () => {
+  it("snapshot freezes analysis settings", () => {
+    const s = makeBaseScenario();
+    const settings = { referenceMode: "inYears", yearsFromNow: 5 } as const;
+    const snap = buildSnapshot(s, [s], defaultAssumptions, {
+      countryProfiles: [],
+      countryAnalysisSettings: { ...settings },
+    });
+    expect(snap.countryAnalysisSettings?.referenceMode).toBe("inYears");
+    expect(snap.countryAnalysisSettings?.yearsFromNow).toBe(5);
+  });
+
+  it("export/import roundtrip preserves analysis settings", async () => {
+    const { useFinanceStore } = await import("@/store/financeStore");
+    const store = useFinanceStore.getState();
+    store.updateCountryAnalysisSettings({ referenceMode: "inYears", yearsFromNow: 7 });
+    const json = store.exportJson();
+    store.resetCountryAnalysisSettings();
+    store.importJson(json);
+    const after = useFinanceStore.getState().countryAnalysisSettings;
+    expect(after.referenceMode).toBe("inYears");
+    expect(after.yearsFromNow).toBe(7);
+  });
+});
