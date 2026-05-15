@@ -76,6 +76,7 @@ export default function Report() {
   const isSnapshotMode = !!activeSnapshot;
 
   const liveCountryProfiles = useFinanceStore((s) => s.countryProfiles);
+  const liveAnalysisSettings = useFinanceStore((s) => s.countryAnalysisSettings);
 
   const liveData = useMemo(() => {
     if (isSnapshotMode) return null;
