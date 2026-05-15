@@ -85,7 +85,7 @@ export default function Report() {
       kpis: deriveKPIs(liveScenario, ys, liveAssumptions),
       checks: sanityChecks(liveScenario, ys),
       fire: computeFireAnalysis(liveScenario, ys, liveAssumptions),
-      countries: computeCountryFireResults(liveScenario, ys, liveAssumptions, liveCountryProfiles),
+      countries: computeCountryFireResults(liveScenario, ys, liveAssumptions, liveCountryProfiles, { analysisSettings: liveAnalysisSettings }),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
