@@ -18,7 +18,7 @@ export function buildSnapshot(
   scenario: Scenario,
   scenarios: Scenario[],
   assumptions: Assumptions,
-  options: { name?: string; notes?: string; countryProfiles?: CountryProfile[] } = {},
+  options: { name?: string; notes?: string; countryProfiles?: CountryProfile[]; countryAnalysisSettings?: CountryAnalysisSettings } = {},
 ): Snapshot {
   const resolved = resolveScenario(scenario, scenarios);
   const years = project(resolved, assumptions);
