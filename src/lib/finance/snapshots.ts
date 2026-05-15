@@ -66,6 +66,7 @@ export function buildSnapshot(
     notes: options.notes,
     metadata: {},
     countryProfiles: options.countryProfiles ?? [],
+    countryAnalysisSettings: options.countryAnalysisSettings,
   });
   return snap;
 }
