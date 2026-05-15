@@ -113,11 +113,17 @@ export interface CountryFireResult {
   monthlySurplus: number;
   /** Kun økonomiske drivere. */
   keyDrivers: string[];
+  /** Alder hvor analysen er evalueret (afhænger af analyseindstillinger). */
+  analysisAge: number;
+  /** Tidligste alder i hele projection hvor niveauet kan opnås. Alias for `achievedAge`. */
+  earliestAchievedAge: number | null;
 }
 
 export interface CountryAnalysisOptions {
   withdrawalRate?: number;
   fireAssumptions?: FireAssumptions;
+  /** Bestemmer hvilken alder/projection-år "Forventet kapital" mv. evalueres ved. */
+  analysisSettings?: CountryAnalysisSettings;
 }
 
 /* ------------------------------------------------------------------ */
