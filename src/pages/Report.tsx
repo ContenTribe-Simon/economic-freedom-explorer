@@ -95,7 +95,7 @@ export default function Report() {
         Nettoformue: Math.round(y.netWorth),
       })),
     };
-  }, [liveScenario, liveAssumptions, liveCountryProfiles, isSnapshotMode]);
+  }, [liveScenario, liveAssumptions, liveCountryProfiles, liveAnalysisSettings, isSnapshotMode]);
 
   const snapshotCountries = useMemo(() => {
     if (!activeSnapshot) return null;
@@ -112,6 +112,7 @@ export default function Report() {
       activeSnapshot.years,
       activeSnapshot.assumptions,
       profiles,
+      { analysisSettings: activeSnapshot.countryAnalysisSettings },
     );
   }, [activeSnapshot]);
 
