@@ -354,10 +354,16 @@ export function computeCountryFireResults(
   const wr = options.withdrawalRate ?? fa.withdrawalRate ?? 0.035;
 
   const fire: FireAnalysis = computeFireAnalysis(scenario, years, globalAssumptions, fa);
-  const refAge = fire.capitalBreakdown.referenceAge;
-  const refYear = years.find((y) => y.age === refAge);
+  const fireRefAge = fire.capitalBreakdown.referenceAge;
+
+  const settings: CountryAnalysisSettings = options.analysisSettings ?? {
+    referenceMode: "fireReference",
+  };
+  const analysisAge = resolveAnalysisAge(scenario, years, settings, fireRefAge);
+
+  const analysisYear = years.find((y) => y.age === analysisAge);
   const stopYear = years.find((y) => y.age === scenario.inputs.stopAge);
-  const refCapital = fireBaseCapitalAt(refYear, fa);
+  const refCapital = fireBaseCapitalAt(analysisYear, fa);
   const stopCapital = fireBaseCapitalAt(stopYear, fa);
 
   const out: CountryFireResult[] = [];
@@ -412,6 +418,7 @@ export function computeCountryFireResults(
         expectedCapitalAtStopAge: stopCapital,
         gap,
         achievedAge,
+        earliestAchievedAge: achievedAge,
         status,
         grossSustainableMonthlyAtReferenceAge: grossSustainableMonthly(refCapital),
         grossSustainableMonthlyAtStopAge: grossSustainableMonthly(stopCapital),
@@ -420,10 +427,60 @@ export function computeCountryFireResults(
         monthlyShortfall: diff < 0 ? -diff : 0,
         monthlySurplus: diff > 0 ? diff : 0,
         keyDrivers: pickKeyDrivers(p, totalAnnualNeed, annual),
+        analysisAge,
       });
     }
   }
   return out;
+}
+
+/**
+ * Beregn den projection-alder der bruges som "analysealder". Clamper til
+ * projection-rækken så vi altid rammer et eksisterende år.
+ */
+export function resolveAnalysisAge(
+  scenario: Scenario,
+  years: YearRow[],
+  settings: CountryAnalysisSettings,
+  fireReferenceAge: number,
+): number {
+  if (years.length === 0) return scenario.inputs.person.currentAge;
+  const minAge = years[0].age;
+  const maxAge = years[years.length - 1].age;
+  const clamp = (n: number) => Math.max(minAge, Math.min(maxAge, Math.round(n)));
+  switch (settings.referenceMode) {
+    case "now":
+      return clamp(scenario.inputs.person.currentAge);
+    case "plannedStopAge":
+      return clamp(scenario.inputs.stopAge);
+    case "inYears":
+      return clamp(scenario.inputs.person.currentAge + (settings.yearsFromNow ?? 0));
+    case "manualAge":
+      return clamp(settings.manualReferenceAge ?? scenario.inputs.person.currentAge);
+    case "fireReference":
+    default:
+      return clamp(fireReferenceAge);
+  }
+}
+
+export function describeAnalysisMode(
+  settings: CountryAnalysisSettings,
+  resolvedAge: number,
+  scenario: Scenario,
+): string {
+  switch (settings.referenceMode) {
+    case "now":
+      return `Nu — alder ${resolvedAge}`;
+    case "plannedStopAge":
+      return `Planlagt stopalder — ${resolvedAge}`;
+    case "inYears":
+      return `Om ${settings.yearsFromNow ?? 0} år — alder ${resolvedAge}`;
+    case "manualAge":
+      return `Valgt alder ${resolvedAge}`;
+    case "fireReference":
+    default:
+      return `FIRE-referencealder — ${resolvedAge}`;
+  }
 }
 
 /** Vælg det "bedste" resultat for et land — første af achieved/near/not_achieved
