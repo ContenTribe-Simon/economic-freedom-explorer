@@ -9,8 +9,11 @@ import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
 import {
   CountryProfile,
   DEFAULT_COUNTRY_PROFILES,
+  DEFAULT_COUNTRY_ANALYSIS_SETTINGS,
   makeBlankCountryProfile,
   normalizeCountryProfile,
+  normalizeCountryAnalysisSettings,
+  type CountryAnalysisSettings,
 } from "@/lib/finance/country";
 
 interface FinanceState {
