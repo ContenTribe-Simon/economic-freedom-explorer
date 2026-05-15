@@ -206,6 +206,7 @@ export const useFinanceStore = create<FinanceState>()(
         const importedCountriesRaw = Array.isArray((parsed as any).countryProfiles)
           ? (parsed as any).countryProfiles
           : null;
+        const importedAnalysis = (parsed as any).countryAnalysisSettings;
         set({
           scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
@@ -214,6 +215,9 @@ export const useFinanceStore = create<FinanceState>()(
           countryProfiles: importedCountriesRaw
             ? importedCountriesRaw.map((c: any) => normalizeCountryProfile(c))
             : get().countryProfiles,
+          countryAnalysisSettings: importedAnalysis
+            ? normalizeCountryAnalysisSettings(importedAnalysis)
+            : get().countryAnalysisSettings,
         });
       },
       addStandardScenarios: () => {
