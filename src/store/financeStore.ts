@@ -86,6 +86,16 @@ export const useFinanceStore = create<FinanceState>()(
       assumptions: defaultAssumptions,
       snapshots: [],
       countryProfiles: structuredClone(DEFAULT_COUNTRY_PROFILES),
+      countryAnalysisSettings: { ...DEFAULT_COUNTRY_ANALYSIS_SETTINGS },
+      updateCountryAnalysisSettings: (patch) =>
+        set((s) => ({
+          countryAnalysisSettings: normalizeCountryAnalysisSettings({
+            ...s.countryAnalysisSettings,
+            ...patch,
+          }),
+        })),
+      resetCountryAnalysisSettings: () =>
+        set({ countryAnalysisSettings: { ...DEFAULT_COUNTRY_ANALYSIS_SETTINGS } }),
       setActive: (id) => {
         const cur = get().activeScenarioId;
         if (cur === id) return; // no-op when same scenario clicked
