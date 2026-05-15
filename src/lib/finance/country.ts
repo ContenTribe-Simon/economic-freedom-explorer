@@ -18,6 +18,53 @@ import type { Assumptions } from "./types";
 export type CountryLifestyle = "lean" | "standard" | "comfortable";
 export type CountryFireStatus = "achieved" | "near" | "not_achieved";
 
+/**
+ * Analyse-/flyttetidspunkt for landeanalyse. Bestemmer hvilket projection-år
+ * der bruges som "Forventet kapital", "Brutto bæredygtigt udtræk",
+ * "Landespecifikt rådighedsbeløb" og "Gap".
+ *
+ *  - "fireReference": Brug FIRE-modulets referencealder (= typisk stopAge).
+ *    Default for bagudkompatibilitet.
+ *  - "now":           Brug brugerens nuværende alder.
+ *  - "plannedStopAge": Brug scenariets stopalder.
+ *  - "inYears":       Brug currentAge + yearsFromNow.
+ *  - "manualAge":     Brug manualReferenceAge.
+ */
+export type CountryAnalysisReferenceMode =
+  | "fireReference"
+  | "now"
+  | "plannedStopAge"
+  | "inYears"
+  | "manualAge";
+
+export interface CountryAnalysisSettings {
+  withdrawalRate?: number;
+  referenceMode: CountryAnalysisReferenceMode;
+  yearsFromNow?: number;
+  manualReferenceAge?: number;
+}
+
+export const DEFAULT_COUNTRY_ANALYSIS_SETTINGS: CountryAnalysisSettings = {
+  referenceMode: "fireReference",
+  yearsFromNow: 5,
+};
+
+export function normalizeCountryAnalysisSettings(raw: any): CountryAnalysisSettings {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_COUNTRY_ANALYSIS_SETTINGS };
+  const allowed: CountryAnalysisReferenceMode[] = [
+    "fireReference", "now", "plannedStopAge", "inYears", "manualAge",
+  ];
+  const mode = allowed.includes(raw.referenceMode) ? raw.referenceMode : "fireReference";
+  const out: CountryAnalysisSettings = { referenceMode: mode };
+  const wr = Number(raw.withdrawalRate);
+  if (Number.isFinite(wr) && wr > 0) out.withdrawalRate = wr;
+  const yfn = Number(raw.yearsFromNow);
+  if (Number.isFinite(yfn) && yfn >= 0) out.yearsFromNow = yfn;
+  const ma = Number(raw.manualReferenceAge);
+  if (Number.isFinite(ma) && ma > 0) out.manualReferenceAge = ma;
+  return out;
+}
+
 export interface CountryProfile {
   id: string;
   name: string;
