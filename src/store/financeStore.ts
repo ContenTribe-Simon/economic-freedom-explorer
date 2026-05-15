@@ -591,7 +591,8 @@ export const useFinanceStore = create<FinanceState>()(
           state.countryProfiles = structuredClone(DEFAULT_COUNTRY_PROFILES);
         } else {
           state.countryProfiles = state.countryProfiles.map((c: any) => normalizeCountryProfile(c));
-        }
+        // v16: countryAnalysisSettings (analysealder/flyttetidspunkt)
+        state.countryAnalysisSettings = normalizeCountryAnalysisSettings(state.countryAnalysisSettings);
         return state;
       },
     },
