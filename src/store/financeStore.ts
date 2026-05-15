@@ -61,6 +61,10 @@ interface FinanceState {
   duplicateCountryProfile: (id: string) => string;
   toggleCountryProfile: (id: string) => void;
   resetCountryProfilesToDefaults: () => void;
+  /** Brugerens analyseindstillinger til landeanalysen (flyttetidspunkt). */
+  countryAnalysisSettings: CountryAnalysisSettings;
+  updateCountryAnalysisSettings: (patch: Partial<CountryAnalysisSettings>) => void;
+  resetCountryAnalysisSettings: () => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
