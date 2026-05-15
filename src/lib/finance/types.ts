@@ -483,6 +483,8 @@ export interface ModelExport {
   snapshots?: Snapshot[];
   /** Brugerredigerbare landeprofiler på model-niveau (Country FIRE-modul). */
   countryProfiles?: import("./country").CountryProfile[];
+  /** Brugerens analyseindstillinger til landeanalysen (flyttetidspunkt). */
+  countryAnalysisSettings?: import("./country").CountryAnalysisSettings;
   metadata?: Record<string, unknown>;
 }
 
