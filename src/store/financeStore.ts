@@ -9,8 +9,11 @@ import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
 import {
   CountryProfile,
   DEFAULT_COUNTRY_PROFILES,
+  DEFAULT_COUNTRY_ANALYSIS_SETTINGS,
   makeBlankCountryProfile,
   normalizeCountryProfile,
+  normalizeCountryAnalysisSettings,
+  type CountryAnalysisSettings,
 } from "@/lib/finance/country";
 
 interface FinanceState {
@@ -58,6 +61,10 @@ interface FinanceState {
   duplicateCountryProfile: (id: string) => string;
   toggleCountryProfile: (id: string) => void;
   resetCountryProfilesToDefaults: () => void;
+  /** Brugerens analyseindstillinger til landeanalysen (flyttetidspunkt). */
+  countryAnalysisSettings: CountryAnalysisSettings;
+  updateCountryAnalysisSettings: (patch: Partial<CountryAnalysisSettings>) => void;
+  resetCountryAnalysisSettings: () => void;
 }
 
 const STANDARD_BASE_NAME = "Base case (standard)";
@@ -79,6 +86,16 @@ export const useFinanceStore = create<FinanceState>()(
       assumptions: defaultAssumptions,
       snapshots: [],
       countryProfiles: structuredClone(DEFAULT_COUNTRY_PROFILES),
+      countryAnalysisSettings: { ...DEFAULT_COUNTRY_ANALYSIS_SETTINGS },
+      updateCountryAnalysisSettings: (patch) =>
+        set((s) => ({
+          countryAnalysisSettings: normalizeCountryAnalysisSettings({
+            ...s.countryAnalysisSettings,
+            ...patch,
+          }),
+        })),
+      resetCountryAnalysisSettings: () =>
+        set({ countryAnalysisSettings: { ...DEFAULT_COUNTRY_ANALYSIS_SETTINGS } }),
       setActive: (id) => {
         const cur = get().activeScenarioId;
         if (cur === id) return; // no-op when same scenario clicked
@@ -160,6 +177,7 @@ export const useFinanceStore = create<FinanceState>()(
           assumptions: get().assumptions,
           snapshots: get().snapshots,
           countryProfiles: get().countryProfiles,
+          countryAnalysisSettings: get().countryAnalysisSettings,
           metadata: { source: "local", release: MODEL_RELEASE },
         };
         return JSON.stringify(payload, null, 2);
@@ -188,6 +206,7 @@ export const useFinanceStore = create<FinanceState>()(
         const importedCountriesRaw = Array.isArray((parsed as any).countryProfiles)
           ? (parsed as any).countryProfiles
           : null;
+        const importedAnalysis = (parsed as any).countryAnalysisSettings;
         set({
           scenarios,
           assumptions: parsed.assumptions ?? defaultAssumptions,
@@ -196,6 +215,9 @@ export const useFinanceStore = create<FinanceState>()(
           countryProfiles: importedCountriesRaw
             ? importedCountriesRaw.map((c: any) => normalizeCountryProfile(c))
             : get().countryProfiles,
+          countryAnalysisSettings: importedAnalysis
+            ? normalizeCountryAnalysisSettings(importedAnalysis)
+            : get().countryAnalysisSettings,
         });
       },
       addStandardScenarios: () => {
@@ -286,6 +308,7 @@ export const useFinanceStore = create<FinanceState>()(
           name: options.name,
           notes: options.notes,
           countryProfiles: state.countryProfiles,
+          countryAnalysisSettings: { ...state.countryAnalysisSettings },
         });
         set((s) => ({ snapshots: [snap, ...s.snapshots] }));
         return snap.snapshotId;
@@ -391,7 +414,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 15,
+      version: 16,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -569,6 +592,8 @@ export const useFinanceStore = create<FinanceState>()(
         } else {
           state.countryProfiles = state.countryProfiles.map((c: any) => normalizeCountryProfile(c));
         }
+        // v16: countryAnalysisSettings (analysealder/flyttetidspunkt)
+        state.countryAnalysisSettings = normalizeCountryAnalysisSettings(state.countryAnalysisSettings);
         return state;
       },
     },

@@ -467,6 +467,8 @@ export interface Snapshot {
    * (kan mangle på ældre snapshots — Country-modulet håndterer det).
    */
   countryProfiles?: import("./country").CountryProfile[];
+  /** Frosset analyseindstilling (analysealder/flyttetidspunkt) for landeanalysen. */
+  countryAnalysisSettings?: import("./country").CountryAnalysisSettings;
 }
 
 /** Skema for eksport/import af hele modellen — forberedt til fremtidig serverlagring. */
@@ -481,6 +483,8 @@ export interface ModelExport {
   snapshots?: Snapshot[];
   /** Brugerredigerbare landeprofiler på model-niveau (Country FIRE-modul). */
   countryProfiles?: import("./country").CountryProfile[];
+  /** Brugerens analyseindstillinger til landeanalysen (flyttetidspunkt). */
+  countryAnalysisSettings?: import("./country").CountryAnalysisSettings;
   metadata?: Record<string, unknown>;
 }
 

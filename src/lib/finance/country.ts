@@ -18,6 +18,53 @@ import type { Assumptions } from "./types";
 export type CountryLifestyle = "lean" | "standard" | "comfortable";
 export type CountryFireStatus = "achieved" | "near" | "not_achieved";
 
+/**
+ * Analyse-/flyttetidspunkt for landeanalyse. Bestemmer hvilket projection-år
+ * der bruges som "Forventet kapital", "Brutto bæredygtigt udtræk",
+ * "Landespecifikt rådighedsbeløb" og "Gap".
+ *
+ *  - "fireReference": Brug FIRE-modulets referencealder (= typisk stopAge).
+ *    Default for bagudkompatibilitet.
+ *  - "now":           Brug brugerens nuværende alder.
+ *  - "plannedStopAge": Brug scenariets stopalder.
+ *  - "inYears":       Brug currentAge + yearsFromNow.
+ *  - "manualAge":     Brug manualReferenceAge.
+ */
+export type CountryAnalysisReferenceMode =
+  | "fireReference"
+  | "now"
+  | "plannedStopAge"
+  | "inYears"
+  | "manualAge";
+
+export interface CountryAnalysisSettings {
+  withdrawalRate?: number;
+  referenceMode: CountryAnalysisReferenceMode;
+  yearsFromNow?: number;
+  manualReferenceAge?: number;
+}
+
+export const DEFAULT_COUNTRY_ANALYSIS_SETTINGS: CountryAnalysisSettings = {
+  referenceMode: "fireReference",
+  yearsFromNow: 5,
+};
+
+export function normalizeCountryAnalysisSettings(raw: any): CountryAnalysisSettings {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_COUNTRY_ANALYSIS_SETTINGS };
+  const allowed: CountryAnalysisReferenceMode[] = [
+    "fireReference", "now", "plannedStopAge", "inYears", "manualAge",
+  ];
+  const mode = allowed.includes(raw.referenceMode) ? raw.referenceMode : "fireReference";
+  const out: CountryAnalysisSettings = { referenceMode: mode };
+  const wr = Number(raw.withdrawalRate);
+  if (Number.isFinite(wr) && wr > 0) out.withdrawalRate = wr;
+  const yfn = Number(raw.yearsFromNow);
+  if (Number.isFinite(yfn) && yfn >= 0) out.yearsFromNow = yfn;
+  const ma = Number(raw.manualReferenceAge);
+  if (Number.isFinite(ma) && ma > 0) out.manualReferenceAge = ma;
+  return out;
+}
+
 export interface CountryProfile {
   id: string;
   name: string;
@@ -66,11 +113,17 @@ export interface CountryFireResult {
   monthlySurplus: number;
   /** Kun økonomiske drivere. */
   keyDrivers: string[];
+  /** Alder hvor analysen er evalueret (afhænger af analyseindstillinger). */
+  analysisAge: number;
+  /** Tidligste alder i hele projection hvor niveauet kan opnås. Alias for `achievedAge`. */
+  earliestAchievedAge: number | null;
 }
 
 export interface CountryAnalysisOptions {
   withdrawalRate?: number;
   fireAssumptions?: FireAssumptions;
+  /** Bestemmer hvilken alder/projection-år "Forventet kapital" mv. evalueres ved. */
+  analysisSettings?: CountryAnalysisSettings;
 }
 
 /* ------------------------------------------------------------------ */
@@ -301,10 +354,16 @@ export function computeCountryFireResults(
   const wr = options.withdrawalRate ?? fa.withdrawalRate ?? 0.035;
 
   const fire: FireAnalysis = computeFireAnalysis(scenario, years, globalAssumptions, fa);
-  const refAge = fire.capitalBreakdown.referenceAge;
-  const refYear = years.find((y) => y.age === refAge);
+  const fireRefAge = fire.capitalBreakdown.referenceAge;
+
+  const settings: CountryAnalysisSettings = options.analysisSettings ?? {
+    referenceMode: "fireReference",
+  };
+  const analysisAge = resolveAnalysisAge(scenario, years, settings, fireRefAge);
+
+  const analysisYear = years.find((y) => y.age === analysisAge);
   const stopYear = years.find((y) => y.age === scenario.inputs.stopAge);
-  const refCapital = fireBaseCapitalAt(refYear, fa);
+  const refCapital = fireBaseCapitalAt(analysisYear, fa);
   const stopCapital = fireBaseCapitalAt(stopYear, fa);
 
   const out: CountryFireResult[] = [];
@@ -359,6 +418,7 @@ export function computeCountryFireResults(
         expectedCapitalAtStopAge: stopCapital,
         gap,
         achievedAge,
+        earliestAchievedAge: achievedAge,
         status,
         grossSustainableMonthlyAtReferenceAge: grossSustainableMonthly(refCapital),
         grossSustainableMonthlyAtStopAge: grossSustainableMonthly(stopCapital),
@@ -367,10 +427,60 @@ export function computeCountryFireResults(
         monthlyShortfall: diff < 0 ? -diff : 0,
         monthlySurplus: diff > 0 ? diff : 0,
         keyDrivers: pickKeyDrivers(p, totalAnnualNeed, annual),
+        analysisAge,
       });
     }
   }
   return out;
+}
+
+/**
+ * Beregn den projection-alder der bruges som "analysealder". Clamper til
+ * projection-rækken så vi altid rammer et eksisterende år.
+ */
+export function resolveAnalysisAge(
+  scenario: Scenario,
+  years: YearRow[],
+  settings: CountryAnalysisSettings,
+  fireReferenceAge: number,
+): number {
+  if (years.length === 0) return scenario.inputs.person.currentAge;
+  const minAge = years[0].age;
+  const maxAge = years[years.length - 1].age;
+  const clamp = (n: number) => Math.max(minAge, Math.min(maxAge, Math.round(n)));
+  switch (settings.referenceMode) {
+    case "now":
+      return clamp(scenario.inputs.person.currentAge);
+    case "plannedStopAge":
+      return clamp(scenario.inputs.stopAge);
+    case "inYears":
+      return clamp(scenario.inputs.person.currentAge + (settings.yearsFromNow ?? 0));
+    case "manualAge":
+      return clamp(settings.manualReferenceAge ?? scenario.inputs.person.currentAge);
+    case "fireReference":
+    default:
+      return clamp(fireReferenceAge);
+  }
+}
+
+export function describeAnalysisMode(
+  settings: CountryAnalysisSettings,
+  resolvedAge: number,
+  scenario: Scenario,
+): string {
+  switch (settings.referenceMode) {
+    case "now":
+      return `Nu — alder ${resolvedAge}`;
+    case "plannedStopAge":
+      return `Planlagt stopalder — ${resolvedAge}`;
+    case "inYears":
+      return `Om ${settings.yearsFromNow ?? 0} år — alder ${resolvedAge}`;
+    case "manualAge":
+      return `Valgt alder ${resolvedAge}`;
+    case "fireReference":
+    default:
+      return `FIRE-referencealder — ${resolvedAge}`;
+  }
 }
 
 /** Vælg det "bedste" resultat for et land — første af achieved/near/not_achieved

@@ -76,6 +76,7 @@ export default function Report() {
   const isSnapshotMode = !!activeSnapshot;
 
   const liveCountryProfiles = useFinanceStore((s) => s.countryProfiles);
+  const liveAnalysisSettings = useFinanceStore((s) => s.countryAnalysisSettings);
 
   const liveData = useMemo(() => {
     if (isSnapshotMode) return null;
@@ -84,7 +85,7 @@ export default function Report() {
       kpis: deriveKPIs(liveScenario, ys, liveAssumptions),
       checks: sanityChecks(liveScenario, ys),
       fire: computeFireAnalysis(liveScenario, ys, liveAssumptions),
-      countries: computeCountryFireResults(liveScenario, ys, liveAssumptions, liveCountryProfiles),
+      countries: computeCountryFireResults(liveScenario, ys, liveAssumptions, liveCountryProfiles, { analysisSettings: liveAnalysisSettings }),
       chartData: ys.map((y) => ({
         age: y.age,
         Fri: Math.round(y.closing.free),
@@ -94,7 +95,7 @@ export default function Report() {
         Nettoformue: Math.round(y.netWorth),
       })),
     };
-  }, [liveScenario, liveAssumptions, liveCountryProfiles, isSnapshotMode]);
+  }, [liveScenario, liveAssumptions, liveCountryProfiles, liveAnalysisSettings, isSnapshotMode]);
 
   const snapshotCountries = useMemo(() => {
     if (!activeSnapshot) return null;
@@ -111,6 +112,7 @@ export default function Report() {
       activeSnapshot.years,
       activeSnapshot.assumptions,
       profiles,
+      { analysisSettings: activeSnapshot.countryAnalysisSettings },
     );
   }, [activeSnapshot]);
 
@@ -480,9 +482,10 @@ export default function Report() {
           <section className="mb-6 break-inside-avoid" data-testid="report-countries">
             <h3 className="font-display text-base font-semibold mb-2">Landeanalyse (kort)</h3>
             <p className="text-xs text-muted-foreground mb-2">
-              Bedste/nærmeste land: <strong>{best.countryName}</strong> ({lifestyleLabel(best.lifestyle)}) — kapitalbehov {formatDKK(best.selectedCapitalNeed, { compact: true })}
+              Evalueret ved analysealder <strong>{best.analysisAge}</strong>. Bedste/nærmeste land:{" "}
+              <strong>{best.countryName}</strong> ({lifestyleLabel(best.lifestyle)}) — kapitalbehov {formatDKK(best.selectedCapitalNeed, { compact: true })}, forventet kapital {formatDKK(best.expectedCapitalAtReferenceAge, { compact: true })}
               {best.gap > 0 ? `, gap ${formatDKK(best.gap, { compact: true })}` : ", opnået"}
-              {best.achievedAge !== null ? `, alder ${best.achievedAge}` : ""}.
+              {best.earliestAchievedAge !== null ? `, tidligst opnået alder ${best.earliestAchievedAge}` : ""}.
             </p>
             <table className="w-full text-sm border-collapse">
               <thead className="text-xs text-muted-foreground">
