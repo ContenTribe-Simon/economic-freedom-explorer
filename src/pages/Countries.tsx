@@ -193,7 +193,7 @@ export default function CountriesPage() {
   );
 
   const minProjAge = years[0]?.age ?? scenario.inputs.person.currentAge;
-  const maxProjAge = years[years.length - 1]?.age ?? scenario.inputs.lifeExpectancy;
+  const maxProjAge = years[years.length - 1]?.age ?? scenario.inputs.person.lifeExpectancy;
 
   return (
     <div className="space-y-8" data-testid="countries-page">
