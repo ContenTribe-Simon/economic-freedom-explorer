@@ -3,7 +3,7 @@ import { resolveScenario } from "./stress";
 import { project } from "./projection";
 import { deriveKPIs } from "./kpis";
 import { sanityChecks } from "./sanity";
-import type { CountryProfile } from "./country";
+import type { CountryProfile, CountryAnalysisSettings } from "./country";
 
 const id = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
