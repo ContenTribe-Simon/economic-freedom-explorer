@@ -5,7 +5,7 @@ import { deriveKPIs } from "@/lib/finance/kpis";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
-import { Trash2, Link2, GitBranch } from "lucide-react";
+import { Trash2, Link2, GitBranch, Pencil } from "lucide-react";
 import { resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { Badge } from "@/components/ui/badge";
 import type { Scenario } from "@/lib/finance/types";
@@ -46,6 +46,15 @@ export default function Scenarios() {
   const applyStressModifier = useFinanceStore((s) => s.applyStressModifier);
   const convertToCustom = useFinanceStore((s) => s.convertToCustom);
   const rebase = useFinanceStore((s) => s.rebaseOnCurrentBase);
+  const renameScenario = useFinanceStore((s) => s.renameScenario);
+
+  const handleRename = (id: string, currentName: string) => {
+    const next = window.prompt("Nyt navn til scenariet", currentName);
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === currentName) return;
+    renameScenario(id, trimmed);
+  };
 
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
@@ -199,6 +208,9 @@ export default function Scenarios() {
                           : "Basisscenarie – kan redigeres frit."}
                     </p>
                     <div className="flex flex-wrap justify-end gap-1 mt-2">
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" title="Omdøb scenarie" onClick={() => handleRename(scenario.id, scenario.name)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => duplicate(scenario.id)}>Dupliker</Button>
                       {scenario.type === "custom" && scenario.baseScenarioId ? (
                         <Button
