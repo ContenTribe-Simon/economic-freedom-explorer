@@ -5,7 +5,7 @@ import { deriveKPIs } from "@/lib/finance/kpis";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDKK } from "@/lib/format";
-import { Trash2, Link2, GitBranch } from "lucide-react";
+import { Trash2, Link2, GitBranch, Pencil } from "lucide-react";
 import { resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { Badge } from "@/components/ui/badge";
 import type { Scenario } from "@/lib/finance/types";
