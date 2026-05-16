@@ -46,6 +46,15 @@ export default function Scenarios() {
   const applyStressModifier = useFinanceStore((s) => s.applyStressModifier);
   const convertToCustom = useFinanceStore((s) => s.convertToCustom);
   const rebase = useFinanceStore((s) => s.rebaseOnCurrentBase);
+  const renameScenario = useFinanceStore((s) => s.renameScenario);
+
+  const handleRename = (id: string, currentName: string) => {
+    const next = window.prompt("Nyt navn til scenariet", currentName);
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === currentName) return;
+    renameScenario(id, trimmed);
+  };
 
   const runStress = (key: string) => {
     const test = STRESS_TESTS.find((t) => t.key === key);
