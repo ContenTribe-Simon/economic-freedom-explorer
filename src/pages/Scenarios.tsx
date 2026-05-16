@@ -208,6 +208,9 @@ export default function Scenarios() {
                           : "Basisscenarie – kan redigeres frit."}
                     </p>
                     <div className="flex flex-wrap justify-end gap-1 mt-2">
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" title="Omdøb scenarie" onClick={() => handleRename(scenario.id, scenario.name)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => duplicate(scenario.id)}>Dupliker</Button>
                       {scenario.type === "custom" && scenario.baseScenarioId ? (
                         <Button
