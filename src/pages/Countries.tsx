@@ -545,10 +545,15 @@ export default function CountriesPage() {
                       <span className="text-muted-foreground">Gap</span>
                       <span className="num">{r.gap > 0 ? formatDKK(r.gap, { compact: true }) : "—"}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status</span>
-                      <span className={statusTone(r.status)}>{statusLabel(r.status)}</span>
-                    </div>
+                    {(() => {
+                      const d = describeStatusAtAnalysisAge(r);
+                      return (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Status</span>
+                          <span className={`text-right ${statusTone(d.tone)}`}>{d.label}</span>
+                        </div>
+                      );
+                    })()}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{r.monthlySurplus > 0 ? "Overskud" : "Mangler"}/md.</span>
                       <span className={`num ${r.monthlySurplus > 0 ? "text-success" : r.monthlyShortfall > 0 ? "text-warning" : ""}`}>
