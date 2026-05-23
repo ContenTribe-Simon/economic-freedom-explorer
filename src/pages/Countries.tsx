@@ -232,21 +232,21 @@ export default function CountriesPage() {
             </div>
           </div>
           <div className="space-y-1 col-span-2">
-            <Label className="text-xs uppercase text-muted-foreground">Analysegrundlag</Label>
+            <Label className="text-xs uppercase text-muted-foreground">Analysealder / flyttetidspunkt</Label>
             <div className="flex items-center gap-2 flex-wrap">
               <Select
                 value={analysisSettings.referenceMode}
                 onValueChange={(v) => updateAnalysis({ referenceMode: v as CountryAnalysisReferenceMode })}
               >
-                <SelectTrigger className="h-8 w-44" data-testid="analysis-mode">
+                <SelectTrigger className="h-8 w-56" data-testid="analysis-mode">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="now">Nu</SelectItem>
-                  <SelectItem value="plannedStopAge">Ved planlagt stopalder</SelectItem>
                   <SelectItem value="inYears">Om X år</SelectItem>
-                  <SelectItem value="manualAge">Vælg alder</SelectItem>
-                  <SelectItem value="fireReference">FIRE-referencealder</SelectItem>
+                  <SelectItem value="plannedStopAge">Ved planlagt stopalder</SelectItem>
+                  <SelectItem value="manualAge">Manuel alder</SelectItem>
+                  <SelectItem value="fireReference">Anbefalet (FIRE-referencealder)</SelectItem>
                 </SelectContent>
               </Select>
               {analysisSettings.referenceMode === "inYears" && (
@@ -271,7 +271,7 @@ export default function CountriesPage() {
               )}
             </div>
             <div className="text-[11px] text-muted-foreground">
-              {describeAnalysisMode(analysisSettings, analysisAge, scenario)}
+              Analysen viser økonomien ved alder <strong>{analysisAge}</strong>.
             </div>
           </div>
           <div className="space-y-1">
