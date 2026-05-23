@@ -519,5 +519,140 @@ describe("Country analysis settings — persistence", () => {
     const after = useFinanceStore.getState().countryAnalysisSettings;
     expect(after.referenceMode).toBe("inYears");
     expect(after.yearsFromNow).toBe(7);
+});
+
+describe("Country FIRE — status ved analysealder vs. tidligst opnået", () => {
+  // A. Positivt gap ved analysealder, men niveauet opnås senere → ikke opnået
+  it("positive gap at analysisAge => not achieved at analysis age, even if earliestAchievedAge exists later", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 200_000; // lavt startkapital
+    const ys = project(s, defaultAssumptions);
+    const cheap: CountryProfile = {
+      ...makeBlankCountryProfile("LaterAchieved"),
+      monthlyCostStandard: 8000,
+    };
+    // Analyse NU → kapital meget lavere end behov, men senere i projection rammes det
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [cheap], {
+      analysisSettings: { referenceMode: "now" },
+    });
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    if (std.capitalGapAtAnalysisAge > 0 && std.earliestAchievedAge != null) {
+      expect(std.achievedAtAnalysisAge).toBe(false);
+      expect(std.status).not.toBe("achieved");
+      expect(std.earliestAchievedAge).toBeGreaterThan(std.analysisAge);
+      const desc = describeStatusAtAnalysisAge(std);
+      expect(desc.tone).toBe("near");
+      expect(desc.label).toMatch(/først ved/i);
+    }
   });
+
+  // B. Opnået ved analysealder
+  it("zero gap at analysisAge => achievedAtAnalysisAge true and status 'achieved'", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 30_000_000;
+    s.inputs.holding.balance = 0;
+    s.inputs.holding.expectedExitValue = 0;
+    const ys = project(s, defaultAssumptions);
+    const cheap: CountryProfile = {
+      ...makeBlankCountryProfile("Cheap"),
+      monthlyCostStandard: 5000,
+    };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [cheap], {
+      analysisSettings: { referenceMode: "now" },
+    });
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    expect(std.capitalGapAtAnalysisAge).toBe(0);
+    expect(std.achievedAtAnalysisAge).toBe(true);
+    expect(std.status).toBe("achieved");
+    expect(describeStatusAtAnalysisAge(std).tone).toBe("achieved");
+  });
+
+  // C. Aldrig opnået i hele projection
+  it("never achieved => label 'Ikke opnået i projectionen'", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 100_000;
+    s.inputs.holding.balance = 0;
+    s.inputs.holding.expectedExitValue = 0;
+    s.inputs.pension.balance = 0;
+    const ys = project(s, defaultAssumptions);
+    const expensive: CountryProfile = {
+      ...makeBlankCountryProfile("Expensive"),
+      monthlyCostStandard: 100_000,
+    };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [expensive]);
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    expect(std.achievedAtAnalysisAge).toBe(false);
+    expect(std.earliestAchievedAge).toBeNull();
+    const desc = describeStatusAtAnalysisAge(std);
+    expect(desc.tone).toBe("not_achieved");
+    expect(desc.label).toBe("Ikke opnået i projectionen");
+  });
+
+  // D. Opnået senere
+  it("earliestAchievedAge > analysisAge => label mentions later age", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 500_000;
+    const ys = project(s, defaultAssumptions);
+    const p: CountryProfile = { ...makeBlankCountryProfile("Later"), monthlyCostStandard: 10_000 };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [p], {
+      analysisSettings: { referenceMode: "now" },
+    });
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    if (std.earliestAchievedAge != null && std.earliestAchievedAge > std.analysisAge) {
+      expect(std.achievedAtAnalysisAge).toBe(false);
+      const desc = describeStatusAtAnalysisAge(std);
+      expect(desc.label).toContain(String(std.earliestAchievedAge));
+    }
+  });
+
+  // E. Sammenligningstabel: status må ikke være "achieved" hvis gap > 0
+  it("status is never 'achieved' when capitalGapAtAnalysisAge > 0", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 500_000;
+    const ys = project(s, defaultAssumptions);
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, DEFAULT_COUNTRY_PROFILES, {
+      analysisSettings: { referenceMode: "now" },
+    });
+    for (const row of r) {
+      if (row.capitalGapAtAnalysisAge > 0) {
+        expect(row.status).not.toBe("achieved");
+        expect(row.achievedAtAnalysisAge).toBe(false);
+      }
+    }
+  });
+
+  // F. Landekort må ikke vise grøn tone hvis Standard først opnås senere
+  it("summarizeCountryStatus tone is not 'achieved' when Standard achieves only later", () => {
+    const s = makeBaseScenario();
+    s.inputs.free.balance = 500_000;
+    const ys = project(s, defaultAssumptions);
+    const p: CountryProfile = {
+      ...makeBlankCountryProfile("LaterOnly"),
+      monthlyCostLean: 100_000,
+      monthlyCostStandard: 100_000,
+      monthlyCostComfortable: 100_000,
+    };
+    const r = computeCountryFireResults(s, ys, defaultAssumptions, [p], {
+      analysisSettings: { referenceMode: "now" },
+    });
+    const std = r.find((x) => x.lifestyle === "standard")!;
+    if (!std.achievedAtAnalysisAge) {
+      const summary = summarizeCountryStatus(r, p.id);
+      expect(summary.tone).not.toBe("achieved");
+    }
+  });
+
+  // Edge: var opnået tidligere men ikke ved analysealder
+  it("describeStatusAtAnalysisAge handles 'achieved earlier but not now' edge case", () => {
+    const r: any = {
+      analysisAge: 90,
+      earliestAchievedAge: 70,
+      achievedAtAnalysisAge: false,
+    };
+    const d = describeStatusAtAnalysisAge(r);
+    expect(d.tone).toBe("near");
+    expect(d.label).toMatch(/70/);
+    expect(d.label).toMatch(/90/);
+  });
+});
 });
