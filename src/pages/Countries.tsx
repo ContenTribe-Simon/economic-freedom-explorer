@@ -454,15 +454,16 @@ export default function CountriesPage() {
                     <th className="text-right p-2">Kapital @4 %</th>
                     <th className="text-right p-2" title="Kapital × udtræksrate / 12.">Brutto udtræk/md.</th>
                     <th className="text-right p-2" title="Efter faste landeomkostninger og buffer/friktion.">Rådigh./md.</th>
-                    <th className="text-right p-2">Tidligst opnået alder</th>
                   </>
                 )}
-                <th className="text-left p-2">Status</th>
+                <th className="text-left p-2">Status ved alder {analysisAge}</th>
+                <th className="text-right p-2">Tidligst opnået</th>
               </tr>
             </thead>
             <tbody>
               {sortedTable.map((r) => {
                 const isSelected = r.countryId === selectedCountry?.id;
+                const desc = describeStatusAtAnalysisAge(r);
                 return (
                   <tr
                     key={`${r.countryId}-${r.lifestyle}`}
@@ -481,10 +482,10 @@ export default function CountriesPage() {
                         <td className="p-2 text-right num">{formatDKK(r.capitalNeed40, { compact: true })}</td>
                         <td className="p-2 text-right num">{formatDKK(r.grossSustainableMonthlyAtReferenceAge, { compact: true })}</td>
                         <td className="p-2 text-right num">{formatDKK(r.sustainableMonthlyNetAtReferenceAge, { compact: true })}</td>
-                        <td className="p-2 text-right num">{r.earliestAchievedAge ?? "—"}</td>
                       </>
                     )}
-                    <td className={`p-2 ${statusTone(r.status)}`}>{statusLabel(r.status)}</td>
+                    <td className={`p-2 ${statusTone(desc.tone)}`}>{desc.label}</td>
+                    <td className="p-2 text-right num">{r.earliestAchievedAge ?? "—"}</td>
                   </tr>
                 );
               })}
@@ -492,8 +493,8 @@ export default function CountriesPage() {
           </table>
         </Card>
         <p className="text-[11px] text-muted-foreground">
-          Forventet kapital og gap er evalueret ved analysealder <strong>{analysisAge}</strong>.
-          Tidligst opnåede alder er separat — første år i hele projection hvor niveauet kunne opnås.
+          <strong>Status ved alder {analysisAge}</strong> viser, om økonomien kan bære landet på det valgte tidspunkt.
+          <strong> Tidligst opnået</strong> alder viser første alder i hele fremskrivningen, hvor niveauet kan bæres.
         </p>
       </section>
 
