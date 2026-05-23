@@ -395,9 +395,11 @@ export function computeCountryFireResults(
 
       const achievedAge = findAchievedAge(years, fa, selectedCapitalNeed);
       const gap = Math.max(0, selectedCapitalNeed - refCapital);
+      const achievedAtAnalysisAge = selectedCapitalNeed > 0 && refCapital >= selectedCapitalNeed;
 
+      // Status afspejler ANALYSEALDER — ikke om niveauet opnås på et tidspunkt.
       let status: CountryFireStatus = "not_achieved";
-      if (achievedAge !== null) status = "achieved";
+      if (achievedAtAnalysisAge) status = "achieved";
       else if (selectedCapitalNeed > 0 && refCapital / selectedCapitalNeed >= 0.85) status = "near";
 
       function grossSustainableMonthly(capital: number): number {
@@ -413,6 +415,8 @@ export function computeCountryFireResults(
 
       const sustainRef = sustainableMonthly(refCapital);
       const diff = sustainRef - monthly;
+      const monthlyShortfall = diff < 0 ? -diff : 0;
+      const monthlySurplus = diff > 0 ? diff : 0;
 
       out.push({
         countryId: p.id,
@@ -432,12 +436,16 @@ export function computeCountryFireResults(
         achievedAge,
         earliestAchievedAge: achievedAge,
         status,
+        achievedAtAnalysisAge,
+        capitalGapAtAnalysisAge: gap,
+        monthlyShortfallAtAnalysisAge: monthlyShortfall,
+        monthlySurplusAtAnalysisAge: monthlySurplus,
         grossSustainableMonthlyAtReferenceAge: grossSustainableMonthly(refCapital),
         grossSustainableMonthlyAtStopAge: grossSustainableMonthly(stopCapital),
         sustainableMonthlyNetAtReferenceAge: sustainRef,
         sustainableMonthlyNetAtStopAge: sustainableMonthly(stopCapital),
-        monthlyShortfall: diff < 0 ? -diff : 0,
-        monthlySurplus: diff > 0 ? diff : 0,
+        monthlyShortfall,
+        monthlySurplus,
         keyDrivers: pickKeyDrivers(p, totalAnnualNeed, annual),
         analysisAge,
       });
