@@ -101,7 +101,19 @@ export interface CountryFireResult {
   expectedCapitalAtStopAge: number;
   gap: number;
   achievedAge: number | null;
+  /**
+   * Status afspejler situationen ved den valgte analysealder — IKKE om niveauet
+   * opnås på et tidspunkt i projection. "achieved" kræver gap ≤ 0 ved analysealder.
+   */
   status: CountryFireStatus;
+  /** True hvis kapitalen ved analysealderen dækker hele kapitalbehovet. */
+  achievedAtAnalysisAge: boolean;
+  /** Kapitalmangel ved analysealderen (alias for `gap`, eksplicit navn). */
+  capitalGapAtAnalysisAge: number;
+  /** Manglende månedligt forbrug ved analysealder (alias for `monthlyShortfall`). */
+  monthlyShortfallAtAnalysisAge: number;
+  /** Overskydende månedligt forbrug ved analysealder (alias for `monthlySurplus`). */
+  monthlySurplusAtAnalysisAge: number;
   /** Brutto bæredygtigt udtræk: kapitalgrundlag × valgt udtræksrate / 12. Uafhængigt af land. */
   grossSustainableMonthlyAtReferenceAge: number;
   grossSustainableMonthlyAtStopAge: number;
@@ -383,9 +395,11 @@ export function computeCountryFireResults(
 
       const achievedAge = findAchievedAge(years, fa, selectedCapitalNeed);
       const gap = Math.max(0, selectedCapitalNeed - refCapital);
+      const achievedAtAnalysisAge = selectedCapitalNeed > 0 && refCapital >= selectedCapitalNeed;
 
+      // Status afspejler ANALYSEALDER — ikke om niveauet opnås på et tidspunkt.
       let status: CountryFireStatus = "not_achieved";
-      if (achievedAge !== null) status = "achieved";
+      if (achievedAtAnalysisAge) status = "achieved";
       else if (selectedCapitalNeed > 0 && refCapital / selectedCapitalNeed >= 0.85) status = "near";
 
       function grossSustainableMonthly(capital: number): number {
@@ -401,6 +415,8 @@ export function computeCountryFireResults(
 
       const sustainRef = sustainableMonthly(refCapital);
       const diff = sustainRef - monthly;
+      const monthlyShortfall = diff < 0 ? -diff : 0;
+      const monthlySurplus = diff > 0 ? diff : 0;
 
       out.push({
         countryId: p.id,
@@ -420,12 +436,16 @@ export function computeCountryFireResults(
         achievedAge,
         earliestAchievedAge: achievedAge,
         status,
+        achievedAtAnalysisAge,
+        capitalGapAtAnalysisAge: gap,
+        monthlyShortfallAtAnalysisAge: monthlyShortfall,
+        monthlySurplusAtAnalysisAge: monthlySurplus,
         grossSustainableMonthlyAtReferenceAge: grossSustainableMonthly(refCapital),
         grossSustainableMonthlyAtStopAge: grossSustainableMonthly(stopCapital),
         sustainableMonthlyNetAtReferenceAge: sustainRef,
         sustainableMonthlyNetAtStopAge: sustainableMonthly(stopCapital),
-        monthlyShortfall: diff < 0 ? -diff : 0,
-        monthlySurplus: diff > 0 ? diff : 0,
+        monthlyShortfall,
+        monthlySurplus,
         keyDrivers: pickKeyDrivers(p, totalAnnualNeed, annual),
         analysisAge,
       });
@@ -523,38 +543,65 @@ export function summarizeCountryStatus(
 ): CountryCardStatus {
   const own = results.filter((r) => r.countryId === countryId);
   const standard = own.find((r) => r.lifestyle === "standard");
-  const standardAchieved = standard?.status === "achieved";
-  const standardNear = standard?.status === "near";
+  const standardAchieved = !!standard?.achievedAtAnalysisAge;
+  const standardNear = standard?.status === "near" && !standardAchieved;
 
-  // Find tidligst opnåede niveau (mindste alder vinder; tie-break: Standard > Lean > Comfortable)
-  const achieved = own.filter((r) => r.achievedAge !== null) as (CountryFireResult & {
-    achievedAge: number;
-  })[];
-  if (achieved.length > 0) {
-    achieved.sort((a, b) => {
-      if (a.achievedAge !== b.achievedAge) return a.achievedAge - b.achievedAge;
-      return LIFESTYLE_PRIORITY.indexOf(a.lifestyle) - LIFESTYLE_PRIORITY.indexOf(b.lifestyle);
-    });
-    const best = achieved[0];
-    let label: string;
-    if (standardAchieved) {
-      label = `Standard opnået ved alder ${standard!.achievedAge}`;
-    } else {
-      label = `${lifestyleLabel(best.lifestyle)} opnået ved alder ${best.achievedAge} · Standard ikke opnået`;
-    }
+  // 1. Standard opnået ved analysealder → grøn
+  if (standardAchieved && standard) {
     return {
-      label,
-      tone: standardAchieved ? "achieved" : "near",
+      label: `Standard opnået ved alder ${standard.analysisAge}`,
+      tone: "achieved",
+      achievedLifestyle: "standard",
+      achievedAge: standard.analysisAge,
+      standardAchieved: true,
+      standardNear: false,
+    };
+  }
+
+  // 2. Andet niveau opnået ved analysealder (men Standard ikke) → gul
+  const achievedNow = own.filter((r) => r.achievedAtAnalysisAge);
+  if (achievedNow.length > 0) {
+    achievedNow.sort(
+      (a, b) => LIFESTYLE_PRIORITY.indexOf(a.lifestyle) - LIFESTYLE_PRIORITY.indexOf(b.lifestyle),
+    );
+    const best = achievedNow[0];
+    return {
+      label: `${lifestyleLabel(best.lifestyle)} opnået ved alder ${best.analysisAge} · Standard ikke opnået`,
+      tone: "near",
       achievedLifestyle: best.lifestyle,
-      achievedAge: best.achievedAge,
-      standardAchieved,
+      achievedAge: best.analysisAge,
+      standardAchieved: false,
       standardNear,
     };
   }
 
-  if (standardNear) {
+  // 3. Ikke opnået ved analysealder, men Standard opnås senere i projection → gul
+  if (standard?.earliestAchievedAge != null && standard.earliestAchievedAge > standard.analysisAge) {
     return {
-      label: "Tæt på Standard",
+      label: `Ikke opnået ved alder ${standard.analysisAge} · først ved ${standard.earliestAchievedAge}`,
+      tone: "near",
+      achievedLifestyle: null,
+      achievedAge: standard.earliestAchievedAge,
+      standardAchieved: false,
+      standardNear: false,
+    };
+  }
+
+  // 4. Edge: Standard var opnået tidligere, men ikke ved analysealder
+  if (standard?.earliestAchievedAge != null && standard.earliestAchievedAge < standard.analysisAge) {
+    return {
+      label: `Var opnået ved alder ${standard.earliestAchievedAge} · ikke ved alder ${standard.analysisAge}`,
+      tone: "near",
+      achievedLifestyle: null,
+      achievedAge: standard.earliestAchievedAge,
+      standardAchieved: false,
+      standardNear: false,
+    };
+  }
+
+  if (standardNear && standard) {
+    return {
+      label: `Tæt på Standard (alder ${standard.analysisAge})`,
       tone: "near",
       achievedLifestyle: null,
       achievedAge: null,
@@ -570,6 +617,32 @@ export function summarizeCountryStatus(
     standardAchieved: false,
     standardNear: false,
   };
+}
+
+/**
+ * Beskriv status for ét konkret resultat (land + livsstil) baseret på
+ * analysealder. Adskiller eksplicit "opnået NU ved analysealder" fra
+ * "først opnået senere i fremskrivningen".
+ */
+export function describeStatusAtAnalysisAge(
+  r: CountryFireResult,
+): { label: string; tone: "achieved" | "near" | "not_achieved" } {
+  if (r.achievedAtAnalysisAge) {
+    return { label: `Opnået ved alder ${r.analysisAge}`, tone: "achieved" };
+  }
+  if (r.earliestAchievedAge != null && r.earliestAchievedAge > r.analysisAge) {
+    return {
+      label: `Ikke opnået ved alder ${r.analysisAge} · først ved ${r.earliestAchievedAge}`,
+      tone: "near",
+    };
+  }
+  if (r.earliestAchievedAge != null && r.earliestAchievedAge < r.analysisAge) {
+    return {
+      label: `Var opnået ved alder ${r.earliestAchievedAge} · ikke ved alder ${r.analysisAge}`,
+      tone: "near",
+    };
+  }
+  return { label: "Ikke opnået i projectionen", tone: "not_achieved" };
 }
 
 export function lifestyleLabel(l: CountryLifestyle): string {
