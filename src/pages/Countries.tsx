@@ -5,10 +5,10 @@ import { FIRE_DEFAULTS, computeFireAnalysis } from "@/lib/finance/fire";
 import {
   computeCountryFireResults,
   describeAnalysisMode,
+  describeStatusAtAnalysisAge,
   formatWithdrawalRatePct,
   lifestyleLabel,
   resolveAnalysisAge,
-  statusLabel,
   summarizeCountryStatus,
   type CountryAnalysisReferenceMode,
   type CountryFireResult,
