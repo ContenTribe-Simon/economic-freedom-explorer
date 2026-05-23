@@ -101,7 +101,19 @@ export interface CountryFireResult {
   expectedCapitalAtStopAge: number;
   gap: number;
   achievedAge: number | null;
+  /**
+   * Status afspejler situationen ved den valgte analysealder — IKKE om niveauet
+   * opnås på et tidspunkt i projection. "achieved" kræver gap ≤ 0 ved analysealder.
+   */
   status: CountryFireStatus;
+  /** True hvis kapitalen ved analysealderen dækker hele kapitalbehovet. */
+  achievedAtAnalysisAge: boolean;
+  /** Kapitalmangel ved analysealderen (alias for `gap`, eksplicit navn). */
+  capitalGapAtAnalysisAge: number;
+  /** Manglende månedligt forbrug ved analysealder (alias for `monthlyShortfall`). */
+  monthlyShortfallAtAnalysisAge: number;
+  /** Overskydende månedligt forbrug ved analysealder (alias for `monthlySurplus`). */
+  monthlySurplusAtAnalysisAge: number;
   /** Brutto bæredygtigt udtræk: kapitalgrundlag × valgt udtræksrate / 12. Uafhængigt af land. */
   grossSustainableMonthlyAtReferenceAge: number;
   grossSustainableMonthlyAtStopAge: number;
