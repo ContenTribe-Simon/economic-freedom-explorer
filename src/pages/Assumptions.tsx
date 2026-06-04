@@ -88,14 +88,23 @@ export default function Assumptions() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="font-display text-xl font-semibold mb-4">Aktieindkomst & holding</h2>
+        <h2 className="font-display text-xl font-semibold mb-2">Personlig aktieindkomst & holding</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Disse satser bruges fælles for holdingudlodning og realiserede gevinster fra almindeligt frit depot.
+          Modellen lægger begge kilder i én årlig aktieindkomst-pulje og bruger 27/42 %-grænsen én gang pr. år.
+          ASK beskattes separat (17 % lagerbeskatning).
+        </p>
         <div className="grid md:grid-cols-3 gap-4">
           <PctField label="Sats lav" value={a.tax.shareLowRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareLowRate: v } }))} />
           <PctField label="Sats høj" value={a.tax.shareHighRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareHighRate: v } }))} />
           <NumberField label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} hint="2026: 79.400 kr (single)" />
           <PctField label="Selskabsskat (info)" value={a.tax.corporateRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, corporateRate: v } }))} />
         </div>
+        <p className="text-[11px] text-muted-foreground mt-3">
+          I denne version antager modellen, at holdingudlodning bruger aktieindkomstgrænsen før realiserede depotgevinster. Prioritering kan gøres konfigurerbar i en senere version.
+        </p>
       </Card>
+
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-2">Aktiesparekonto (ASK)</h2>
