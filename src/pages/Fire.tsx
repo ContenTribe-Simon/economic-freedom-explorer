@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { formatDKK, formatPct } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FireMilestoneMap } from "@/components/FireMilestoneMap";
 
 const TYPE_ORDER: FireType[] = ["coast", "lean", "standard", "fat", "barista"];
 
