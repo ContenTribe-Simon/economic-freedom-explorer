@@ -33,6 +33,8 @@ interface Balances {
   holding: number;
   buffer: number;
   debt: number;
+  /** ASK sub-bucket (0 hvis ASK ikke er aktiveret). Bevarer bagudkompatibilitet. */
+  ask: number;
 }
 
 function withdrawFromBucket(
@@ -41,11 +43,21 @@ function withdrawFromBucket(
   bal: Balances,
   a: Assumptions,
   pensionTaxRate: number,
+  onAskWithdraw?: (n: number) => void,
 ): { netCovered: number; gross: number; tax: number } {
   if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0 };
   if (bucket === "free") {
-    const take = Math.min(bal.free, netNeeded);
-    bal.free -= take;
+    // Træk først fra almindeligt depot, dernæst fra ASK (sub-bucket).
+    const fromDepot = Math.min(bal.free, netNeeded);
+    bal.free -= fromDepot;
+    let take = fromDepot;
+    let rem = netNeeded - fromDepot;
+    if (rem > 0 && bal.ask > 0) {
+      const fromAsk = Math.min(bal.ask, rem);
+      bal.ask -= fromAsk;
+      take += fromAsk;
+      onAskWithdraw?.(fromAsk);
+    }
     return { netCovered: take, gross: take, tax: 0 };
   }
   if (bucket === "holding") {
@@ -233,12 +245,31 @@ export function projectWithStopAge(
 
   const debts: DebtItem[] = (inp.debts ?? []).map((d) => ({ ...d }));
 
+  // ---- ASK (Aktiesparekonto) initialisering ----
+  // ASK er optional og defaulter til disabled — når disabled giver al logik
+  // præcis samme resultater som tidligere (bal.ask = 0).
+  const askInput = inp.free.ask;
+  const askActive = !!askInput?.enabled;
+  const askTaxRate = askInput?.taxRate ?? 0.17;
+  const askDepositLimit = askInput?.depositLimit ?? 174_200;
+  const totalFreeOpening = inp.free.balance;
+  // currentValue er "heraf ASK" — må ikke overstige samlet fri kapital.
+  const askInitialValue = askActive
+    ? Math.max(0, Math.min(askInput!.currentValue ?? 0, totalFreeOpening))
+    : 0;
+  let askCarryForward = askActive ? Math.max(0, askInput!.taxCreditCarryForward ?? 0) : 0;
+  // Indskudsrum for år 0 baseret på priorYearEndValue (fallback til currentValue).
+  let askPriorYearEnd = askActive
+    ? Math.max(0, askInput!.priorYearEndValue ?? askInitialValue)
+    : 0;
+
   const bal: Balances = {
-    free: inp.free.balance,
+    free: totalFreeOpening - askInitialValue,
     pension: inp.pension.balance,
     holding: inp.holding.balance,
     buffer: inp.free.cashBuffer ?? 0,
     debt: debts.filter((d) => (d.includeInNetWorth ?? d.impact !== "risk_only")).reduce((s, d) => s + (d?.balance ?? 0), 0),
+    ask: askInitialValue,
   };
 
   /** Persisterende effekt af one_time privat-gælds-events. */
@@ -249,7 +280,18 @@ export function projectWithStopAge(
   for (let i = 0; i < totalYears; i++) {
     const age = inp.person.currentAge + i;
     const calYear = startYear + i;
-    const opening = { ...bal };
+    // Opening eksponerer fri kapital som samlet sum (ask + depot) — bagudkompatibelt.
+    const openingFree = bal.free + bal.ask;
+    const opening = {
+      free: openingFree,
+      pension: bal.pension,
+      holding: bal.holding,
+      buffer: bal.buffer,
+      debt: bal.debt,
+    };
+    const askOpening = bal.ask;
+    let askContribYear = 0;
+    let askWithdrawYear = 0;
 
     const working = age < stopAge;
     const pt = inp.income.partTime;
@@ -433,10 +475,11 @@ export function projectWithStopAge(
     };
 
     const order = buildOrder();
+    const trackAskWithdraw = (n: number) => { askWithdrawYear += n; };
     const drainShortfall = (needed: number) => {
       for (const b of order) {
         if (needed <= 0) break;
-        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate);
+        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, trackAskWithdraw);
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
         if (b === "pension") {
@@ -460,6 +503,23 @@ export function projectWithStopAge(
       }
     };
 
+    // Allokering af planlagt fri opsparing — fyld evt. ASK først.
+    const allocateFreeContribution = (amount: number) => {
+      if (amount <= 0) return;
+      if (askActive && askInput!.autoFillFirst) {
+        const room = Math.max(0, askDepositLimit - askPriorYearEnd);
+        const toAsk = Math.min(amount, room);
+        if (toAsk > 0) {
+          bal.ask += toAsk;
+          askContribYear += toAsk;
+        }
+        const toDepot = amount - toAsk;
+        if (toDepot > 0) bal.free += toDepot;
+      } else {
+        bal.free += amount;
+      }
+    };
+
     let unallocatedCashflow = 0;
     const plannedActive = plannedStopAge === null || age < plannedStopAge;
     const rawPlanned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
@@ -470,16 +530,16 @@ export function projectWithStopAge(
       if (savingsLogic === "cashflow") {
         if (cashflow >= 0) {
           freeContribution = cashflow;
-          bal.free += freeContribution;
+          allocateFreeContribution(freeContribution);
         } else drainShortfall(-cashflow);
       } else if (savingsLogic === "planned") {
         freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
-        bal.free += freeContribution;
+        allocateFreeContribution(freeContribution);
         // Overskydende cashflow ud over planlagt opsparing investeres IKKE — vises som ikke-allokeret.
         unallocatedCashflow = Math.max(0, cashflow - freeContribution);
       } else {
         freeContribution = planned;
-        bal.free += freeContribution;
+        allocateFreeContribution(freeContribution);
         const net = cashflow - planned;
         if (net < 0) drainShortfall(-net);
         else unallocatedCashflow = net;
@@ -487,7 +547,7 @@ export function projectWithStopAge(
     } else {
       if (cashflow >= 0) {
         freeContribution = cashflow;
-        bal.free += freeContribution;
+        allocateFreeContribution(freeContribution);
       } else {
         drainShortfall(-cashflow);
       }
@@ -506,19 +566,50 @@ export function projectWithStopAge(
       incomeNet + withdrawals.free + withdrawals.pension + withdrawals.holding + withdrawals.buffer;
     const stillShort = Math.max(0, required - provided);
 
+    // ---- Vækst ----
+    // Almindeligt frit depot bevarer eksisterende sti (brutto realafkast).
+    const freeDepotGrowth = bal.free * a.realReturn.free;
+    bal.free += freeDepotGrowth;
+
+    // ASK: brutto afkast, fremført negativ skat modregnes, lagerskat fratrækkes ASK.
+    let askGrowthGross = 0;
+    let askTax = 0;
+    let askCarryUsed = 0;
+    if (askActive) {
+      askGrowthGross = bal.ask * a.realReturn.free;
+      if (askGrowthGross > 0) {
+        let taxable = askGrowthGross;
+        if (askCarryForward > 0) {
+          askCarryUsed = Math.min(askCarryForward, taxable);
+          taxable -= askCarryUsed;
+          askCarryForward -= askCarryUsed;
+        }
+        askTax = Math.max(0, taxable) * askTaxRate;
+      } else if (askGrowthGross < 0) {
+        // Negativt afkast — fremfør tabet til modregning i fremtidige positive afkast.
+        askCarryForward += -askGrowthGross;
+      }
+      bal.ask = Math.max(0, bal.ask + askGrowthGross - askTax);
+    }
+
     const growth = {
-      free: bal.free * a.realReturn.free,
+      free: freeDepotGrowth + (askActive ? askGrowthGross - askTax : 0),
       pension: bal.pension * a.realReturn.pension,
       holding: bal.holding * a.realReturn.holding,
     };
-    bal.free += growth.free;
     bal.pension += growth.pension;
     bal.holding += growth.holding;
 
     // Tilføj persisterende livsfase-gæld til årets udgående gæld (efter processDebts).
     bal.debt = bal.debt + lifeEventDebtBalance;
 
-    const closing = { ...bal };
+    const closing = {
+      free: bal.free + bal.ask,
+      pension: bal.pension,
+      holding: bal.holding,
+      buffer: bal.buffer,
+      debt: bal.debt,
+    };
     const netWorth = closing.free + closing.pension + closing.holding + closing.buffer - closing.debt;
     const totalHoldingNet = holdingPlanned.net + holdingExtra.net;
     const totalHoldingGross = holdingPlanned.gross + holdingExtra.gross;
@@ -564,6 +655,17 @@ export function projectWithStopAge(
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
         lifeEventEffects: lifeEventEffects ?? undefined,
+        ask: askActive ? {
+          opening: askOpening,
+          contribution: askContribYear,
+          growthGross: askGrowthGross,
+          tax: askTax,
+          carryForwardUsed: askCarryUsed,
+          carryForwardEnd: askCarryForward,
+          withdrawal: askWithdrawYear,
+          closing: bal.ask,
+          freeDepotClosing: bal.free,
+        } : undefined,
       },
       totalIncomeNet: incomeNet,
       netWorth,
@@ -571,6 +673,9 @@ export function projectWithStopAge(
       shortfallAmount: stillShort,
       monthlyGap: stillShort / 12,
     });
+
+    // Forbered næste år: ASK ultimo er grundlag for indskudsrum næste år.
+    if (askActive) askPriorYearEnd = bal.ask;
   }
 
   return years;

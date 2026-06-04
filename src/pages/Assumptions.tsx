@@ -98,6 +98,21 @@ export default function Assumptions() {
       </Card>
 
       <Card className="p-6">
+        <h2 className="font-display text-xl font-semibold mb-2">Aktiesparekonto (ASK)</h2>
+        <p className="text-sm text-muted-foreground mb-3">
+          ASK beskattes særskilt efter lagerprincippet. Almindeligt frit depot bruger fortsat modellens eksisterende fri kapital-logik.
+        </p>
+        <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
+          <li>ASK-skat: <strong>17 %</strong> (lagerbeskatning).</li>
+          <li>Indskudsloft: <strong>174.200 kr.</strong> (kan tilpasses pr. scenarie).</li>
+          <li>Skatten fratrækkes ASK-værdien i modellen.</li>
+          <li>Negativt afkast giver ingen skat — tabet fremføres og modregnes i senere gevinster.</li>
+          <li>ASK aktiveres pr. scenarie under <em>Variabler → Aktiesparekonto</em>.</li>
+        </ul>
+      </Card>
+
+
+      <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Privat pension</h2>
         <p className="text-sm text-muted-foreground">
           Skat på privat pension styres lokalt på hvert pensionsspor (ratepension og livsvarig pension/livrente) under <em>Variabler</em>. Der findes ingen global pensionsskattesats.

@@ -27,6 +27,33 @@ export interface FreeBucketInputs {
   contributionStopRule?: FreeContributionStopRule;
   /** Anvendt når contributionStopRule = "customAge". */
   contributionStopAge?: number;
+  /** Optional ASK (Aktiesparekonto) sub-bucket under fri kapital. Default undefined / disabled. */
+  ask?: AskInputs;
+}
+
+/**
+ * Aktiesparekonto (ASK) — optional sub-bucket under fri kapital.
+ *
+ * Når enabled=false (default) er ASK fuldstændig inaktiv og projection
+ * giver samme resultater som tidligere. ASK-værdien tæller som en del af
+ * den eksisterende fri kapital — ikke et beløb oveni.
+ */
+export interface AskInputs {
+  enabled: boolean;
+  /** Nuværende ASK-værdi — tæller som "heraf ASK" af fri kapital. */
+  currentValue: number;
+  /** ASK-værdi pr. seneste årsskifte (bruges til indskudsrum). */
+  priorYearEndValue?: number;
+  /** Indskudsloft (kr.). Default 174.200. */
+  depositLimit: number;
+  /** ASK-skat (lagerbeskatning). Default 0.17. */
+  taxRate: number;
+  /** Fyld ASK før almindeligt depot ved planlagt opsparing. */
+  autoFillFirst: boolean;
+  /** Fremført negativ ASK-skat (positivt tal = kr. tab der kan modregnes). */
+  taxCreditCarryForward: number;
+  /** Hvordan ASK-skat betales — i denne version altid fratrukket ASK. */
+  taxPaymentMode: "deductFromASK";
 }
 
 export type LifeAnnuityMode = "gross" | "net";
@@ -317,6 +344,30 @@ export interface YearFlows {
   holdingFinancingShortfall: number;
   /** Effekt fra aktive livsfaser i året (kun udfyldt når der er aktive events). */
   lifeEventEffects?: LifeEventYearEffect;
+  /** Detaljeret ASK-bevægelse for året (kun udfyldt når ASK er aktiveret). */
+  ask?: AskYearAudit;
+}
+
+/** Audit-detaljer for ASK i et givent år. */
+export interface AskYearAudit {
+  /** Primo ASK-værdi. */
+  opening: number;
+  /** Indskud til ASK fra fri opsparing. */
+  contribution: number;
+  /** ASK-afkast før skat. */
+  growthGross: number;
+  /** ASK-skat (positivt = betalt, fratrukket ASK). */
+  tax: number;
+  /** Brugt af fremført negativ skat i år. */
+  carryForwardUsed: number;
+  /** Fremført negativ skat ultimo. */
+  carryForwardEnd: number;
+  /** Udtræk fra ASK (efter depot er drænet). */
+  withdrawal: number;
+  /** Ultimo ASK. */
+  closing: number;
+  /** Ultimo almindeligt frit depot. */
+  freeDepotClosing: number;
 }
 
 /** Aggregeret effekt af aktive livsfaser i et givent år. */

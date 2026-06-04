@@ -267,6 +267,9 @@ export default function Inputs() {
         )}
       </Section>
 
+      <AskSection inp={inp} set={set} />
+
+
       <Section title="Kontant buffer" description="Tæller med i nettoformue, men investeres ikke og får intet afkast.">
         <NumField label="Buffer-saldo" value={inp.free.cashBuffer ?? 0} onChange={(v) => set("free", { ...inp.free, cashBuffer: v })} suffix="kr" step={5000} />
         <div className="space-y-1.5 flex flex-col justify-end">
@@ -713,3 +716,97 @@ export default function Inputs() {
   );
 }
 
+
+function AskSection({ inp, set }: { inp: ScenarioInputs; set: <K extends keyof ScenarioInputs>(k: K, v: ScenarioInputs[K]) => void }) {
+  const ask = inp.free.ask;
+  const enabled = !!ask?.enabled;
+  const totalFree = inp.free.balance ?? 0;
+  const currentValue = ask?.currentValue ?? 0;
+  const depot = Math.max(0, totalFree - Math.min(currentValue, totalFree));
+  const overflow = currentValue > totalFree;
+
+  const updateAsk = (patch: Partial<NonNullable<typeof ask>>) => {
+    const base = ask ?? {
+      enabled: false,
+      currentValue: 0,
+      priorYearEndValue: 0,
+      depositLimit: 174_200,
+      taxRate: 0.17,
+      autoFillFirst: false,
+      taxCreditCarryForward: 0,
+      taxPaymentMode: "deductFromASK" as const,
+    };
+    set("free", { ...inp.free, ask: { ...base, ...patch } });
+  };
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-display text-xl font-semibold">Aktiesparekonto (ASK)</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            ASK indgår som en del af fri kapital. Beløbet her skal derfor ikke lægges oven i fri kapital, hvis det allerede er inkluderet.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40 shrink-0">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => updateAsk({ enabled: e.target.checked })}
+          />
+          <span className="text-sm">Brug ASK i modellen</span>
+        </label>
+      </div>
+      {enabled && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <NumField
+            label="Nuværende ASK-værdi (heraf ASK)"
+            value={currentValue}
+            onChange={(v) => updateAsk({ currentValue: v })}
+            suffix="kr"
+            step={1000}
+            hint={`Almindeligt frit depot beregnet: ${depot.toLocaleString("da-DK")} kr.`}
+          />
+          <NumField
+            label="ASK-værdi ved sidste årsskifte"
+            value={ask?.priorYearEndValue ?? 0}
+            onChange={(v) => updateAsk({ priorYearEndValue: v })}
+            suffix="kr"
+            step={1000}
+            hint="Bruges til at beregne årets indskudsrum."
+          />
+          <NumField
+            label="Indskudsloft"
+            value={ask?.depositLimit ?? 174_200}
+            onChange={(v) => updateAsk({ depositLimit: v })}
+            suffix="kr"
+            step={100}
+          />
+          <NumField
+            label="Fremført negativ ASK-skat"
+            value={ask?.taxCreditCarryForward ?? 0}
+            onChange={(v) => updateAsk({ taxCreditCarryForward: v })}
+            suffix="kr"
+            step={500}
+            hint="Tab fra tidligere år der kan modregnes i fremtidige gevinster."
+          />
+          <div className="md:col-span-2">
+            <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
+              <input
+                type="checkbox"
+                checked={ask?.autoFillFirst ?? false}
+                onChange={(e) => updateAsk({ autoFillFirst: e.target.checked })}
+              />
+              <span className="text-sm">Fyld ASK før almindeligt depot ved planlagt opsparing</span>
+            </label>
+          </div>
+          {overflow && (
+            <div className="md:col-span-2 p-3 rounded-md border border-destructive/40 bg-destructive/10 text-sm text-destructive">
+              ASK-værdi ({currentValue.toLocaleString("da-DK")} kr.) er højere end samlet fri kapital ({totalFree.toLocaleString("da-DK")} kr.). Modellen begrænser ASK til den samlede fri kapital.
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
