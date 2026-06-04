@@ -738,7 +738,19 @@ export function projectWithStopAge(
 
     // ---- Livsfaser: engangs-effekter på fri kapital og privat gæld ----
     if (lifeEventEffects) {
-      bal.free = Math.max(0, bal.free + lifeEventEffects.freeCapitalDelta);
+      const lvDelta = lifeEventEffects.freeCapitalDelta;
+      if (depotTaxState && lvDelta !== 0) {
+        if (lvDelta > 0) {
+          // Tilskud — behandles som indskud til cost basis
+          depotTaxState.costBasis += lvDelta;
+          depotContributionYear += lvDelta;
+        } else if (bal.free > 0) {
+          // Negativt one-time uttræk — reducer kostpris proportionalt (ingen skattepåvirkning i v1)
+          const ratio = Math.min(1, -lvDelta / bal.free);
+          depotTaxState.costBasis = Math.max(0, depotTaxState.costBasis * (1 - ratio));
+        }
+      }
+      bal.free = Math.max(0, bal.free + lvDelta);
       lifeEventDebtBalance = Math.max(0, lifeEventDebtBalance + lifeEventEffects.debtDelta);
     }
 
@@ -751,6 +763,14 @@ export function projectWithStopAge(
     // Almindeligt frit depot bevarer eksisterende sti (brutto realafkast).
     const freeDepotGrowth = bal.free * a.realReturn.free;
     bal.free += freeDepotGrowth;
+
+    // Årlig aktieindkomstskat af positivt depot-afkast (kun annualShareIncomeTax).
+    let annualDepotTax = 0;
+    if (depotTaxState && depotTaxMethod === "annualShareIncomeTax" && freeDepotGrowth > 0) {
+      const r = applyShareIncomeTax(depotTaxState.ctx, freeDepotGrowth);
+      annualDepotTax = r.tax;
+      bal.free = Math.max(0, bal.free - annualDepotTax);
+    }
 
     // ASK: brutto afkast, fremført negativ skat modregnes, lagerskat fratrækkes ASK.
     let askGrowthGross = 0;
@@ -767,19 +787,22 @@ export function projectWithStopAge(
         }
         askTax = Math.max(0, taxable) * askTaxRate;
       } else if (askGrowthGross < 0) {
-        // Negativt afkast — fremfør tabet til modregning i fremtidige positive afkast.
         askCarryForward += -askGrowthGross;
       }
       bal.ask = Math.max(0, bal.ask + askGrowthGross - askTax);
     }
 
     const growth = {
-      free: freeDepotGrowth + (askActive ? askGrowthGross - askTax : 0),
+      free: freeDepotGrowth - annualDepotTax + (askActive ? askGrowthGross - askTax : 0),
       pension: bal.pension * a.realReturn.pension,
       holding: bal.holding * a.realReturn.holding,
     };
     bal.pension += growth.pension;
     bal.holding += growth.holding;
+
+    // Synkronisér depot-kostpris-state tilbage til persistent variable for næste år.
+    if (depotTaxState) depotCostBasis = depotTaxState.costBasis;
+
 
     // Tilføj persisterende livsfase-gæld til årets udgående gæld (efter processDebts).
     bal.debt = bal.debt + lifeEventDebtBalance;
