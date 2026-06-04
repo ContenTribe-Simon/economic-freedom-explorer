@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { formatDKK, formatPct } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FireMilestoneMap } from "@/components/FireMilestoneMap";
 
 const TYPE_ORDER: FireType[] = ["coast", "lean", "standard", "fat", "barista"];
 
@@ -56,6 +57,12 @@ export default function FirePage() {
           Resultaterne er indikative benchmarks — ikke finansiel rådgivning.
         </p>
       </header>
+      <FireMilestoneMap
+        analysis={analysis}
+        currentAge={scenario.inputs.person.currentAge}
+        plannedStopAge={scenario.inputs.stopAge}
+        fullPensionAge={scenario.inputs.fullRetireAge}
+      />
 
       {/* ---- Konklusion ---- */}
       <Card className="p-5" data-testid="fire-summary">
