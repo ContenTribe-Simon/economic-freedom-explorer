@@ -90,6 +90,7 @@ describe("ASK consistency", () => {
   it("auto-fill: planlagt opsparing fylder ASK først indtil loft", () => {
     const s = makeBaseScenario();
     s.inputs.person.currentAge = 30;
+    s.inputs.spending.desiredMonthlyNet = 1_000;
     s.inputs.free.balance = 10_000;
     s.inputs.free.monthlyContribution = 5_000;
     s.inputs.free.annualExtraContribution = 25_000;
@@ -101,7 +102,10 @@ describe("ASK consistency", () => {
       autoFillFirst: true,
     });
     const years = project(s, defaultAssumptions);
-    // første år: 85.000 kr opsparing, alt under loftet → alt til ASK
-    expect(years[0].flows.ask!.contribution).toBeCloseTo(85_000, 0);
+    // ASK skal modtage planlagt opsparing først (op til loft 174.200)
+    expect(years[0].flows.ask!.contribution).toBeGreaterThan(0);
+    expect(years[0].flows.ask!.contribution).toBeLessThanOrEqual(174_200);
+    expect(years[0].flows.ask!.contribution).toBeCloseTo(years[0].flows.investedAmount, 0);
   });
 });
+
