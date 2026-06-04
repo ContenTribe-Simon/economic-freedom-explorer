@@ -934,6 +934,17 @@ export function projectWithStopAge(
           const totalShareIncome = ctx.used;
           const taxedAtLow = Math.min(totalShareIncome, ctx.threshold);
           const taxedAtHigh = Math.max(0, totalShareIncome - ctx.threshold);
+          const holdingTotalGross = holdingPlanned.gross + holdingExtra.gross;
+          const holdingTotalTax = holdingPlanned.tax + holdingExtra.tax;
+          const fundedFromHolding = holdingPlanned.net + holdingExtra.net;
+          const fundedFromDepot = depotTaxState.grossSaleAcc - depotTaxState.saleTaxAcc;
+          const taxAllocatedHolding = holdingTotalGross > 0
+            ? (ctx.taxLow + ctx.taxHigh) * (holdingTotalGross / Math.max(1e-9, holdingTotalGross + realizedDepotGain + annualDepotTaxable))
+            : 0;
+          const taxAllocatedDepot = (ctx.taxLow + ctx.taxHigh) - taxAllocatedHolding;
+          // Fald tilbage til faktiske skattetal når muligt (mere præcist end pro-rata):
+          const taxAllocatedHoldingExact = Math.min(holdingTotalTax, ctx.taxLow + ctx.taxHigh);
+          const taxAllocatedDepotExact = Math.max(0, ctx.taxLow + ctx.taxHigh - taxAllocatedHoldingExact);
           return {
             threshold: ctx.threshold,
             lowRate: ctx.lowRate,
@@ -950,6 +961,11 @@ export function projectWithStopAge(
             taxTotal: ctx.taxLow + ctx.taxHigh,
             thresholdUsedByHolding,
             thresholdRemainingForDepot,
+            fundingStrategy,
+            fundedFromHolding,
+            fundedFromDepot,
+            taxAllocatedHolding: taxAllocatedHoldingExact || taxAllocatedHolding,
+            taxAllocatedDepot: taxAllocatedDepotExact || taxAllocatedDepot,
           };
         })() : undefined,
         depot: depotTaxState ? (() => {
