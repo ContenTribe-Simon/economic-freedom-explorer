@@ -29,7 +29,27 @@ export interface FreeBucketInputs {
   contributionStopAge?: number;
   /** Optional ASK (Aktiesparekonto) sub-bucket under fri kapital. Default undefined / disabled. */
   ask?: AskInputs;
+  /** Optional skattebehandling af almindeligt frit depot. Default undefined ⇒ legacy. */
+  depotTax?: DepotTaxInputs;
 }
+
+/**
+ * Skattebehandling af almindeligt frit depot (ekskl. ASK).
+ *  - "legacy": ingen eksplicit skat — gammel modeladfærd (default).
+ *  - "realizationSimple": kun gevinstandelen ved salg beskattes som aktieindkomst.
+ *  - "annualShareIncomeTax": positivt årligt depotafkast beskattes løbende.
+ * ASK indgår aldrig i denne pulje.
+ */
+export type DepotTaxMethod = "legacy" | "realizationSimple" | "annualShareIncomeTax";
+
+export interface DepotTaxInputs {
+  enabled: boolean;
+  method: DepotTaxMethod;
+  /** Kostpris ved start. null ⇒ sættes lig depot markedsværdi (ingen latent gevinst). */
+  costBasis: number | null;
+  showDeferredTax: boolean;
+}
+
 
 /**
  * Aktiesparekonto (ASK) — optional sub-bucket under fri kapital.
