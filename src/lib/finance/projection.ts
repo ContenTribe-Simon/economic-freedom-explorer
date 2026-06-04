@@ -245,12 +245,31 @@ export function projectWithStopAge(
 
   const debts: DebtItem[] = (inp.debts ?? []).map((d) => ({ ...d }));
 
+  // ---- ASK (Aktiesparekonto) initialisering ----
+  // ASK er optional og defaulter til disabled — når disabled giver al logik
+  // præcis samme resultater som tidligere (bal.ask = 0).
+  const askInput = inp.free.ask;
+  const askActive = !!askInput?.enabled;
+  const askTaxRate = askInput?.taxRate ?? 0.17;
+  const askDepositLimit = askInput?.depositLimit ?? 174_200;
+  const totalFreeOpening = inp.free.balance;
+  // currentValue er "heraf ASK" — må ikke overstige samlet fri kapital.
+  const askInitialValue = askActive
+    ? Math.max(0, Math.min(askInput!.currentValue ?? 0, totalFreeOpening))
+    : 0;
+  let askCarryForward = askActive ? Math.max(0, askInput!.taxCreditCarryForward ?? 0) : 0;
+  // Indskudsrum for år 0 baseret på priorYearEndValue (fallback til currentValue).
+  let askPriorYearEnd = askActive
+    ? Math.max(0, askInput!.priorYearEndValue ?? askInitialValue)
+    : 0;
+
   const bal: Balances = {
-    free: inp.free.balance,
+    free: totalFreeOpening - askInitialValue,
     pension: inp.pension.balance,
     holding: inp.holding.balance,
     buffer: inp.free.cashBuffer ?? 0,
     debt: debts.filter((d) => (d.includeInNetWorth ?? d.impact !== "risk_only")).reduce((s, d) => s + (d?.balance ?? 0), 0),
+    ask: askInitialValue,
   };
 
   /** Persisterende effekt af one_time privat-gælds-events. */
@@ -261,7 +280,18 @@ export function projectWithStopAge(
   for (let i = 0; i < totalYears; i++) {
     const age = inp.person.currentAge + i;
     const calYear = startYear + i;
-    const opening = { ...bal };
+    // Opening eksponerer fri kapital som samlet sum (ask + depot) — bagudkompatibelt.
+    const openingFree = bal.free + bal.ask;
+    const opening = {
+      free: openingFree,
+      pension: bal.pension,
+      holding: bal.holding,
+      buffer: bal.buffer,
+      debt: bal.debt,
+    };
+    const askOpening = bal.ask;
+    let askContribYear = 0;
+    let askWithdrawYear = 0;
 
     const working = age < stopAge;
     const pt = inp.income.partTime;
