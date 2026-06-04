@@ -122,9 +122,25 @@ export default function Assumptions() {
 
         </ul>
       </Card>
+      <Card className="p-6">
+        <h2 className="font-display text-xl font-semibold mb-2">Almindeligt frit depot</h2>
+        <p className="text-sm text-muted-foreground mb-3">
+          Modellen bruger en forsimplet aktieindkomstberegning. Den laver ikke fuld dansk skatteberegning med
+          individuelle positioner, udbytter, tab, fondstyper, ægtefælleoverførsel eller udenlandsk kildeskat
+          i denne version.
+        </p>
+        <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
+          <li><strong>Legacy</strong> bevarer gammel modeladfærd uden eksplicit skat på depotet (default).</li>
+          <li><strong>Simpel realisationsskat</strong> beskatter kun gevinstandelen ved salg fra depotet og bruger samme 27/42 %-grænse som holding.</li>
+          <li><strong>Simpel årlig aktieindkomstskat</strong> beskatter positivt depotafkast årligt — udtræk udløser ingen yderligere skat.</li>
+          <li>Vælges pr. scenarie under <em>Variabler → Almindeligt frit depot</em>.</li>
+          <li>ASK indgår aldrig i denne pulje — ASK fortsætter med 17 % lagerbeskatning.</li>
+        </ul>
+      </Card>
 
 
       <Card className="p-6">
+
         <h2 className="font-display text-xl font-semibold mb-4">Privat pension</h2>
         <p className="text-sm text-muted-foreground">
           Skat på privat pension styres lokalt på hvert pensionsspor (ratepension og livsvarig pension/livrente) under <em>Variabler</em>. Der findes ingen global pensionsskattesats.
