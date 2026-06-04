@@ -173,6 +173,22 @@ function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: Scen
                   </div>
                 )}
                 <Row label="Faktisk investeret i fri kapital" value={f.investedAmount} strong />
+                {f.ask && (
+                  <div data-testid="audit-ask-allocation">
+                    <Row label="Heraf til ASK" value={f.ask.contribution} indent />
+                    <Row label="Heraf til almindeligt frit depot" value={Math.max(0, f.investedAmount - f.ask.contribution)} indent />
+                    {!f.ask.autoFillFirst && (
+                      <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                        ASK auto-fill er slået fra — opsparing går til almindeligt depot.
+                      </div>
+                    )}
+                    {f.ask.autoFillFirst && f.investedAmount > 0 && f.ask.contribution < f.investedAmount && (
+                      <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                        ASK-indskudsloft nået — resten går til almindeligt depot.
+                      </div>
+                    )}
+                  </div>
+                )}
                 {f.unallocatedCashflow > 0.5 && (
                   <Row label="Ikke-allokeret cashflow" value={f.unallocatedCashflow} indent />
                 )}
