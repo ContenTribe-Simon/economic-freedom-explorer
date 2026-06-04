@@ -408,6 +408,8 @@ export function projectWithStopAge(
   const depotTaxInput = inp.free.depotTax;
   const depotTaxActive = !!depotTaxInput?.enabled && depotTaxInput?.method !== "legacy";
   const depotTaxMethod = depotTaxInput?.method ?? "legacy";
+  const fundingStrategy: ShareIncomeFundingStrategy =
+    depotTaxInput?.shareIncomeFundingStrategy ?? "holdingFirst";
   const depotInitialValue = totalFreeOpening - askInitialValue;
   // Kostpris: null ⇒ markedsværdi (ingen latent gevinst).
   let depotCostBasis = depotTaxActive
