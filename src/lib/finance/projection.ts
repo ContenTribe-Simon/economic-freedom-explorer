@@ -676,10 +676,6 @@ export function projectWithStopAge(
 
     // Forbered næste år: ASK ultimo er grundlag for indskudsrum næste år.
     if (askActive) askPriorYearEnd = bal.ask;
-      shortfall: stillShort > 0.5,
-      shortfallAmount: stillShort,
-      monthlyGap: stillShort / 12,
-    });
   }
 
   return years;
