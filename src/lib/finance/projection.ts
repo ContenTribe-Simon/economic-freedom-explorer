@@ -688,11 +688,18 @@ export function projectWithStopAge(
           askContribYear += toAsk;
         }
         const toDepot = amount - toAsk;
-        if (toDepot > 0) bal.free += toDepot;
+        if (toDepot > 0) {
+          bal.free += toDepot;
+          depotContributionYear += toDepot;
+          if (depotTaxState) depotTaxState.costBasis += toDepot;
+        }
       } else {
         bal.free += amount;
+        depotContributionYear += amount;
+        if (depotTaxState) depotTaxState.costBasis += amount;
       }
     };
+
 
     let unallocatedCashflow = 0;
     const plannedActive = plannedStopAge === null || age < plannedStopAge;
