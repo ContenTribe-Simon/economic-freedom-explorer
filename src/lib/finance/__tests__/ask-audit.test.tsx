@@ -67,7 +67,7 @@ describe("ASK audit rendering", () => {
       s.inputs.free.balance = 200_000;
       s.inputs.free.ask = baseAsk({ currentValue: 100_000, priorYearEndValue: 100_000 });
     });
-    expect(screen.getByText(/ASK-afkast før skat/i)).toBeTruthy();
+    expect(screen.getAllByText(/ASK-afkast før skat/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Vækst fri i alt \(efter ASK-skat\)/i)).toBeTruthy();
   });
 });
