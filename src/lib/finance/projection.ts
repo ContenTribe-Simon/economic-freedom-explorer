@@ -46,13 +46,15 @@ interface Balances {
 
 /**
  * Depot-skat state der opdateres in-place ved salg fra almindeligt depot.
- * Bruges kun når depotTax.method = "realizationSimple". For andre metoder
- * (legacy / annual) sættes denne til undefined og udtræk sker uden gross-up.
+ * Eksisterer kun når depotTax er aktiv (ctx + accumulators bruges også for
+ * annualShareIncomeTax — realization-gross-up er gated af realizationActive).
  */
 interface DepotTaxState {
   ctx: ShareIncomeCtx;
   /** Skattemæssig kostpris for almindeligt depot. */
   costBasis: number;
+  /** Aktivér gross-up ved depotudtræk (kun realizationSimple). */
+  realizationActive: boolean;
   /** Akkumuleret brutto salg i året (audit). */
   grossSaleAcc: number;
   /** Akkumuleret realiseret gevinst i året (audit). */
@@ -62,6 +64,7 @@ interface DepotTaxState {
   /** Akkumuleret reduktion af kostpris (audit). */
   costBasisReductionAcc: number;
 }
+
 
 function withdrawFromBucket(
   bucket: Bucket,
