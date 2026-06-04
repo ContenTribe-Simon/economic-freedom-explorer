@@ -368,6 +368,12 @@ export interface AskYearAudit {
   closing: number;
   /** Ultimo almindeligt frit depot. */
   freeDepotClosing: number;
+  /** Årets indskudsloft (depositLimit fra konfigurationen). */
+  depositLimit: number;
+  /** Tilgængeligt indskudsrum ved årets start (limit - priorYearEnd). */
+  depositRoom: number;
+  /** Indikator for om auto-fill (autoFillFirst) var aktivt i året. */
+  autoFillFirst: boolean;
 }
 
 /** Aggregeret effekt af aktive livsfaser i et givent år. */
