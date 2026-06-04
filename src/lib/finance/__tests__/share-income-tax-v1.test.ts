@@ -40,9 +40,18 @@ describe("Personlig aktieindkomst v1", () => {
   describe("B. Holding-only regression", () => {
     it("80.000 brutto holding ved 27 % giver 21.600 skat og 58.400 netto (uden depot-skat)", () => {
       const ctx = newShareIncomeCtx(defaultAssumptions.tax);
+      // 80.000 > tærskel (79.400). Forventet: 79.400*0,27 + 600*0,42 = 21.690
       const r = applyShareIncomeTax(ctx, 80_000);
-      expect(r.tax).toBeCloseTo(80_000 * 0.27, 2);
-      expect(r.net).toBeCloseTo(80_000 * 0.73, 2);
+      expect(r.tax).toBeCloseTo(79_400 * 0.27 + 600 * 0.42, 2);
+      expect(r.net).toBeCloseTo(80_000 - r.tax, 2);
+    });
+
+    it("holding 70.000 inden for tærsklen ⇒ 27 % flat", () => {
+      const ctx = newShareIncomeCtx(defaultAssumptions.tax);
+      const r = applyShareIncomeTax(ctx, 70_000);
+      expect(r.tax).toBeCloseTo(70_000 * 0.27, 2);
+      expect(r.net).toBeCloseTo(70_000 * 0.73, 2);
+
     });
   });
 
