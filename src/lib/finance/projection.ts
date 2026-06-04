@@ -876,6 +876,65 @@ export function projectWithStopAge(
           depositRoom: Math.max(0, askDepositLimit - askPriorYearEnd),
           autoFillFirst: !!askInput!.autoFillFirst,
         } : undefined,
+        shareIncome: depotTaxState ? (() => {
+          const ctx = depotTaxState.ctx;
+          const holdingGrossTotal = holdingPlanned.gross + holdingExtra.gross;
+          const thresholdUsedByHolding = Math.min(holdingGrossTotal, ctx.threshold);
+          const thresholdRemainingForDepot = Math.max(0, ctx.threshold - thresholdUsedByHolding);
+          const realizedDepotGain = depotTaxState.realizedGainAcc;
+          const annualDepotTaxable = depotTaxMethod === "annualShareIncomeTax" ? Math.max(0, freeDepotGrowth) : 0;
+          const totalShareIncome = ctx.used;
+          const taxedAtLow = Math.min(totalShareIncome, ctx.threshold);
+          const taxedAtHigh = Math.max(0, totalShareIncome - ctx.threshold);
+          return {
+            threshold: ctx.threshold,
+            lowRate: ctx.lowRate,
+            highRate: ctx.highRate,
+            holdingGross: holdingPlanned.gross,
+            extraHoldingGross: holdingExtra.gross,
+            realizedDepotGain,
+            annualDepotTaxable,
+            totalShareIncome,
+            taxedAtLow,
+            taxedAtHigh,
+            taxLow: ctx.taxLow,
+            taxHigh: ctx.taxHigh,
+            taxTotal: ctx.taxLow + ctx.taxHigh,
+            thresholdUsedByHolding,
+            thresholdRemainingForDepot,
+          };
+        })() : undefined,
+        depot: depotTaxState ? (() => {
+          const opening = depotPrimo;
+          const costBasisOpening = depotCostBasisPrimo;
+          const unrealizedGainOpening = Math.max(0, opening - costBasisOpening);
+          const effRate = ctxEffectiveRate(depotTaxState.ctx);
+          const deferredTaxOpening = unrealizedGainOpening * effRate;
+          const closing = bal.free;
+          const costBasisClosing = depotTaxState.costBasis;
+          const unrealizedGainClosing = Math.max(0, closing - costBasisClosing);
+          const deferredTaxClosing = unrealizedGainClosing * effRate;
+          return {
+            method: depotTaxMethod,
+            opening,
+            costBasisOpening,
+            unrealizedGainOpening,
+            deferredTaxOpening,
+            contribution: depotContributionYear,
+            growthGross: freeDepotGrowth,
+            annualTax: annualDepotTax,
+            grossSale: depotTaxState.grossSaleAcc,
+            realizedGain: depotTaxState.realizedGainAcc,
+            saleTax: depotTaxState.saleTaxAcc,
+            netToCashflow: depotTaxState.grossSaleAcc - depotTaxState.saleTaxAcc,
+            costBasisReduction: depotTaxState.costBasisReductionAcc,
+            closing,
+            costBasisClosing,
+            unrealizedGainClosing,
+            deferredTaxClosing,
+          };
+        })() : undefined,
+
       },
       totalIncomeNet: incomeNet,
       netWorth,
