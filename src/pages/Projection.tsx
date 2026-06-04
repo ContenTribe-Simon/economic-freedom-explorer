@@ -305,6 +305,25 @@ function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: Scen
           </section>
         )}
 
+        {f.ask && (
+          <section data-testid="audit-ask">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Aktiesparekonto (ASK)</div>
+            <Row label="ASK primo" value={f.ask.opening} indent />
+            <Row label="Almindeligt frit depot primo" value={y.opening.free - f.ask.opening} indent />
+            <Row label="ASK-indskud" value={f.ask.contribution} indent />
+            <Row label="Indskudsrum anvendt" value={f.ask.contribution} indent />
+            <Row label="Resterende indskudsrum" value={Math.max(0, f.ask.depositRoom - f.ask.contribution)} indent />
+            <Row label="ASK-afkast før skat" value={f.ask.growthGross} indent />
+            <Row label="ASK-skat" value={-f.ask.tax} indent />
+            <Row label="Brugt af fremført negativ skat" value={f.ask.carryForwardUsed} indent />
+            <Row label="Fremført negativ skat (ultimo)" value={f.ask.carryForwardEnd} indent />
+            <Row label="ASK-udtræk" value={-f.ask.withdrawal} indent />
+            <Row label="ASK ultimo" value={f.ask.closing} strong />
+            <Row label="Almindeligt frit depot ultimo" value={f.ask.freeDepotClosing} indent />
+            <Row label="Samlet fri kapital ultimo (ASK + depot)" value={f.ask.closing + f.ask.freeDepotClosing} strong />
+          </section>
+        )}
+
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Udgående saldi</div>
           <Row label="Fri kapital (slut)" value={y.closing.free} strong />
