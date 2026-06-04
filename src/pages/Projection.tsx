@@ -312,17 +312,30 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
             <Row label="Almindeligt frit depot primo" value={y.opening.free - f.ask.opening} indent />
             <Row label="ASK-indskud" value={f.ask.contribution} indent />
             <Row label="Indskudsrum anvendt" value={f.ask.contribution} indent />
-            <Row label="Resterende indskudsrum" value={Math.max(0, f.ask.depositRoom - f.ask.contribution)} indent />
+            <Row label="Resterende indskudsrum før årets afkast" value={Math.max(0, f.ask.depositRoom - f.ask.contribution)} indent />
             <Row label="ASK-afkast før skat" value={f.ask.growthGross} indent />
             <Row label="ASK-skat" value={-f.ask.tax} indent />
             <Row label="Brugt af fremført negativ skat" value={f.ask.carryForwardUsed} indent />
             <Row label="Fremført negativ skat (ultimo)" value={f.ask.carryForwardEnd} indent />
-            <Row label="ASK-udtræk" value={-f.ask.withdrawal} indent />
+            <div className="mt-2 p-2 rounded-md border border-border bg-muted/30" data-testid="audit-ask-withdrawal">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+                Nedsparingsrækkefølge: {f.ask.withdrawalStrategy === "askFirst" ? "ASK først" : f.ask.withdrawalStrategy === "proRata" ? "Pro rata" : "Almindeligt depot først"}
+              </div>
+              <Row label="Udtræk fra almindeligt depot" value={-f.ask.withdrawalFreeDepot} indent />
+              <Row label="Udtræk fra ASK" value={-f.ask.withdrawal} indent />
+              {f.ask.withdrawalStrategy === "depotFirst" && f.ask.withdrawalFreeDepot > 0 && f.ask.withdrawal === 0 && (
+                <p className="text-[11px] text-muted-foreground mt-1">ASK blev ikke brugt, fordi almindeligt depot dækkede årets frie udtræk.</p>
+              )}
+              {f.ask.withdrawalFreeDepot === 0 && f.ask.withdrawal === 0 && (
+                <p className="text-[11px] text-muted-foreground mt-1">Ingen udtræk fra fri kapital i året.</p>
+              )}
+            </div>
             <Row label="ASK ultimo" value={f.ask.closing} strong />
             <Row label="Almindeligt frit depot ultimo" value={f.ask.freeDepotClosing} indent />
             <Row label="Samlet fri kapital ultimo (ASK + depot)" value={f.ask.closing + f.ask.freeDepotClosing} strong />
           </section>
         )}
+
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Udgående saldi</div>
