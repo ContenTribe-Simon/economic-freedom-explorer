@@ -6,6 +6,7 @@ import {
   DebtYearDetail,
   Scenario,
   ScenarioInputs,
+  ShareIncomeFundingStrategy,
   YearRow,
 } from "./types";
 
