@@ -648,7 +648,7 @@ export function projectWithStopAge(
     const drainShortfall = (needed: number) => {
       for (const b of order) {
         if (needed <= 0) break;
-        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw);
+        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw, depotTaxState);
 
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
