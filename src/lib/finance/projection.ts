@@ -538,17 +538,18 @@ export function projectWithStopAge(
     const depotPrimo = bal.free;
     const depotCostBasisPrimo = depotCostBasis;
     let depotContributionYear = 0;
-    const depotTaxState: DepotTaxState | undefined =
-      depotTaxActive && depotTaxMethod === "realizationSimple"
-        ? {
-            ctx: shareCtx!,
-            costBasis: depotCostBasis,
-            grossSaleAcc: 0,
-            realizedGainAcc: 0,
-            saleTaxAcc: 0,
-            costBasisReductionAcc: 0,
-          }
-        : undefined;
+    const depotTaxState: DepotTaxState | undefined = depotTaxActive
+      ? {
+          ctx: shareCtx!,
+          costBasis: depotCostBasis,
+          realizationActive: depotTaxMethod === "realizationSimple",
+          grossSaleAcc: 0,
+          realizedGainAcc: 0,
+          saleTaxAcc: 0,
+          costBasisReductionAcc: 0,
+        }
+      : undefined;
+
 
     // ---- Planlagt holdingudlodning ----
     const holdingPlanned = { gross: 0, net: 0, tax: 0 };
