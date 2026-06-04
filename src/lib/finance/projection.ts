@@ -692,6 +692,9 @@ export function projectWithStopAge(
           carryForwardUsed: askCarryUsed,
           carryForwardEnd: askCarryForward,
           withdrawal: askWithdrawYear,
+          withdrawalFreeDepot: askDepotWithdrawYear,
+          withdrawalStrategy: askStrategy,
+
           closing: bal.ask,
           freeDepotClosing: bal.free,
           depositLimit: askDepositLimit,
