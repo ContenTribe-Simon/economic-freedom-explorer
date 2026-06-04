@@ -367,8 +367,12 @@ export interface AskYearAudit {
   carryForwardUsed: number;
   /** Fremført negativ skat ultimo. */
   carryForwardEnd: number;
-  /** Udtræk fra ASK (efter depot er drænet). */
+  /** Udtræk fra ASK (efter strategi). */
   withdrawal: number;
+  /** Udtræk fra almindeligt frit depot (efter strategi). */
+  withdrawalFreeDepot: number;
+  /** Anvendt nedsparingsrækkefølge i året. */
+  withdrawalStrategy: AskWithdrawalStrategy;
   /** Ultimo ASK. */
   closing: number;
   /** Ultimo almindeligt frit depot. */
@@ -380,6 +384,7 @@ export interface AskYearAudit {
   /** Indikator for om auto-fill (autoFillFirst) var aktivt i året. */
   autoFillFirst: boolean;
 }
+
 
 /** Aggregeret effekt af aktive livsfaser i et givent år. */
 export interface LifeEventYearEffect {
