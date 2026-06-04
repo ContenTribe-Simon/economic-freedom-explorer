@@ -83,7 +83,7 @@ function withdrawFromBucket(
     // Returnerer netto faktisk dækket og brutto salg fra depot.
     const drainDepotNet = (need: number): { net: number; gross: number; tax: number } => {
       if (need <= 0 || bal.free <= 0) return { net: 0, gross: 0, tax: 0 };
-      if (!depotTax) {
+      if (!depotTax || !depotTax.realizationActive) {
         const g = Math.min(bal.free, need);
         bal.free -= g;
         return { net: g, gross: g, tax: 0 };
