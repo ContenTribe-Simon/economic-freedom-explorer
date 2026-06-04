@@ -269,6 +269,10 @@ export default function Inputs() {
 
       <AskSection inp={inp} set={set} />
 
+      <DepotTaxSection inp={inp} set={set} />
+
+
+
 
       <Section title="Kontant buffer" description="Tæller med i nettoformue, men investeres ikke og får intet afkast.">
         <NumField label="Buffer-saldo" value={inp.free.cashBuffer ?? 0} onChange={(v) => set("free", { ...inp.free, cashBuffer: v })} suffix="kr" step={5000} />
