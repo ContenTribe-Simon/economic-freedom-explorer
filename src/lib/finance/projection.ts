@@ -33,6 +33,8 @@ interface Balances {
   holding: number;
   buffer: number;
   debt: number;
+  /** ASK sub-bucket (0 hvis ASK ikke er aktiveret). Bevarer bagudkompatibilitet. */
+  ask: number;
 }
 
 function withdrawFromBucket(
@@ -41,11 +43,21 @@ function withdrawFromBucket(
   bal: Balances,
   a: Assumptions,
   pensionTaxRate: number,
+  onAskWithdraw?: (n: number) => void,
 ): { netCovered: number; gross: number; tax: number } {
   if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0 };
   if (bucket === "free") {
-    const take = Math.min(bal.free, netNeeded);
-    bal.free -= take;
+    // Træk først fra almindeligt depot, dernæst fra ASK (sub-bucket).
+    const fromDepot = Math.min(bal.free, netNeeded);
+    bal.free -= fromDepot;
+    let take = fromDepot;
+    let rem = netNeeded - fromDepot;
+    if (rem > 0 && bal.ask > 0) {
+      const fromAsk = Math.min(bal.ask, rem);
+      bal.ask -= fromAsk;
+      take += fromAsk;
+      onAskWithdraw?.(fromAsk);
+    }
     return { netCovered: take, gross: take, tax: 0 };
   }
   if (bucket === "holding") {
