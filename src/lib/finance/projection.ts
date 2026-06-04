@@ -655,9 +655,27 @@ export function projectWithStopAge(
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
         lifeEventEffects: lifeEventEffects ?? undefined,
+        ask: askActive ? {
+          opening: askOpening,
+          contribution: askContribYear,
+          growthGross: askGrowthGross,
+          tax: askTax,
+          carryForwardUsed: askCarryUsed,
+          carryForwardEnd: askCarryForward,
+          withdrawal: askWithdrawYear,
+          closing: bal.ask,
+          freeDepotClosing: bal.free,
+        } : undefined,
       },
       totalIncomeNet: incomeNet,
       netWorth,
+      shortfall: stillShort > 0.5,
+      shortfallAmount: stillShort,
+      monthlyGap: stillShort / 12,
+    });
+
+    // Forbered næste år: ASK ultimo er grundlag for indskudsrum næste år.
+    if (askActive) askPriorYearEnd = bal.ask;
       shortfall: stillShort > 0.5,
       shortfallAmount: stillShort,
       monthlyGap: stillShort / 12,
