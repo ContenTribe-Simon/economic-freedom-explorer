@@ -101,7 +101,7 @@ export default function Assumptions() {
           <PctField label="Selskabsskat (info)" value={a.tax.corporateRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, corporateRate: v } }))} />
         </div>
         <p className="text-[11px] text-muted-foreground mt-3">
-          I denne version antager modellen, at holdingudlodning bruger aktieindkomstgrænsen før realiserede depotgevinster. Prioritering kan gøres konfigurerbar i en senere version.
+          Udbetalingsrækkefølge mellem holding og almindeligt depot (holding først / depot først / pro rata) vælges pr. scenarie under <em>Variabler → Almindeligt frit depot</em>. Skatten beregnes altid samlet i én pulje med samme 27/42 %-grænse.
         </p>
       </Card>
 
