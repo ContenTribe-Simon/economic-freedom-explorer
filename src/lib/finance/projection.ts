@@ -566,19 +566,50 @@ export function projectWithStopAge(
       incomeNet + withdrawals.free + withdrawals.pension + withdrawals.holding + withdrawals.buffer;
     const stillShort = Math.max(0, required - provided);
 
+    // ---- Vækst ----
+    // Almindeligt frit depot bevarer eksisterende sti (brutto realafkast).
+    const freeDepotGrowth = bal.free * a.realReturn.free;
+    bal.free += freeDepotGrowth;
+
+    // ASK: brutto afkast, fremført negativ skat modregnes, lagerskat fratrækkes ASK.
+    let askGrowthGross = 0;
+    let askTax = 0;
+    let askCarryUsed = 0;
+    if (askActive) {
+      askGrowthGross = bal.ask * a.realReturn.free;
+      if (askGrowthGross > 0) {
+        let taxable = askGrowthGross;
+        if (askCarryForward > 0) {
+          askCarryUsed = Math.min(askCarryForward, taxable);
+          taxable -= askCarryUsed;
+          askCarryForward -= askCarryUsed;
+        }
+        askTax = Math.max(0, taxable) * askTaxRate;
+      } else if (askGrowthGross < 0) {
+        // Negativt afkast — fremfør tabet til modregning i fremtidige positive afkast.
+        askCarryForward += -askGrowthGross;
+      }
+      bal.ask = Math.max(0, bal.ask + askGrowthGross - askTax);
+    }
+
     const growth = {
-      free: bal.free * a.realReturn.free,
+      free: freeDepotGrowth + (askActive ? askGrowthGross - askTax : 0),
       pension: bal.pension * a.realReturn.pension,
       holding: bal.holding * a.realReturn.holding,
     };
-    bal.free += growth.free;
     bal.pension += growth.pension;
     bal.holding += growth.holding;
 
     // Tilføj persisterende livsfase-gæld til årets udgående gæld (efter processDebts).
     bal.debt = bal.debt + lifeEventDebtBalance;
 
-    const closing = { ...bal };
+    const closing = {
+      free: bal.free + bal.ask,
+      pension: bal.pension,
+      holding: bal.holding,
+      buffer: bal.buffer,
+      debt: bal.debt,
+    };
     const netWorth = closing.free + closing.pension + closing.holding + closing.buffer - closing.debt;
     const totalHoldingNet = holdingPlanned.net + holdingExtra.net;
     const totalHoldingGross = holdingPlanned.gross + holdingExtra.gross;
