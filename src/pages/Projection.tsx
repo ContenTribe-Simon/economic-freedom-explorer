@@ -46,7 +46,7 @@ export function lifeAnnuityStatusText(
   return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
 }
 
-function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void }) {
+export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void }) {
   const f = y.flows;
   const incomeTotal =
     f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
@@ -173,6 +173,22 @@ function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: Scen
                   </div>
                 )}
                 <Row label="Faktisk investeret i fri kapital" value={f.investedAmount} strong />
+                {f.ask && (
+                  <div data-testid="audit-ask-allocation">
+                    <Row label="Heraf til ASK" value={f.ask.contribution} indent />
+                    <Row label="Heraf til almindeligt frit depot" value={Math.max(0, f.investedAmount - f.ask.contribution)} indent />
+                    {!f.ask.autoFillFirst && (
+                      <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                        ASK auto-fill er slået fra — opsparing går til almindeligt depot.
+                      </div>
+                    )}
+                    {f.ask.autoFillFirst && f.investedAmount > 0 && f.ask.contribution < f.investedAmount && (
+                      <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                        ASK-indskudsloft nået — resten går til almindeligt depot.
+                      </div>
+                    )}
+                  </div>
+                )}
                 {f.unallocatedCashflow > 0.5 && (
                   <Row label="Ikke-allokeret cashflow" value={f.unallocatedCashflow} indent />
                 )}
@@ -260,7 +276,17 @@ function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: Scen
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Vækst (realafkast)</div>
-          <Row label="Vækst fri" value={f.growth.free} indent />
+          {f.ask ? (
+            <>
+              <Row label="Vækst fri i alt (efter ASK-skat)" value={f.growth.free} strong />
+              <Row label="ASK-afkast før skat" value={f.ask.growthGross} indent />
+              <Row label="ASK-skat" value={-f.ask.tax} indent />
+              <Row label="ASK-afkast efter skat" value={f.ask.growthGross - f.ask.tax} indent />
+              <Row label="Almindeligt depot-afkast (brutto)" value={f.growth.free - (f.ask.growthGross - f.ask.tax)} indent />
+            </>
+          ) : (
+            <Row label="Vækst fri" value={f.growth.free} indent />
+          )}
           <Row label="Vækst pension" value={f.growth.pension} indent />
           <Row label="Vækst holding" value={f.growth.holding} indent />
         </section>
@@ -276,6 +302,25 @@ function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: Scen
             <Row label="Standard FI" value={fireYear.meets.standard ? "Ja" : "Nej"} indent />
             <Row label="Fat FI" value={fireYear.meets.fat ? "Ja" : "Nej"} indent />
             <Row label="Barista FI" value={fireYear.meets.barista ? "Ja" : "Nej"} indent />
+          </section>
+        )}
+
+        {f.ask && (
+          <section data-testid="audit-ask">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Aktiesparekonto (ASK)</div>
+            <Row label="ASK primo" value={f.ask.opening} indent />
+            <Row label="Almindeligt frit depot primo" value={y.opening.free - f.ask.opening} indent />
+            <Row label="ASK-indskud" value={f.ask.contribution} indent />
+            <Row label="Indskudsrum anvendt" value={f.ask.contribution} indent />
+            <Row label="Resterende indskudsrum" value={Math.max(0, f.ask.depositRoom - f.ask.contribution)} indent />
+            <Row label="ASK-afkast før skat" value={f.ask.growthGross} indent />
+            <Row label="ASK-skat" value={-f.ask.tax} indent />
+            <Row label="Brugt af fremført negativ skat" value={f.ask.carryForwardUsed} indent />
+            <Row label="Fremført negativ skat (ultimo)" value={f.ask.carryForwardEnd} indent />
+            <Row label="ASK-udtræk" value={-f.ask.withdrawal} indent />
+            <Row label="ASK ultimo" value={f.ask.closing} strong />
+            <Row label="Almindeligt frit depot ultimo" value={f.ask.freeDepotClosing} indent />
+            <Row label="Samlet fri kapital ultimo (ASK + depot)" value={f.ask.closing + f.ask.freeDepotClosing} strong />
           </section>
         )}
 
