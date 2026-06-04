@@ -27,6 +27,33 @@ export interface FreeBucketInputs {
   contributionStopRule?: FreeContributionStopRule;
   /** Anvendt når contributionStopRule = "customAge". */
   contributionStopAge?: number;
+  /** Optional ASK (Aktiesparekonto) sub-bucket under fri kapital. Default undefined / disabled. */
+  ask?: AskInputs;
+}
+
+/**
+ * Aktiesparekonto (ASK) — optional sub-bucket under fri kapital.
+ *
+ * Når enabled=false (default) er ASK fuldstændig inaktiv og projection
+ * giver samme resultater som tidligere. ASK-værdien tæller som en del af
+ * den eksisterende fri kapital — ikke et beløb oveni.
+ */
+export interface AskInputs {
+  enabled: boolean;
+  /** Nuværende ASK-værdi — tæller som "heraf ASK" af fri kapital. */
+  currentValue: number;
+  /** ASK-værdi pr. seneste årsskifte (bruges til indskudsrum). */
+  priorYearEndValue?: number;
+  /** Indskudsloft (kr.). Default 174.200. */
+  depositLimit: number;
+  /** ASK-skat (lagerbeskatning). Default 0.17. */
+  taxRate: number;
+  /** Fyld ASK før almindeligt depot ved planlagt opsparing. */
+  autoFillFirst: boolean;
+  /** Fremført negativ ASK-skat (positivt tal = kr. tab der kan modregnes). */
+  taxCreditCarryForward: number;
+  /** Hvordan ASK-skat betales — i denne version altid fratrukket ASK. */
+  taxPaymentMode: "deductFromASK";
 }
 
 export type LifeAnnuityMode = "gross" | "net";
