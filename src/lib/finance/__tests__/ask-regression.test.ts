@@ -72,7 +72,7 @@ describe("ASK v0 regression — fri kapital adfærd er låst", () => {
   it("scenarier uden ASK-felter crasher ikke (datamodel-sikkerhed)", () => {
     const s = makeBaseScenario();
     // Bekræft at der IKKE findes et ask-felt på FreeBucketInputs i dag — gamle modeller skal virke
-    expect((s.inputs.free as Record<string, unknown>).ask).toBeUndefined();
+    expect((s.inputs.free as unknown as Record<string, unknown>).ask).toBeUndefined();
     expect(() => project(s, defaultAssumptions)).not.toThrow();
   });
 });
