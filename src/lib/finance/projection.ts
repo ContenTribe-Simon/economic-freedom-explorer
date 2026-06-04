@@ -372,6 +372,17 @@ export function projectWithStopAge(
     ? Math.max(0, askInput!.priorYearEndValue ?? askInitialValue)
     : 0;
 
+  // ---- Depot-skat (almindeligt frit depot) initialisering ----
+  const depotTaxInput = inp.free.depotTax;
+  const depotTaxActive = !!depotTaxInput?.enabled && depotTaxInput?.method !== "legacy";
+  const depotTaxMethod = depotTaxInput?.method ?? "legacy";
+  const depotInitialValue = totalFreeOpening - askInitialValue;
+  // Kostpris: null ⇒ markedsværdi (ingen latent gevinst).
+  let depotCostBasis = depotTaxActive
+    ? Math.max(0, depotTaxInput!.costBasis ?? depotInitialValue)
+    : depotInitialValue;
+
+
   const bal: Balances = {
     free: totalFreeOpening - askInitialValue,
     pension: inp.pension.balance,
