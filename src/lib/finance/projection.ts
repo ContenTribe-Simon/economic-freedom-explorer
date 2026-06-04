@@ -44,6 +44,25 @@ interface Balances {
   ask: number;
 }
 
+/**
+ * Depot-skat state der opdateres in-place ved salg fra almindeligt depot.
+ * Bruges kun når depotTax.method = "realizationSimple". For andre metoder
+ * (legacy / annual) sættes denne til undefined og udtræk sker uden gross-up.
+ */
+interface DepotTaxState {
+  ctx: ShareIncomeCtx;
+  /** Skattemæssig kostpris for almindeligt depot. */
+  costBasis: number;
+  /** Akkumuleret brutto salg i året (audit). */
+  grossSaleAcc: number;
+  /** Akkumuleret realiseret gevinst i året (audit). */
+  realizedGainAcc: number;
+  /** Akkumuleret skat fra depotsalg i året (audit). */
+  saleTaxAcc: number;
+  /** Akkumuleret reduktion af kostpris (audit). */
+  costBasisReductionAcc: number;
+}
+
 function withdrawFromBucket(
   bucket: Bucket,
   netNeeded: number,
@@ -53,39 +72,100 @@ function withdrawFromBucket(
   askStrategy: AskWithdrawalStrategy = "depotFirst",
   onAskWithdraw?: (n: number) => void,
   onDepotWithdraw?: (n: number) => void,
+  depotTax?: DepotTaxState,
 ): { netCovered: number; gross: number; tax: number } {
   if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0 };
   if (bucket === "free") {
-    const total = bal.free + bal.ask;
-    const take = Math.min(total, netNeeded);
-    if (take <= 0) return { netCovered: 0, gross: 0, tax: 0 };
-    let fromDepot = 0;
-    let fromAsk = 0;
+    // Hjælper: træk netto fra depot med korrekt gross-up når depotTax.realizationSimple.
+    // Returnerer netto faktisk dækket og brutto salg fra depot.
+    const drainDepotNet = (need: number): { net: number; gross: number; tax: number } => {
+      if (need <= 0 || bal.free <= 0) return { net: 0, gross: 0, tax: 0 };
+      if (!depotTax) {
+        const g = Math.min(bal.free, need);
+        bal.free -= g;
+        return { net: g, gross: g, tax: 0 };
+      }
+      const depotBefore = bal.free;
+      const gainRatio = Math.max(0, depotBefore - depotTax.costBasis) / depotBefore;
+      const thresholdRemaining = Math.max(0, depotTax.ctx.threshold - depotTax.ctx.used);
+      const sol = grossSaleForNetNeeded(
+        need,
+        gainRatio,
+        thresholdRemaining,
+        depotTax.ctx.lowRate,
+        depotTax.ctx.highRate,
+        depotBefore,
+      );
+      if (sol.sale <= 0) return { net: 0, gross: 0, tax: 0 };
+      // Anvend gevinst gennem ctx (opdaterer used/taxLow/taxHigh)
+      applyShareIncomeTax(depotTax.ctx, sol.realizedGain);
+      // Reducer kostpris proportionalt
+      const reductionRatio = sol.sale / depotBefore;
+      const costBasisReduction = Math.max(0, depotTax.costBasis * reductionRatio);
+      depotTax.costBasis = Math.max(0, depotTax.costBasis - costBasisReduction);
+      bal.free = Math.max(0, bal.free - sol.sale);
+      depotTax.grossSaleAcc += sol.sale;
+      depotTax.realizedGainAcc += sol.realizedGain;
+      depotTax.saleTaxAcc += sol.tax;
+      depotTax.costBasisReductionAcc += costBasisReduction;
+      return { net: sol.sale - sol.tax, gross: sol.sale, tax: sol.tax };
+    };
+
+    const drainAskNet = (need: number): number => {
+      if (need <= 0 || bal.ask <= 0) return 0;
+      const take = Math.min(bal.ask, need);
+      bal.ask -= take;
+      return take;
+    };
+
+    let netCovered = 0;
+    let grossOut = 0;
+    let taxOut = 0;
     if (askStrategy === "askFirst") {
-      fromAsk = Math.min(bal.ask, take);
-      fromDepot = Math.min(bal.free, take - fromAsk);
+      const a1 = drainAskNet(netNeeded);
+      if (a1 > 0) onAskWithdraw?.(a1);
+      netCovered += a1; grossOut += a1;
+      const rem = netNeeded - netCovered;
+      if (rem > 0) {
+        const d = drainDepotNet(rem);
+        if (d.gross > 0) onDepotWithdraw?.(d.gross);
+        netCovered += d.net; grossOut += d.gross; taxOut += d.tax;
+      }
     } else if (askStrategy === "proRata" && bal.ask > 0 && bal.free > 0) {
-      const ratio = bal.ask / (bal.ask + bal.free);
-      fromAsk = Math.min(bal.ask, take * ratio);
-      fromDepot = Math.min(bal.free, take - fromAsk);
-      // Any rounding/cap remainder: fill from whichever still has balance.
-      let remainder = take - fromAsk - fromDepot;
-      if (remainder > 0) {
-        const addAsk = Math.min(bal.ask - fromAsk, remainder);
-        fromAsk += addAsk;
-        remainder -= addAsk;
-        if (remainder > 0) fromDepot += Math.min(bal.free - fromDepot, remainder);
+      const total = bal.ask + bal.free;
+      const askPart = Math.min(bal.ask, netNeeded * (bal.ask / total));
+      const depotPart = netNeeded - askPart;
+      const a1 = drainAskNet(askPart);
+      if (a1 > 0) onAskWithdraw?.(a1);
+      const d = drainDepotNet(depotPart);
+      if (d.gross > 0) onDepotWithdraw?.(d.gross);
+      netCovered = a1 + d.net; grossOut = a1 + d.gross; taxOut = d.tax;
+      // Hvis en gren ikke dækkede pga. cap, prøv den anden
+      const shortfall = netNeeded - netCovered;
+      if (shortfall > 0.5) {
+        if (bal.free > 0) {
+          const d2 = drainDepotNet(shortfall);
+          if (d2.gross > 0) onDepotWithdraw?.(d2.gross);
+          netCovered += d2.net; grossOut += d2.gross; taxOut += d2.tax;
+        } else if (bal.ask > 0) {
+          const a2 = drainAskNet(shortfall);
+          if (a2 > 0) onAskWithdraw?.(a2);
+          netCovered += a2; grossOut += a2;
+        }
       }
     } else {
-      // depotFirst (default) — også når der ikke er ASK-saldo i proRata-tilfælde.
-      fromDepot = Math.min(bal.free, take);
-      fromAsk = Math.min(bal.ask, take - fromDepot);
+      // depotFirst (default)
+      const d = drainDepotNet(netNeeded);
+      if (d.gross > 0) onDepotWithdraw?.(d.gross);
+      netCovered += d.net; grossOut += d.gross; taxOut += d.tax;
+      const rem = netNeeded - netCovered;
+      if (rem > 0) {
+        const a1 = drainAskNet(rem);
+        if (a1 > 0) onAskWithdraw?.(a1);
+        netCovered += a1; grossOut += a1;
+      }
     }
-    bal.free -= fromDepot;
-    bal.ask -= fromAsk;
-    if (fromDepot > 0) onDepotWithdraw?.(fromDepot);
-    if (fromAsk > 0) onAskWithdraw?.(fromAsk);
-    return { netCovered: fromDepot + fromAsk, gross: fromDepot + fromAsk, tax: 0 };
+    return { netCovered, gross: grossOut, tax: taxOut };
   }
   if (bucket === "holding") {
     const grossNeeded = grossHoldingForNet(netNeeded, a.tax);
@@ -100,6 +180,7 @@ function withdrawFromBucket(
   bal.pension -= take;
   return { netCovered: net, gross: take, tax };
 }
+
 
 
 interface DebtTotals {
