@@ -276,7 +276,17 @@ function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: Scen
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Vækst (realafkast)</div>
-          <Row label="Vækst fri" value={f.growth.free} indent />
+          {f.ask ? (
+            <>
+              <Row label="Vækst fri i alt (efter ASK-skat)" value={f.growth.free} strong />
+              <Row label="ASK-afkast før skat" value={f.ask.growthGross} indent />
+              <Row label="ASK-skat" value={-f.ask.tax} indent />
+              <Row label="ASK-afkast efter skat" value={f.ask.growthGross - f.ask.tax} indent />
+              <Row label="Almindeligt depot-afkast (brutto)" value={f.growth.free - (f.ask.growthGross - f.ask.tax)} indent />
+            </>
+          ) : (
+            <Row label="Vækst fri" value={f.growth.free} indent />
+          )}
           <Row label="Vækst pension" value={f.growth.pension} indent />
           <Row label="Vækst holding" value={f.growth.holding} indent />
         </section>
