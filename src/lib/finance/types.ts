@@ -408,6 +408,16 @@ export interface ShareIncomeTaxYearAudit {
   thresholdUsedByHolding: number;
   /** Resterende lav-grænse tilgængelig for depotgevinst efter holding. */
   thresholdRemainingForDepot: number;
+  /** Valgt udbetalingsrækkefølge mellem holding og depot. */
+  fundingStrategy?: ShareIncomeFundingStrategy;
+  /** Netto cashflow leveret af holding (planlagt + ekstra). */
+  fundedFromHolding?: number;
+  /** Netto cashflow leveret af almindeligt depot (efter skat). */
+  fundedFromDepot?: number;
+  /** Skat allokeret til holding-kilder. */
+  taxAllocatedHolding?: number;
+  /** Skat allokeret til depot-kilder. */
+  taxAllocatedDepot?: number;
 }
 
 /** Audit af almindeligt frit depot (ekskl. ASK), kun ved depotTax aktiv. */
