@@ -29,7 +29,27 @@ export interface FreeBucketInputs {
   contributionStopAge?: number;
   /** Optional ASK (Aktiesparekonto) sub-bucket under fri kapital. Default undefined / disabled. */
   ask?: AskInputs;
+  /** Optional skattebehandling af almindeligt frit depot. Default undefined ⇒ legacy. */
+  depotTax?: DepotTaxInputs;
 }
+
+/**
+ * Skattebehandling af almindeligt frit depot (ekskl. ASK).
+ *  - "legacy": ingen eksplicit skat — gammel modeladfærd (default).
+ *  - "realizationSimple": kun gevinstandelen ved salg beskattes som aktieindkomst.
+ *  - "annualShareIncomeTax": positivt årligt depotafkast beskattes løbende.
+ * ASK indgår aldrig i denne pulje.
+ */
+export type DepotTaxMethod = "legacy" | "realizationSimple" | "annualShareIncomeTax";
+
+export interface DepotTaxInputs {
+  enabled: boolean;
+  method: DepotTaxMethod;
+  /** Kostpris ved start. null ⇒ sættes lig depot markedsværdi (ingen latent gevinst). */
+  costBasis: number | null;
+  showDeferredTax: boolean;
+}
+
 
 /**
  * Aktiesparekonto (ASK) — optional sub-bucket under fri kapital.
@@ -351,7 +371,55 @@ export interface YearFlows {
   lifeEventEffects?: LifeEventYearEffect;
   /** Detaljeret ASK-bevægelse for året (kun udfyldt når ASK er aktiveret). */
   ask?: AskYearAudit;
+  /** Personlig aktieindkomst-pulje for året (kun udfyldt når depotTax er aktiv). */
+  shareIncome?: ShareIncomeTaxYearAudit;
+  /** Audit af almindeligt frit depot (kun udfyldt når depotTax er aktiv). */
+  depot?: DepotYearAudit;
 }
+
+/** Audit af personlig aktieindkomst-pulje (holding + depot deler 27/42 %-grænsen). */
+export interface ShareIncomeTaxYearAudit {
+  threshold: number;
+  lowRate: number;
+  highRate: number;
+  holdingGross: number;
+  extraHoldingGross: number;
+  realizedDepotGain: number;
+  annualDepotTaxable: number;
+  totalShareIncome: number;
+  taxedAtLow: number;
+  taxedAtHigh: number;
+  taxLow: number;
+  taxHigh: number;
+  taxTotal: number;
+  /** Hvor meget af lav-grænsen blev brugt af holding-kilder. */
+  thresholdUsedByHolding: number;
+  /** Resterende lav-grænse tilgængelig for depotgevinst efter holding. */
+  thresholdRemainingForDepot: number;
+}
+
+/** Audit af almindeligt frit depot (ekskl. ASK), kun ved depotTax aktiv. */
+export interface DepotYearAudit {
+  method: DepotTaxMethod;
+  opening: number;
+  costBasisOpening: number;
+  unrealizedGainOpening: number;
+  deferredTaxOpening: number;
+  contribution: number;
+  growthGross: number;
+  /** Skat på årligt afkast (kun annualShareIncomeTax). */
+  annualTax: number;
+  grossSale: number;
+  realizedGain: number;
+  saleTax: number;
+  netToCashflow: number;
+  costBasisReduction: number;
+  closing: number;
+  costBasisClosing: number;
+  unrealizedGainClosing: number;
+  deferredTaxClosing: number;
+}
+
 
 /** Audit-detaljer for ASK i et givent år. */
 export interface AskYearAudit {

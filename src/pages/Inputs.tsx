@@ -269,6 +269,10 @@ export default function Inputs() {
 
       <AskSection inp={inp} set={set} />
 
+      <DepotTaxSection inp={inp} set={set} />
+
+
+
 
       <Section title="Kontant buffer" description="Tæller med i nettoformue, men investeres ikke og får intet afkast.">
         <NumField label="Buffer-saldo" value={inp.free.cashBuffer ?? 0} onChange={(v) => set("free", { ...inp.free, cashBuffer: v })} suffix="kr" step={5000} />
@@ -827,6 +831,92 @@ function AskSection({ inp, set }: { inp: ScenarioInputs; set: <K extends keyof S
 
         </div>
       )}
+    </Card>
+  );
+}
+
+function DepotTaxSection({ inp, set }: { inp: ScenarioInputs; set: <K extends keyof ScenarioInputs>(k: K, v: ScenarioInputs[K]) => void }) {
+  const depotTax = inp.free.depotTax;
+  const enabled = !!depotTax?.enabled;
+  const method = depotTax?.method ?? "legacy";
+  const askValue = inp.free.ask?.enabled ? Math.min(inp.free.ask.currentValue ?? 0, inp.free.balance) : 0;
+  const depotValue = Math.max(0, inp.free.balance - askValue);
+  const costBasis = depotTax?.costBasis ?? depotValue;
+  const unrealized = Math.max(0, depotValue - costBasis);
+  const lowRate = 0.27, highRate = 0.42;
+  const effRate = (lowRate + highRate) / 2;
+  const deferredTax = unrealized * effRate;
+
+  const updateDepotTax = (patch: Partial<NonNullable<typeof depotTax>>) => {
+    const base = depotTax ?? {
+      enabled: false,
+      method: "legacy" as const,
+      costBasis: null,
+      showDeferredTax: true,
+    };
+    set("free", { ...inp.free, depotTax: { ...base, ...patch } });
+  };
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-display text-xl font-semibold">Almindeligt frit depot</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Beregnet som fri kapital minus ASK. Vælg om modellen skal lave en simpel skatteberegning på depotet.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40 shrink-0">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => updateDepotTax({ enabled: e.target.checked })}
+          />
+          <span className="text-sm">Aktivér depot-skat</span>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="p-3 rounded-md border border-border bg-muted/30 text-xs space-y-1">
+          <div className="flex justify-between"><span>Almindeligt frit depot</span><strong className="text-foreground">{depotValue.toLocaleString("da-DK")} kr.</strong></div>
+          <div className="flex justify-between"><span>Skattemæssig kostpris</span><strong className="text-foreground">{costBasis.toLocaleString("da-DK")} kr.</strong></div>
+          <div className="flex justify-between"><span>Urealiseret gevinst</span><strong className="text-foreground">{unrealized.toLocaleString("da-DK")} kr.</strong></div>
+          {enabled && (
+            <div className="flex justify-between"><span>Latent skat (grov indikator)</span><strong className="text-foreground">{Math.round(deferredTax).toLocaleString("da-DK")} kr.</strong></div>
+          )}
+        </div>
+        {enabled && (
+          <>
+            <div className="md:col-span-2">
+              <label className="text-xs uppercase tracking-wider text-muted-foreground">Skattebehandling af almindeligt depot</label>
+              <select
+                data-testid="depot-tax-method"
+                className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={method}
+                onChange={(e) => updateDepotTax({ method: e.target.value as "legacy" | "realizationSimple" | "annualShareIncomeTax" })}
+              >
+                <option value="legacy">Legacy / ingen eksplicit skat</option>
+                <option value="realizationSimple">Simpel realisationsskat ved udtræk</option>
+                <option value="annualShareIncomeTax">Simpel årlig aktieindkomstskat af positivt afkast</option>
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Holdingudlodning og depotgevinster deler samme 27/42 %-grænse. Holding bruger grænsen først.
+              </p>
+            </div>
+            <NumField
+              label="Skattemæssig kostpris"
+              value={depotTax?.costBasis ?? depotValue}
+              onChange={(v) => updateDepotTax({ costBasis: v })}
+              suffix="kr"
+              step={1000}
+              hint="Hvis du ikke kender kostprisen, kan du lade den være lig depotværdien. Så antager modellen ingen latent gevinst ved start."
+            />
+            <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
+              ASK indgår ikke i denne pulje — ASK beskattes fortsat særskilt med 17 % lagerbeskatning.
+            </div>
+          </>
+        )}
+      </div>
     </Card>
   );
 }

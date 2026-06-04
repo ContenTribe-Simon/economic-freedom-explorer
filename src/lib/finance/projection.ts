@@ -10,13 +10,18 @@ import {
 } from "./types";
 
 import {
+  applyShareIncomeTax,
   grossHoldingForNet,
   grossPensionForNet,
+  grossSaleForNetNeeded,
   laborTax,
+  newShareIncomeCtx,
   pensionPayoutTax,
   shareTax,
+  type ShareIncomeCtx,
 } from "./tax";
 import { computeLifeEventEffects } from "./lifeEvents";
+
 
 export function mergeAssumptions(global: Assumptions, override?: Partial<Assumptions>): Assumptions {
   if (!override) return global;
@@ -29,6 +34,14 @@ export function mergeAssumptions(global: Assumptions, override?: Partial<Assumpt
   };
 }
 
+/** Grov, gennemsnitlig effektiv sats til latent skat-indikator i audit. */
+function ctxEffectiveRate(ctx: ShareIncomeCtx): number {
+  return (ctx.lowRate + ctx.highRate) / 2;
+}
+
+
+
+
 interface Balances {
   free: number;
   pension: number;
@@ -39,6 +52,28 @@ interface Balances {
   ask: number;
 }
 
+/**
+ * Depot-skat state der opdateres in-place ved salg fra almindeligt depot.
+ * Eksisterer kun når depotTax er aktiv (ctx + accumulators bruges også for
+ * annualShareIncomeTax — realization-gross-up er gated af realizationActive).
+ */
+interface DepotTaxState {
+  ctx: ShareIncomeCtx;
+  /** Skattemæssig kostpris for almindeligt depot. */
+  costBasis: number;
+  /** Aktivér gross-up ved depotudtræk (kun realizationSimple). */
+  realizationActive: boolean;
+  /** Akkumuleret brutto salg i året (audit). */
+  grossSaleAcc: number;
+  /** Akkumuleret realiseret gevinst i året (audit). */
+  realizedGainAcc: number;
+  /** Akkumuleret skat fra depotsalg i året (audit). */
+  saleTaxAcc: number;
+  /** Akkumuleret reduktion af kostpris (audit). */
+  costBasisReductionAcc: number;
+}
+
+
 function withdrawFromBucket(
   bucket: Bucket,
   netNeeded: number,
@@ -48,41 +83,121 @@ function withdrawFromBucket(
   askStrategy: AskWithdrawalStrategy = "depotFirst",
   onAskWithdraw?: (n: number) => void,
   onDepotWithdraw?: (n: number) => void,
+  depotTax?: DepotTaxState,
 ): { netCovered: number; gross: number; tax: number } {
   if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0 };
   if (bucket === "free") {
-    const total = bal.free + bal.ask;
-    const take = Math.min(total, netNeeded);
-    if (take <= 0) return { netCovered: 0, gross: 0, tax: 0 };
-    let fromDepot = 0;
-    let fromAsk = 0;
+    // Hjælper: træk netto fra depot med korrekt gross-up når depotTax.realizationSimple.
+    // Returnerer netto faktisk dækket og brutto salg fra depot.
+    const drainDepotNet = (need: number): { net: number; gross: number; tax: number } => {
+      if (need <= 0 || bal.free <= 0) return { net: 0, gross: 0, tax: 0 };
+      if (!depotTax || !depotTax.realizationActive) {
+        const g = Math.min(bal.free, need);
+        bal.free -= g;
+        return { net: g, gross: g, tax: 0 };
+      }
+      const depotBefore = bal.free;
+      const gainRatio = Math.max(0, depotBefore - depotTax.costBasis) / depotBefore;
+      const thresholdRemaining = Math.max(0, depotTax.ctx.threshold - depotTax.ctx.used);
+      const sol = grossSaleForNetNeeded(
+        need,
+        gainRatio,
+        thresholdRemaining,
+        depotTax.ctx.lowRate,
+        depotTax.ctx.highRate,
+        depotBefore,
+      );
+      if (sol.sale <= 0) return { net: 0, gross: 0, tax: 0 };
+      // Anvend gevinst gennem ctx (opdaterer used/taxLow/taxHigh)
+      applyShareIncomeTax(depotTax.ctx, sol.realizedGain);
+      // Reducer kostpris proportionalt
+      const reductionRatio = sol.sale / depotBefore;
+      const costBasisReduction = Math.max(0, depotTax.costBasis * reductionRatio);
+      depotTax.costBasis = Math.max(0, depotTax.costBasis - costBasisReduction);
+      bal.free = Math.max(0, bal.free - sol.sale);
+      depotTax.grossSaleAcc += sol.sale;
+      depotTax.realizedGainAcc += sol.realizedGain;
+      depotTax.saleTaxAcc += sol.tax;
+      depotTax.costBasisReductionAcc += costBasisReduction;
+      return { net: sol.sale - sol.tax, gross: sol.sale, tax: sol.tax };
+    };
+
+    const drainAskNet = (need: number): number => {
+      if (need <= 0 || bal.ask <= 0) return 0;
+      const take = Math.min(bal.ask, need);
+      bal.ask -= take;
+      return take;
+    };
+
+    let netCovered = 0;
+    let grossOut = 0;
+    let taxOut = 0;
     if (askStrategy === "askFirst") {
-      fromAsk = Math.min(bal.ask, take);
-      fromDepot = Math.min(bal.free, take - fromAsk);
+      const a1 = drainAskNet(netNeeded);
+      if (a1 > 0) onAskWithdraw?.(a1);
+      netCovered += a1; grossOut += a1;
+      const rem = netNeeded - netCovered;
+      if (rem > 0) {
+        const d = drainDepotNet(rem);
+        if (d.gross > 0) onDepotWithdraw?.(d.gross);
+        netCovered += d.net; grossOut += d.gross; taxOut += d.tax;
+      }
     } else if (askStrategy === "proRata" && bal.ask > 0 && bal.free > 0) {
-      const ratio = bal.ask / (bal.ask + bal.free);
-      fromAsk = Math.min(bal.ask, take * ratio);
-      fromDepot = Math.min(bal.free, take - fromAsk);
-      // Any rounding/cap remainder: fill from whichever still has balance.
-      let remainder = take - fromAsk - fromDepot;
-      if (remainder > 0) {
-        const addAsk = Math.min(bal.ask - fromAsk, remainder);
-        fromAsk += addAsk;
-        remainder -= addAsk;
-        if (remainder > 0) fromDepot += Math.min(bal.free - fromDepot, remainder);
+      const total = bal.ask + bal.free;
+      const askPart = Math.min(bal.ask, netNeeded * (bal.ask / total));
+      const depotPart = netNeeded - askPart;
+      const a1 = drainAskNet(askPart);
+      if (a1 > 0) onAskWithdraw?.(a1);
+      const d = drainDepotNet(depotPart);
+      if (d.gross > 0) onDepotWithdraw?.(d.gross);
+      netCovered = a1 + d.net; grossOut = a1 + d.gross; taxOut = d.tax;
+      // Hvis en gren ikke dækkede pga. cap, prøv den anden
+      const shortfall = netNeeded - netCovered;
+      if (shortfall > 0.5) {
+        if (bal.free > 0) {
+          const d2 = drainDepotNet(shortfall);
+          if (d2.gross > 0) onDepotWithdraw?.(d2.gross);
+          netCovered += d2.net; grossOut += d2.gross; taxOut += d2.tax;
+        } else if (bal.ask > 0) {
+          const a2 = drainAskNet(shortfall);
+          if (a2 > 0) onAskWithdraw?.(a2);
+          netCovered += a2; grossOut += a2;
+        }
       }
     } else {
-      // depotFirst (default) — også når der ikke er ASK-saldo i proRata-tilfælde.
-      fromDepot = Math.min(bal.free, take);
-      fromAsk = Math.min(bal.ask, take - fromDepot);
+      // depotFirst (default)
+      const d = drainDepotNet(netNeeded);
+      if (d.gross > 0) onDepotWithdraw?.(d.gross);
+      netCovered += d.net; grossOut += d.gross; taxOut += d.tax;
+      const rem = netNeeded - netCovered;
+      if (rem > 0) {
+        const a1 = drainAskNet(rem);
+        if (a1 > 0) onAskWithdraw?.(a1);
+        netCovered += a1; grossOut += a1;
+      }
     }
-    bal.free -= fromDepot;
-    bal.ask -= fromAsk;
-    if (fromDepot > 0) onDepotWithdraw?.(fromDepot);
-    if (fromAsk > 0) onAskWithdraw?.(fromAsk);
-    return { netCovered: fromDepot + fromAsk, gross: fromDepot + fromAsk, tax: 0 };
+    return { netCovered, gross: grossOut, tax: taxOut };
   }
   if (bucket === "holding") {
+    if (depotTax?.ctx) {
+      // Shared-pool: brug aktieindkomst-pulje (delt 27/42-grænse med depotgevinst).
+      // Iterativt gross-up: tax afhænger af ctx.used, så solve s.
+      const ctx = depotTax.ctx;
+      const remainingLow = Math.max(0, ctx.threshold - ctx.used);
+      // Inverse: net = grossNeeded - tax; tax = min(g, remLow)*lowRate + max(0, g-remLow)*highRate
+      let grossNeeded: number;
+      const lowCap = remainingLow * (1 - ctx.lowRate);
+      if (netNeeded <= lowCap) {
+        grossNeeded = ctx.lowRate < 1 ? netNeeded / (1 - ctx.lowRate) : netNeeded;
+      } else {
+        const overNet = netNeeded - lowCap;
+        grossNeeded = remainingLow + (ctx.highRate < 1 ? overNet / (1 - ctx.highRate) : overNet);
+      }
+      const take = Math.min(bal.holding, grossNeeded);
+      const r = applyShareIncomeTax(ctx, take);
+      bal.holding -= take;
+      return { netCovered: r.net, gross: take, tax: r.tax };
+    }
     const grossNeeded = grossHoldingForNet(netNeeded, a.tax);
     const take = Math.min(bal.holding, grossNeeded);
     const { net, tax } = shareTax(take, a.tax);
@@ -95,6 +210,8 @@ function withdrawFromBucket(
   bal.pension -= take;
   return { netCovered: net, gross: take, tax };
 }
+
+
 
 
 interface DebtTotals {
@@ -286,6 +403,17 @@ export function projectWithStopAge(
     ? Math.max(0, askInput!.priorYearEndValue ?? askInitialValue)
     : 0;
 
+  // ---- Depot-skat (almindeligt frit depot) initialisering ----
+  const depotTaxInput = inp.free.depotTax;
+  const depotTaxActive = !!depotTaxInput?.enabled && depotTaxInput?.method !== "legacy";
+  const depotTaxMethod = depotTaxInput?.method ?? "legacy";
+  const depotInitialValue = totalFreeOpening - askInitialValue;
+  // Kostpris: null ⇒ markedsværdi (ingen latent gevinst).
+  let depotCostBasis = depotTaxActive
+    ? Math.max(0, depotTaxInput!.costBasis ?? depotInitialValue)
+    : depotInitialValue;
+
+
   const bal: Balances = {
     free: totalFreeOpening - askInitialValue,
     pension: inp.pension.balance,
@@ -412,23 +540,48 @@ export function projectWithStopAge(
       ? stopAge
       : inp.holding.distributionFromAge;
 
+    // ---- Aktieindkomst-pulje + depot-skat state (per år) ----
+    // Når depotTax ikke er aktiv, holder vi shareCtx=undefined → al holding-skat kører legacy.
+    const shareCtx: ShareIncomeCtx | undefined = depotTaxActive ? newShareIncomeCtx(a.tax) : undefined;
+    const depotPrimo = bal.free;
+    const depotCostBasisPrimo = depotCostBasis;
+    let depotContributionYear = 0;
+    const depotTaxState: DepotTaxState | undefined = depotTaxActive
+      ? {
+          ctx: shareCtx!,
+          costBasis: depotCostBasis,
+          realizationActive: depotTaxMethod === "realizationSimple",
+          grossSaleAcc: 0,
+          realizedGainAcc: 0,
+          saleTaxAcc: 0,
+          costBasisReductionAcc: 0,
+        }
+      : undefined;
+
+
     // ---- Planlagt holdingudlodning ----
     const holdingPlanned = { gross: 0, net: 0, tax: 0 };
     const canDistribute = bal.holding > 0 && age >= distFromAge;
     if (canDistribute) {
       if (holdingStrategy === "up_to_low_threshold") {
-        // Udlod automatisk op til lav-sats grænse (brutto)
         holdingPlanned.gross = Math.min(bal.holding, a.tax.shareThreshold);
       } else if (inp.holding.annualDistribution > 0) {
         holdingPlanned.gross = Math.min(bal.holding, inp.holding.annualDistribution);
       }
       if (holdingPlanned.gross > 0) {
-        const r = shareTax(holdingPlanned.gross, a.tax);
-        holdingPlanned.net = r.net;
-        holdingPlanned.tax = r.tax;
+        if (shareCtx) {
+          const r = applyShareIncomeTax(shareCtx, holdingPlanned.gross);
+          holdingPlanned.net = r.net;
+          holdingPlanned.tax = r.tax;
+        } else {
+          const r = shareTax(holdingPlanned.gross, a.tax);
+          holdingPlanned.net = r.net;
+          holdingPlanned.tax = r.tax;
+        }
         bal.holding -= holdingPlanned.gross;
       }
     }
+
 
     // Gæld
     syncLinkedLiabilities(debts);
@@ -507,7 +660,7 @@ export function projectWithStopAge(
     const drainShortfall = (needed: number) => {
       for (const b of order) {
         if (needed <= 0) break;
-        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw);
+        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw, depotTaxState);
 
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
@@ -543,11 +696,18 @@ export function projectWithStopAge(
           askContribYear += toAsk;
         }
         const toDepot = amount - toAsk;
-        if (toDepot > 0) bal.free += toDepot;
+        if (toDepot > 0) {
+          bal.free += toDepot;
+          depotContributionYear += toDepot;
+          if (depotTaxState) depotTaxState.costBasis += toDepot;
+        }
       } else {
         bal.free += amount;
+        depotContributionYear += amount;
+        if (depotTaxState) depotTaxState.costBasis += amount;
       }
     };
+
 
     let unallocatedCashflow = 0;
     const plannedActive = plannedStopAge === null || age < plannedStopAge;
@@ -586,7 +746,19 @@ export function projectWithStopAge(
 
     // ---- Livsfaser: engangs-effekter på fri kapital og privat gæld ----
     if (lifeEventEffects) {
-      bal.free = Math.max(0, bal.free + lifeEventEffects.freeCapitalDelta);
+      const lvDelta = lifeEventEffects.freeCapitalDelta;
+      if (depotTaxState && lvDelta !== 0) {
+        if (lvDelta > 0) {
+          // Tilskud — behandles som indskud til cost basis
+          depotTaxState.costBasis += lvDelta;
+          depotContributionYear += lvDelta;
+        } else if (bal.free > 0) {
+          // Negativt one-time uttræk — reducer kostpris proportionalt (ingen skattepåvirkning i v1)
+          const ratio = Math.min(1, -lvDelta / bal.free);
+          depotTaxState.costBasis = Math.max(0, depotTaxState.costBasis * (1 - ratio));
+        }
+      }
+      bal.free = Math.max(0, bal.free + lvDelta);
       lifeEventDebtBalance = Math.max(0, lifeEventDebtBalance + lifeEventEffects.debtDelta);
     }
 
@@ -599,6 +771,14 @@ export function projectWithStopAge(
     // Almindeligt frit depot bevarer eksisterende sti (brutto realafkast).
     const freeDepotGrowth = bal.free * a.realReturn.free;
     bal.free += freeDepotGrowth;
+
+    // Årlig aktieindkomstskat af positivt depot-afkast (kun annualShareIncomeTax).
+    let annualDepotTax = 0;
+    if (depotTaxState && depotTaxMethod === "annualShareIncomeTax" && freeDepotGrowth > 0) {
+      const r = applyShareIncomeTax(depotTaxState.ctx, freeDepotGrowth);
+      annualDepotTax = r.tax;
+      bal.free = Math.max(0, bal.free - annualDepotTax);
+    }
 
     // ASK: brutto afkast, fremført negativ skat modregnes, lagerskat fratrækkes ASK.
     let askGrowthGross = 0;
@@ -615,19 +795,22 @@ export function projectWithStopAge(
         }
         askTax = Math.max(0, taxable) * askTaxRate;
       } else if (askGrowthGross < 0) {
-        // Negativt afkast — fremfør tabet til modregning i fremtidige positive afkast.
         askCarryForward += -askGrowthGross;
       }
       bal.ask = Math.max(0, bal.ask + askGrowthGross - askTax);
     }
 
     const growth = {
-      free: freeDepotGrowth + (askActive ? askGrowthGross - askTax : 0),
+      free: freeDepotGrowth - annualDepotTax + (askActive ? askGrowthGross - askTax : 0),
       pension: bal.pension * a.realReturn.pension,
       holding: bal.holding * a.realReturn.holding,
     };
     bal.pension += growth.pension;
     bal.holding += growth.holding;
+
+    // Synkronisér depot-kostpris-state tilbage til persistent variable for næste år.
+    if (depotTaxState) depotCostBasis = depotTaxState.costBasis;
+
 
     // Tilføj persisterende livsfase-gæld til årets udgående gæld (efter processDebts).
     bal.debt = bal.debt + lifeEventDebtBalance;
@@ -701,6 +884,65 @@ export function projectWithStopAge(
           depositRoom: Math.max(0, askDepositLimit - askPriorYearEnd),
           autoFillFirst: !!askInput!.autoFillFirst,
         } : undefined,
+        shareIncome: depotTaxState ? (() => {
+          const ctx = depotTaxState.ctx;
+          const holdingGrossTotal = holdingPlanned.gross + holdingExtra.gross;
+          const thresholdUsedByHolding = Math.min(holdingGrossTotal, ctx.threshold);
+          const thresholdRemainingForDepot = Math.max(0, ctx.threshold - thresholdUsedByHolding);
+          const realizedDepotGain = depotTaxState.realizedGainAcc;
+          const annualDepotTaxable = depotTaxMethod === "annualShareIncomeTax" ? Math.max(0, freeDepotGrowth) : 0;
+          const totalShareIncome = ctx.used;
+          const taxedAtLow = Math.min(totalShareIncome, ctx.threshold);
+          const taxedAtHigh = Math.max(0, totalShareIncome - ctx.threshold);
+          return {
+            threshold: ctx.threshold,
+            lowRate: ctx.lowRate,
+            highRate: ctx.highRate,
+            holdingGross: holdingPlanned.gross,
+            extraHoldingGross: holdingExtra.gross,
+            realizedDepotGain,
+            annualDepotTaxable,
+            totalShareIncome,
+            taxedAtLow,
+            taxedAtHigh,
+            taxLow: ctx.taxLow,
+            taxHigh: ctx.taxHigh,
+            taxTotal: ctx.taxLow + ctx.taxHigh,
+            thresholdUsedByHolding,
+            thresholdRemainingForDepot,
+          };
+        })() : undefined,
+        depot: depotTaxState ? (() => {
+          const opening = depotPrimo;
+          const costBasisOpening = depotCostBasisPrimo;
+          const unrealizedGainOpening = Math.max(0, opening - costBasisOpening);
+          const effRate = ctxEffectiveRate(depotTaxState.ctx);
+          const deferredTaxOpening = unrealizedGainOpening * effRate;
+          const closing = bal.free;
+          const costBasisClosing = depotTaxState.costBasis;
+          const unrealizedGainClosing = Math.max(0, closing - costBasisClosing);
+          const deferredTaxClosing = unrealizedGainClosing * effRate;
+          return {
+            method: depotTaxMethod,
+            opening,
+            costBasisOpening,
+            unrealizedGainOpening,
+            deferredTaxOpening,
+            contribution: depotContributionYear,
+            growthGross: freeDepotGrowth,
+            annualTax: annualDepotTax,
+            grossSale: depotTaxState.grossSaleAcc,
+            realizedGain: depotTaxState.realizedGainAcc,
+            saleTax: depotTaxState.saleTaxAcc,
+            netToCashflow: depotTaxState.grossSaleAcc - depotTaxState.saleTaxAcc,
+            costBasisReduction: depotTaxState.costBasisReductionAcc,
+            closing,
+            costBasisClosing,
+            unrealizedGainClosing,
+            deferredTaxClosing,
+          };
+        })() : undefined,
+
       },
       totalIncomeNet: incomeNet,
       netWorth,

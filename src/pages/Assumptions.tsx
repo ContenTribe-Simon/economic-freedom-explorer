@@ -88,14 +88,23 @@ export default function Assumptions() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="font-display text-xl font-semibold mb-4">Aktieindkomst & holding</h2>
+        <h2 className="font-display text-xl font-semibold mb-2">Personlig aktieindkomst & holding</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Disse satser bruges fælles for holdingudlodning og realiserede gevinster fra almindeligt frit depot.
+          Modellen lægger begge kilder i én årlig aktieindkomst-pulje og bruger 27/42 %-grænsen én gang pr. år.
+          ASK beskattes separat (17 % lagerbeskatning).
+        </p>
         <div className="grid md:grid-cols-3 gap-4">
           <PctField label="Sats lav" value={a.tax.shareLowRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareLowRate: v } }))} />
           <PctField label="Sats høj" value={a.tax.shareHighRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareHighRate: v } }))} />
           <NumberField label="Tærskel (DKK)" value={a.tax.shareThreshold} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, shareThreshold: v } }))} suffix="kr" step={500} hint="2026: 79.400 kr (single)" />
           <PctField label="Selskabsskat (info)" value={a.tax.corporateRate} onChange={(v) => update((x) => ({ ...x, tax: { ...x.tax, corporateRate: v } }))} />
         </div>
+        <p className="text-[11px] text-muted-foreground mt-3">
+          I denne version antager modellen, at holdingudlodning bruger aktieindkomstgrænsen før realiserede depotgevinster. Prioritering kan gøres konfigurerbar i en senere version.
+        </p>
       </Card>
+
 
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-2">Aktiesparekonto (ASK)</h2>
@@ -113,9 +122,25 @@ export default function Assumptions() {
 
         </ul>
       </Card>
+      <Card className="p-6">
+        <h2 className="font-display text-xl font-semibold mb-2">Almindeligt frit depot</h2>
+        <p className="text-sm text-muted-foreground mb-3">
+          Modellen bruger en forsimplet aktieindkomstberegning. Den laver ikke fuld dansk skatteberegning med
+          individuelle positioner, udbytter, tab, fondstyper, ægtefælleoverførsel eller udenlandsk kildeskat
+          i denne version.
+        </p>
+        <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
+          <li><strong>Legacy</strong> bevarer gammel modeladfærd uden eksplicit skat på depotet (default).</li>
+          <li><strong>Simpel realisationsskat</strong> beskatter kun gevinstandelen ved salg fra depotet og bruger samme 27/42 %-grænse som holding.</li>
+          <li><strong>Simpel årlig aktieindkomstskat</strong> beskatter positivt depotafkast årligt — udtræk udløser ingen yderligere skat.</li>
+          <li>Vælges pr. scenarie under <em>Variabler → Almindeligt frit depot</em>.</li>
+          <li>ASK indgår aldrig i denne pulje — ASK fortsætter med 17 % lagerbeskatning.</li>
+        </ul>
+      </Card>
 
 
       <Card className="p-6">
+
         <h2 className="font-display text-xl font-semibold mb-4">Privat pension</h2>
         <p className="text-sm text-muted-foreground">
           Skat på privat pension styres lokalt på hvert pensionsspor (ratepension og livsvarig pension/livrente) under <em>Variabler</em>. Der findes ingen global pensionsskattesats.

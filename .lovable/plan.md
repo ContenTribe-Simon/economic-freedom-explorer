@@ -1,131 +1,81 @@
+# Personlig aktieindkomst v1 – plan
+
 ## Mål
+Indfør én årlig personlig aktieindkomst-pulje, som holdingudlodning og realiserede depotgevinster deler 27/42 %-grænsen i. ASK forbliver helt separat (17 % lagerbeskatning). Default-adfærd uændret — alle eksisterende tests skal passere.
 
-Indføre en tydelig scenarie-arkitektur med tre typer (`base`, `linked_stress_test`, `custom`) hvor linked stress-tests beregnes dynamisk fra aktuel basecase + modifiers — så ændringer i basecase automatisk slår igennem, mens manuelle ændringer eskalerer scenariet til `custom`.
+## Designprincipper
+- **Backwards compat first**: `depotTax.method = "legacy"` er default. Når legacy gælder, kører projection præcis som i dag (også 80.000 brutto → 21.600 skat → 58.400 netto for holding-only).
+- **Én pulje, deterministisk rækkefølge**: holding bruger lav-sats-grænsen først, depotgevinst får resterende. Ingen optimering.
+- **ASK rør jeg ikke**: ASK-skat, audit, withdrawalStrategy og tests forbliver uændrede. ASK-afkast/-udtræk indgår aldrig i den fælles pulje.
+- **Refaktor med minimal blast radius**: ekstrahér en `applyShareIncomeTax(ctx, gross)`-helper og brug den både for holding (alle tre eksisterende kald: planned/extra) og for depot-realisation. Når depot-skat er legacy og ingen depotgevinst findes, er ctx tom og helperen returnerer nøjagtigt samme tal som `shareTax(...)` i dag.
 
-## Datamodel (`src/lib/finance/types.ts`)
+## Datamodel (types.ts)
+- `FreeBucketInputs.depotTax?: DepotTaxInputs`
+  ```
+  { enabled: boolean; method: "legacy" | "realizationSimple" | "annualShareIncomeTax";
+    costBasis: number | null; showDeferredTax: boolean }
+  ```
+  Default undefined ⇒ legacy. `costBasis === null` ⇒ initial cost basis = almindeligt depot markedsværdi (= free.balance − ask.currentValue).
+- `YearFlows.shareIncome?: ShareIncomeTaxYearAudit` med: holdingGross, extraHoldingGross, realizedDepotGain, annualDepotTaxable, totalShareIncome, taxedAtLow, taxedAtHigh, taxLow, taxHigh, taxTotal, thresholdUsedByHolding, thresholdRemainingForDepot.
+- `YearFlows.depot?: DepotYearAudit` med primo/ultimo værdier, costBasis primo/ultimo, urealiseret gevinst, latent skat, brutto salg, realiseret gevinst, skat, netto.
 
-Udvid `Scenario`:
-```ts
-type ScenarioType = "base" | "linked_stress_test" | "custom";
+## Projection.ts ændringer
+1. **State**: ud over `bal.free` (= almindeligt depot ekskl. ASK) trackes `depotCostBasis` (kun når depotTax aktiv). Init = `costBasis ?? bal.free`.
+2. **Per-år context**:
+   ```
+   ctx = { threshold, lowRate, highRate, used: 0 }
+   applyShareIncomeTax(ctx, gross) -> { tax, net, atLow, atHigh }
+   ```
+   Holding-planned + holding-extra køres gennem ctx (legacy-resultat er identisk, fordi de allerede deler `shareTax`-logikken — og ctx.used akkumuleres på tværs af kilder).
+3. **Indskud til depot**: når depotTax aktiv, `depotCostBasis += freeContribution_til_depot` (ASK-delen påvirker ikke kostpris).
+4. **Afkast**: depotCostBasis ændres ikke ved afkast. Når `method = annualShareIncomeTax`, kør positivt depotafkast gennem ctx; træk skat fra bal.free.
+5. **Udtræk fra fri kapital**: `withdrawFromBucket("free", …)` udvides så depot-delen gross-up'es når `method = "realizationSimple"`:
+   - gainRatio = max(0, (bal.free − costBasis)) / bal.free
+   - Solve grossSale så `grossSale − tax(gainRatio·grossSale, ctxRemaining) = netNeeded` (bisection, 30 iter, eps=1 kr).
+   - realizedGain = grossSale·gainRatio → kør gennem ctx.
+   - costBasis reduceres proportionalt: `costBasis *= (1 − grossSale/depotBeforeSale)`, clampes ≥ 0.
+   - ASK-grenen er uændret — ASK-udtræk udløser aldrig aktieindkomstskat.
+6. **Withdrawal strategy samspil**: bevarer eksisterende depotFirst/askFirst/proRata. For proRata gross-up'es kun depot-delen.
 
-interface Scenario {
-  // eksisterende felter...
-  type?: ScenarioType;          // default: "custom" for legacy uden modifiers, "base" hvis ingen baseScenarioId
-  manuallyEdited?: boolean;     // sat når bruger eskalerer fra linked → custom
-  changedFields?: string[];     // valgfri sporing
-}
-```
-
-Bump `MODEL_VERSION` ikke (ingen breaking change i beregningsmotor) men tilføj migration i persist.
-
-## Modifier-katalog (`src/lib/finance/stress.ts`)
-
-Hver `StressModifier` får et eksplicit `allowedFields: string[]` (dot-paths) udover `apply`:
-
-| Modifier | Tilladte felter |
-| --- | --- |
-| `noBarma` | `inputs.holding.balance`, `inputs.holding.expectedExitValue`, `inputs.holding.annualDistribution` |
-| `noPartTime` | `inputs.income.partTime.grossAnnual`, `inputs.income.partTime.netMonthly`, `inputs.fullRetireAge` |
-| `lowReturn` | `assumptionsOverride.realReturn.free/.pension/.holding` |
-| `higherSpending` | `inputs.spending.desiredMonthlyNet` |
-| `noFolkepension` | `inputs.income.statePension.mode` |
-
-Tilføj helper `resolveScenario(scenario, baseScenario)` som for `linked_stress_test`:
-1. Tager dyb kopi af `baseScenario`
-2. Bevarer scenarie-ID/navn/type/modifiers
-3. Anvender hver aktiv modifier via `apply`
-
-## Beregning (`projection.ts` / `kpis.ts`)
-
-**Ingen ændring i selve motoren.** I stedet wrapper på indgangen — alle steder der i dag kalder `project(scenario, assumptions)` skal i stedet hente det resolvede scenarie:
-
-```ts
-const resolved = resolveScenarioForCompute(scenario, scenarios);
-const years = project(resolved, assumptions);
-```
-
-Tilføj én ny helper i `stress.ts` (eller ny `resolve.ts`) — opdater call sites:
-- `Dashboard.tsx`
-- `Projection.tsx`
-- `Scenarios.tsx`
-- `Report.tsx`
-- evt. tests
-
-## Manuel redigering eskalering
-
-`Inputs.tsx` (og `Assumptions.tsx`) — wrap input-handlers så ændring på et `linked_stress_test` udløser bekræftelses-dialog:
-
-> "Dette er et linket stress-test scenarie. Hvis du ændrer dette felt, bliver scenariet konverteret til et manuelt scenarie."
-> [Konvertér til custom] [Annullér]
-
-Konvertering sker via store-action `convertToCustom(id)` der:
-1. Materialiserer det resolvede scenarie (kopierer alle felter ind som concrete values)
-2. Sætter `type = "custom"`, `manuallyEdited = true`
-3. Bevarer `baseScenarioId`/`baseScenarioName` til reference
-
-Whitelist: hvis det ændrede felt er i modifierens `allowedFields`, blokér ændringen helt (eller tillad og opdater stress-konfigurationen — vi vælger blokér, da modifier-værdier er deterministiske).
-
-## Store-actions (`src/store/financeStore.ts`)
-
-Nye/ændrede actions:
-- `convertToCustom(id)` — materialiser linked → custom
-- `rebaseOnCurrentBase(id)` — for custom: kopier basecase-felter ind igen, behold modifiers, sæt `manuallyEdited = false`, type=`linked_stress_test` hvis modifiers findes
-- `resetToCleanStressTest(id)` — drop alle ad-hoc ændringer, bliv `linked_stress_test`
-- Migration ved persist hydrate: scenarier uden `type` får:
-  - `type = "base"` hvis `!baseScenarioId && !modifiers`
-  - `type = "linked_stress_test"` hvis modifiers && passer med modifier whitelist (deep-equal mod resolved)
-  - ellers `type = "custom"`, `manuallyEdited = true`
+## Tax helper (tax.ts)
+Tilføj `applyShareIncomeTax(ctx, gross)` og `shareTaxForGainGivenContext(ctx, gain)`; eksisterende `shareTax()` røres ikke, så øvrige callsites er uændrede.
 
 ## UI
+- **Inputs.tsx**: ny mini-sektion under "Fri/investerbar kapital" der viser depot ekskl. ASK + (når depotTax.enabled) felt for kostpris, urealiseret gevinst og latent skat. Microcopy om kostpris=depotværdi.
+- **Assumptions.tsx**: omdøb sektion til "Personlig aktieindkomst & holding" + forklarende tekst. Ny "Almindeligt frit depot"-blok med method-vælger (legacy/realizationSimple/annualShareIncomeTax) og note om prioriteringsrækkefølge.
+- **Projection.tsx (AuditPanel)**: ny "Personlig aktieindkomstskat"-blok (kilder, lav/høj fordeling, skat). Ny "Almindeligt frit depot"-blok (primo, kostpris, urealiseret, brutto salg, realiseret gevinst, skat, netto, ultimo) — vises kun når method ≠ legacy.
 
-**Sidebar / Scenarie-vælger (AppShell)**: badge ved hvert scenarie:
-- "Base" / "Linket stress-test" / "Custom"
+## Persistens
+- `cloud/models.ts`: serialisér `free.depotTax` + per-år shareIncome/depot audit; tolerér manglende felter ved indlæsning.
+- Snapshots: ingen kode­ændring nødvendig — `resolvedInputs` + `years` indeholder allerede de nye felter via types.
+- JSON import/export: samme.
 
-**Scenarios.tsx**: 
-- Header-cellen viser badge + kort tekst:
-  - linked: "Beregnes ud fra aktuel basecase + modifier."
-  - custom: "Manuelt scenarie – følger ikke basecase."
-- For custom: knapper "Rebasér på basecase" / "Nulstil til stress-test" / "Behold"
+## Scenarier
+DepotTax følger almindelig scenario-arkitektur. Linked stress-tests bruger resolved basecase som i dag. Manuel redigering eskalerer til custom via eksisterende mekanisme — ingen ny modal-logik.
 
-**Inputs.tsx**: Banner øverst når aktivt scenarie er `linked_stress_test`:
-> "Linket stress-test. Felter låst og styres af basecase + modifier."
+## FIRE / Lande / Dashboard / Report
+Ingen ændringer — de bruger projection-output (closing.free, kpis). Lavere fri kapital pga. depot-skat propagerer automatisk.
 
-Inputs disables for ikke-allowed-felter; allowed-felter er også låst (deterministiske).
+## Tests (nyt: `share-income-tax-v1.test.ts`)
+A. Legacy-default = uændret resultat (smoke + holding 80k → 21.600 skat).
+B. Fælles grænse: holding spiser hele lav-grænse → depotgevinst beskattes 42 %.
+C. Realisation: costBasis=marketValue ⇒ gainRatio=0, ingen skat.
+D. Realisation: costBasis=60k/market=100k ⇒ gainRatio=0,4; salg 10k brutto giver 4k gevinst og skat efter ctx.
+E. Gross-up: netNeeded=50k med gainRatio>0 giver grossSale så netto efter skat ≈ 50k (±1 kr).
+F. Kostpris reduceres proportionalt; aldrig negativ.
+G. annualShareIncomeTax: positivt afkast beskattes; negativt giver 0 skat (ingen carryforward i v1).
+H. ASK-separation: ASK-vækst/-udtræk påvirker ikke ctx.totalShareIncome.
+I. WithdrawalStrategy: depotFirst/askFirst/proRata — kun depot-delen beskattes; ask ultimo + depot ultimo = closing.free.
+J. Persistens: roundtrip JSON med/uden depotTax; gamle modeller indlæses uden crash.
+K. Regression: alle eksisterende suites passerer (mål: 288/288 → ≥288 + nye).
 
-For `custom`: lille banner med rebase/reset-handlinger.
+## Acceptkriterier
+Som specificeret i opgaven §19.
 
-## Eksport/import (`financeStore.exportJson` / `importJson`)
+## Eksplicitte forenklinger (vil blive nævnt i microcopy)
+- Holding bruger lav-grænsen før depot (ingen optimerings-strategi i v1).
+- Latent skat på depot vises som indikator, ikke som skattegæld.
+- Negativt depotafkast giver ingen carryforward i annual-mode (v1).
+- Ingen fond/udbytte/kildeskat-håndtering.
 
-`Scenario` eksporteres som-er — de nye felter (`type`, `manuallyEdited`, `changedFields`) følger med naturligt. Validering i `importJson` accepterer manglende felter (kører migration igen).
-
-## Tests (`__tests__/scenario-types.test.ts` ny)
-
-1. Linked "uden Barma" + ændring af basecase `desiredMonthlyNet` 21000 → 15000 → resolved scenarie bruger 15000 og `holding.balance === 0`.
-2. Linked "uden deltid" + ændring af basecase `income.partTime.grossAnnual` (men noPartTime nuller den, så test på et andet felt fx `salary`) → resolved følger ny basecase.
-3. `convertToCustom` på et linked scenarie → type=`custom`, manuallyEdited=true, efterfølgende basecase-ændring påvirker IKKE scenariet.
-4. Eksport→import bevarer `type`, `baseScenarioId`, `modifiers`, `manuallyEdited`.
-5. Migration: legacy scenarie uden `type` men med modifiers og kun modifier-felter ændret → klassificeres som `linked_stress_test`.
-6. Migration: legacy scenarie med modifiers + ekstra ændringer → `custom` + manuallyEdited.
-
-## Filer
-
-| Fil | Ændring |
-| --- | --- |
-| `src/lib/finance/types.ts` | Tilføj `ScenarioType`, udvid `Scenario` |
-| `src/lib/finance/stress.ts` | Tilføj `allowedFields` pr. modifier, `resolveScenarioForCompute`, classify-helper til migration |
-| `src/store/financeStore.ts` | Migration, nye actions, applyStressModifier markerer som linked_stress_test |
-| `src/pages/Scenarios.tsx` | Badges, custom-handlinger, brug resolved scenarie til KPI |
-| `src/pages/Dashboard.tsx` | Brug resolved scenarie |
-| `src/pages/Projection.tsx` | Brug resolved scenarie |
-| `src/pages/Report.tsx` | Brug resolved scenarie |
-| `src/pages/Inputs.tsx` | Eskalerings-dialog, lock UI for linked, banners |
-| `src/components/AppShell.tsx` | Badge i scenarie-listen |
-| `src/lib/finance/__tests__/scenario-types.test.ts` | Ny testsuite |
-| `src/lib/finance/MODEL.md` | Dokumentér scenarie-typer |
-
-## Garantier
-
-- Ingen ændring i `projection.ts`, `kpis.ts`, `tax.ts`, `sanity.ts`.
-- Ingen ændring i shortfall/holding/pension/score-logik.
-- Eksisterende scenarier bevares via migration.
-- Alle eksisterende tests skal fortsat passere.
+Bekræft planen, så implementerer jeg.

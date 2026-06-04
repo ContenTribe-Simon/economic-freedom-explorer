@@ -336,6 +336,57 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
           </section>
         )}
 
+        {f.shareIncome && (
+          <section data-testid="audit-share-income">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Personlig aktieindkomstskat</div>
+            <Row label="Holdingudlodning brutto" value={f.shareIncome.holdingGross} indent />
+            <Row label="Ekstra holdingudlodning brutto" value={f.shareIncome.extraHoldingGross} indent />
+            <Row label="Realiseret depotgevinst" value={f.shareIncome.realizedDepotGain} indent />
+            {f.shareIncome.annualDepotTaxable > 0 && (
+              <Row label="Årligt skattepligtigt depotafkast" value={f.shareIncome.annualDepotTaxable} indent />
+            )}
+            <Row label="Samlet aktieindkomst" value={f.shareIncome.totalShareIncome} strong />
+            <Row label={`Beskattet ved lav sats (${Math.round(f.shareIncome.lowRate * 100)} %)`} value={f.shareIncome.taxedAtLow} indent />
+            <Row label={`Beskattet ved høj sats (${Math.round(f.shareIncome.highRate * 100)} %)`} value={f.shareIncome.taxedAtHigh} indent />
+            <Row label="Skat ved lav sats" value={-f.shareIncome.taxLow} indent />
+            <Row label="Skat ved høj sats" value={-f.shareIncome.taxHigh} indent />
+            <Row label="Aktieindkomstskat i alt" value={-f.shareIncome.taxTotal} strong />
+            <p className="text-[11px] text-muted-foreground mt-2 italic">
+              Holding bruger lav-grænsen ({Math.round(f.shareIncome.thresholdUsedByHolding).toLocaleString("da-DK")} kr.) før depotgevinst. Resterende lav-grænse: {Math.round(f.shareIncome.thresholdRemainingForDepot).toLocaleString("da-DK")} kr.
+            </p>
+          </section>
+        )}
+
+        {f.depot && f.depot.method !== "legacy" && (
+          <section data-testid="audit-depot">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Almindeligt frit depot</div>
+            <Row label="Depot primo" value={f.depot.opening} indent />
+            <Row label="Skattemæssig kostpris primo" value={f.depot.costBasisOpening} indent />
+            <Row label="Urealiseret gevinst primo" value={f.depot.unrealizedGainOpening} indent />
+            <Row label="Latent skat primo (indikator)" value={f.depot.deferredTaxOpening} indent />
+            <Row label="Indskud til depot" value={f.depot.contribution} indent />
+            <Row label="Depot-afkast før skat" value={f.depot.growthGross} indent />
+            {f.depot.annualTax > 0 && (
+              <Row label="Årlig aktieindkomstskat (depot)" value={-f.depot.annualTax} indent />
+            )}
+            {f.depot.grossSale > 0 && (
+              <>
+                <Row label="Brutto salg fra depot" value={-f.depot.grossSale} indent />
+                <Row label="Realiseret depotgevinst" value={f.depot.realizedGain} indent />
+                <Row label="Skat af depotgevinst" value={-f.depot.saleTax} indent />
+                <Row label="Netto fra depot til cashflow" value={f.depot.netToCashflow} indent />
+                <Row label="Kostpris reduceret ved salg" value={-f.depot.costBasisReduction} indent />
+              </>
+            )}
+            <Row label="Depot ultimo" value={f.depot.closing} strong />
+            <Row label="Skattemæssig kostpris ultimo" value={f.depot.costBasisClosing} indent />
+            <Row label="Urealiseret gevinst ultimo" value={f.depot.unrealizedGainClosing} indent />
+            <Row label="Latent skat ultimo (indikator)" value={f.depot.deferredTaxClosing} indent />
+          </section>
+        )}
+
+
+
 
         <section>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Udgående saldi</div>
