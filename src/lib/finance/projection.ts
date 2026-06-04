@@ -168,6 +168,25 @@ function withdrawFromBucket(
     return { netCovered, gross: grossOut, tax: taxOut };
   }
   if (bucket === "holding") {
+    if (depotTax?.ctx) {
+      // Shared-pool: brug aktieindkomst-pulje (delt 27/42-grænse med depotgevinst).
+      // Iterativt gross-up: tax afhænger af ctx.used, så solve s.
+      const ctx = depotTax.ctx;
+      const remainingLow = Math.max(0, ctx.threshold - ctx.used);
+      // Inverse: net = grossNeeded - tax; tax = min(g, remLow)*lowRate + max(0, g-remLow)*highRate
+      let grossNeeded: number;
+      const lowCap = remainingLow * (1 - ctx.lowRate);
+      if (netNeeded <= lowCap) {
+        grossNeeded = ctx.lowRate < 1 ? netNeeded / (1 - ctx.lowRate) : netNeeded;
+      } else {
+        const overNet = netNeeded - lowCap;
+        grossNeeded = remainingLow + (ctx.highRate < 1 ? overNet / (1 - ctx.highRate) : overNet);
+      }
+      const take = Math.min(bal.holding, grossNeeded);
+      const r = applyShareIncomeTax(ctx, take);
+      bal.holding -= take;
+      return { netCovered: r.net, gross: take, tax: r.tax };
+    }
     const grossNeeded = grossHoldingForNet(netNeeded, a.tax);
     const take = Math.min(bal.holding, grossNeeded);
     const { net, tax } = shareTax(take, a.tax);
@@ -180,6 +199,7 @@ function withdrawFromBucket(
   bal.pension -= take;
   return { netCovered: net, gross: take, tax };
 }
+
 
 
 
