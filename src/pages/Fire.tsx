@@ -57,6 +57,12 @@ export default function FirePage() {
           Resultaterne er indikative benchmarks — ikke finansiel rådgivning.
         </p>
       </header>
+      <FireMilestoneMap
+        analysis={analysis}
+        currentAge={scenario.inputs.person.currentAge}
+        plannedStopAge={scenario.inputs.stopAge}
+        fullPensionAge={scenario.inputs.fullRetireAge}
+      />
 
       {/* ---- Konklusion ---- */}
       <Card className="p-5" data-testid="fire-summary">
