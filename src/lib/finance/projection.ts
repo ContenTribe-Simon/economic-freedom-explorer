@@ -498,11 +498,17 @@ export function projectWithStopAge(
     };
 
     const order = buildOrder();
+    const askStrategy: AskWithdrawalStrategy = askActive
+      ? (askInput!.withdrawalStrategy ?? "depotFirst")
+      : "depotFirst";
+    let askDepotWithdrawYear = 0;
     const trackAskWithdraw = (n: number) => { askWithdrawYear += n; };
+    const trackDepotWithdraw = (n: number) => { askDepotWithdrawYear += n; };
     const drainShortfall = (needed: number) => {
       for (const b of order) {
         if (needed <= 0) break;
-        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, trackAskWithdraw);
+        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw);
+
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
         if (b === "pension") {
