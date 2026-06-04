@@ -10,13 +10,18 @@ import {
 } from "./types";
 
 import {
+  applyShareIncomeTax,
   grossHoldingForNet,
   grossPensionForNet,
+  grossSaleForNetNeeded,
   laborTax,
+  newShareIncomeCtx,
   pensionPayoutTax,
   shareTax,
+  type ShareIncomeCtx,
 } from "./tax";
 import { computeLifeEventEffects } from "./lifeEvents";
+
 
 export function mergeAssumptions(global: Assumptions, override?: Partial<Assumptions>): Assumptions {
   if (!override) return global;
