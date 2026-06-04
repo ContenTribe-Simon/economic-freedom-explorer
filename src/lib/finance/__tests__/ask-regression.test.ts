@@ -43,12 +43,19 @@ describe("ASK v0 regression — fri kapital adfærd er låst", () => {
   it("udtræk fra fri kapital er skattefrit (gross == net, tax == 0)", () => {
     // Tving shortfall så fri kapital tappes
     const s = makeBaseScenario();
+    s.inputs.person.currentAge = 60;
+    s.inputs.stopAge = 55;
+    s.inputs.fullRetireAge = 55;
     s.inputs.free.balance = 500_000;
     s.inputs.free.monthlyContribution = 0;
     s.inputs.free.annualExtraContribution = 0;
     s.inputs.income.salaryGross = 0;
     s.inputs.income.familyFundAnnualNet = 0;
     s.inputs.income.statePension.mode = "none";
+    s.inputs.income.partTime = { mode: "net_monthly", grossAnnual: 0, netMonthly: 0, fromAge: 99, untilAge: 99 };
+    s.inputs.pension.balance = 0;
+    s.inputs.holding.balance = 0;
+    s.inputs.holding.expectedExitValue = 0;
     s.inputs.spending.desiredMonthlyNet = 20_000;
     s.inputs.debts = [];
 
