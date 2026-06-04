@@ -38,6 +38,8 @@ export interface FreeBucketInputs {
  * giver samme resultater som tidligere. ASK-værdien tæller som en del af
  * den eksisterende fri kapital — ikke et beløb oveni.
  */
+export type AskWithdrawalStrategy = "depotFirst" | "askFirst" | "proRata";
+
 export interface AskInputs {
   enabled: boolean;
   /** Nuværende ASK-værdi — tæller som "heraf ASK" af fri kapital. */
@@ -54,7 +56,10 @@ export interface AskInputs {
   taxCreditCarryForward: number;
   /** Hvordan ASK-skat betales — i denne version altid fratrukket ASK. */
   taxPaymentMode: "deductFromASK";
+  /** Nedsparingsrækkefølge mellem alm. depot og ASK. Default "depotFirst". */
+  withdrawalStrategy?: AskWithdrawalStrategy;
 }
+
 
 export type LifeAnnuityMode = "gross" | "net";
 
@@ -362,8 +367,12 @@ export interface AskYearAudit {
   carryForwardUsed: number;
   /** Fremført negativ skat ultimo. */
   carryForwardEnd: number;
-  /** Udtræk fra ASK (efter depot er drænet). */
+  /** Udtræk fra ASK (efter strategi). */
   withdrawal: number;
+  /** Udtræk fra almindeligt frit depot (efter strategi). */
+  withdrawalFreeDepot: number;
+  /** Anvendt nedsparingsrækkefølge i året. */
+  withdrawalStrategy: AskWithdrawalStrategy;
   /** Ultimo ASK. */
   closing: number;
   /** Ultimo almindeligt frit depot. */
@@ -375,6 +384,7 @@ export interface AskYearAudit {
   /** Indikator for om auto-fill (autoFillFirst) var aktivt i året. */
   autoFillFirst: boolean;
 }
+
 
 /** Aggregeret effekt af aktive livsfaser i et givent år. */
 export interface LifeEventYearEffect {

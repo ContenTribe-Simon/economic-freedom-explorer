@@ -1,5 +1,6 @@
 import {
   Assumptions,
+  AskWithdrawalStrategy,
   Bucket,
   DebtItem,
   DebtYearDetail,
@@ -7,6 +8,7 @@ import {
   ScenarioInputs,
   YearRow,
 } from "./types";
+
 import {
   grossHoldingForNet,
   grossPensionForNet,
@@ -43,22 +45,42 @@ function withdrawFromBucket(
   bal: Balances,
   a: Assumptions,
   pensionTaxRate: number,
+  askStrategy: AskWithdrawalStrategy = "depotFirst",
   onAskWithdraw?: (n: number) => void,
+  onDepotWithdraw?: (n: number) => void,
 ): { netCovered: number; gross: number; tax: number } {
   if (netNeeded <= 0) return { netCovered: 0, gross: 0, tax: 0 };
   if (bucket === "free") {
-    // Træk først fra almindeligt depot, dernæst fra ASK (sub-bucket).
-    const fromDepot = Math.min(bal.free, netNeeded);
-    bal.free -= fromDepot;
-    let take = fromDepot;
-    let rem = netNeeded - fromDepot;
-    if (rem > 0 && bal.ask > 0) {
-      const fromAsk = Math.min(bal.ask, rem);
-      bal.ask -= fromAsk;
-      take += fromAsk;
-      onAskWithdraw?.(fromAsk);
+    const total = bal.free + bal.ask;
+    const take = Math.min(total, netNeeded);
+    if (take <= 0) return { netCovered: 0, gross: 0, tax: 0 };
+    let fromDepot = 0;
+    let fromAsk = 0;
+    if (askStrategy === "askFirst") {
+      fromAsk = Math.min(bal.ask, take);
+      fromDepot = Math.min(bal.free, take - fromAsk);
+    } else if (askStrategy === "proRata" && bal.ask > 0 && bal.free > 0) {
+      const ratio = bal.ask / (bal.ask + bal.free);
+      fromAsk = Math.min(bal.ask, take * ratio);
+      fromDepot = Math.min(bal.free, take - fromAsk);
+      // Any rounding/cap remainder: fill from whichever still has balance.
+      let remainder = take - fromAsk - fromDepot;
+      if (remainder > 0) {
+        const addAsk = Math.min(bal.ask - fromAsk, remainder);
+        fromAsk += addAsk;
+        remainder -= addAsk;
+        if (remainder > 0) fromDepot += Math.min(bal.free - fromDepot, remainder);
+      }
+    } else {
+      // depotFirst (default) — også når der ikke er ASK-saldo i proRata-tilfælde.
+      fromDepot = Math.min(bal.free, take);
+      fromAsk = Math.min(bal.ask, take - fromDepot);
     }
-    return { netCovered: take, gross: take, tax: 0 };
+    bal.free -= fromDepot;
+    bal.ask -= fromAsk;
+    if (fromDepot > 0) onDepotWithdraw?.(fromDepot);
+    if (fromAsk > 0) onAskWithdraw?.(fromAsk);
+    return { netCovered: fromDepot + fromAsk, gross: fromDepot + fromAsk, tax: 0 };
   }
   if (bucket === "holding") {
     const grossNeeded = grossHoldingForNet(netNeeded, a.tax);
@@ -73,6 +95,7 @@ function withdrawFromBucket(
   bal.pension -= take;
   return { netCovered: net, gross: take, tax };
 }
+
 
 interface DebtTotals {
   privateInterest: number;
@@ -475,11 +498,17 @@ export function projectWithStopAge(
     };
 
     const order = buildOrder();
+    const askStrategy: AskWithdrawalStrategy = askActive
+      ? (askInput!.withdrawalStrategy ?? "depotFirst")
+      : "depotFirst";
+    let askDepotWithdrawYear = 0;
     const trackAskWithdraw = (n: number) => { askWithdrawYear += n; };
+    const trackDepotWithdraw = (n: number) => { askDepotWithdrawYear += n; };
     const drainShortfall = (needed: number) => {
       for (const b of order) {
         if (needed <= 0) break;
-        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, trackAskWithdraw);
+        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw);
+
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
         if (b === "pension") {
@@ -663,6 +692,9 @@ export function projectWithStopAge(
           carryForwardUsed: askCarryUsed,
           carryForwardEnd: askCarryForward,
           withdrawal: askWithdrawYear,
+          withdrawalFreeDepot: askDepotWithdrawYear,
+          withdrawalStrategy: askStrategy,
+
           closing: bal.ask,
           freeDepotClosing: bal.free,
           depositLimit: askDepositLimit,
