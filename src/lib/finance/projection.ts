@@ -529,23 +529,47 @@ export function projectWithStopAge(
       ? stopAge
       : inp.holding.distributionFromAge;
 
+    // ---- Aktieindkomst-pulje + depot-skat state (per år) ----
+    // Når depotTax ikke er aktiv, holder vi shareCtx=undefined → al holding-skat kører legacy.
+    const shareCtx: ShareIncomeCtx | undefined = depotTaxActive ? newShareIncomeCtx(a.tax) : undefined;
+    const depotPrimo = bal.free;
+    const depotCostBasisPrimo = depotCostBasis;
+    let depotContributionYear = 0;
+    const depotTaxState: DepotTaxState | undefined =
+      depotTaxActive && depotTaxMethod === "realizationSimple"
+        ? {
+            ctx: shareCtx!,
+            costBasis: depotCostBasis,
+            grossSaleAcc: 0,
+            realizedGainAcc: 0,
+            saleTaxAcc: 0,
+            costBasisReductionAcc: 0,
+          }
+        : undefined;
+
     // ---- Planlagt holdingudlodning ----
     const holdingPlanned = { gross: 0, net: 0, tax: 0 };
     const canDistribute = bal.holding > 0 && age >= distFromAge;
     if (canDistribute) {
       if (holdingStrategy === "up_to_low_threshold") {
-        // Udlod automatisk op til lav-sats grænse (brutto)
         holdingPlanned.gross = Math.min(bal.holding, a.tax.shareThreshold);
       } else if (inp.holding.annualDistribution > 0) {
         holdingPlanned.gross = Math.min(bal.holding, inp.holding.annualDistribution);
       }
       if (holdingPlanned.gross > 0) {
-        const r = shareTax(holdingPlanned.gross, a.tax);
-        holdingPlanned.net = r.net;
-        holdingPlanned.tax = r.tax;
+        if (shareCtx) {
+          const r = applyShareIncomeTax(shareCtx, holdingPlanned.gross);
+          holdingPlanned.net = r.net;
+          holdingPlanned.tax = r.tax;
+        } else {
+          const r = shareTax(holdingPlanned.gross, a.tax);
+          holdingPlanned.net = r.net;
+          holdingPlanned.tax = r.tax;
+        }
         bal.holding -= holdingPlanned.gross;
       }
     }
+
 
     // Gæld
     syncLinkedLiabilities(debts);
