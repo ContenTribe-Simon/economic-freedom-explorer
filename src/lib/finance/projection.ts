@@ -37,6 +37,9 @@ export function mergeAssumptions(global: Assumptions, override?: Partial<Assumpt
 /** Grov, gennemsnitlig effektiv sats til latent skat-indikator i audit. */
 function ctxEffectiveRate(ctx: ShareIncomeCtx): number {
   return (ctx.lowRate + ctx.highRate) / 2;
+}
+
+
 
 
 interface Balances {
