@@ -475,10 +475,11 @@ export function projectWithStopAge(
     };
 
     const order = buildOrder();
+    const trackAskWithdraw = (n: number) => { askWithdrawYear += n; };
     const drainShortfall = (needed: number) => {
       for (const b of order) {
         if (needed <= 0) break;
-        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate);
+        const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, trackAskWithdraw);
         withdrawals[b] += r.netCovered;
         withdrawalsGross[b] += r.gross;
         if (b === "pension") {
@@ -502,6 +503,23 @@ export function projectWithStopAge(
       }
     };
 
+    // Allokering af planlagt fri opsparing — fyld evt. ASK først.
+    const allocateFreeContribution = (amount: number) => {
+      if (amount <= 0) return;
+      if (askActive && askInput!.autoFillFirst) {
+        const room = Math.max(0, askDepositLimit - askPriorYearEnd);
+        const toAsk = Math.min(amount, room);
+        if (toAsk > 0) {
+          bal.ask += toAsk;
+          askContribYear += toAsk;
+        }
+        const toDepot = amount - toAsk;
+        if (toDepot > 0) bal.free += toDepot;
+      } else {
+        bal.free += amount;
+      }
+    };
+
     let unallocatedCashflow = 0;
     const plannedActive = plannedStopAge === null || age < plannedStopAge;
     const rawPlanned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
@@ -512,16 +530,16 @@ export function projectWithStopAge(
       if (savingsLogic === "cashflow") {
         if (cashflow >= 0) {
           freeContribution = cashflow;
-          bal.free += freeContribution;
+          allocateFreeContribution(freeContribution);
         } else drainShortfall(-cashflow);
       } else if (savingsLogic === "planned") {
         freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
-        bal.free += freeContribution;
+        allocateFreeContribution(freeContribution);
         // Overskydende cashflow ud over planlagt opsparing investeres IKKE — vises som ikke-allokeret.
         unallocatedCashflow = Math.max(0, cashflow - freeContribution);
       } else {
         freeContribution = planned;
-        bal.free += freeContribution;
+        allocateFreeContribution(freeContribution);
         const net = cashflow - planned;
         if (net < 0) drainShortfall(-net);
         else unallocatedCashflow = net;
@@ -529,7 +547,7 @@ export function projectWithStopAge(
     } else {
       if (cashflow >= 0) {
         freeContribution = cashflow;
-        bal.free += freeContribution;
+        allocateFreeContribution(freeContribution);
       } else {
         drainShortfall(-cashflow);
       }
