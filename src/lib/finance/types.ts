@@ -344,6 +344,30 @@ export interface YearFlows {
   holdingFinancingShortfall: number;
   /** Effekt fra aktive livsfaser i året (kun udfyldt når der er aktive events). */
   lifeEventEffects?: LifeEventYearEffect;
+  /** Detaljeret ASK-bevægelse for året (kun udfyldt når ASK er aktiveret). */
+  ask?: AskYearAudit;
+}
+
+/** Audit-detaljer for ASK i et givent år. */
+export interface AskYearAudit {
+  /** Primo ASK-værdi. */
+  opening: number;
+  /** Indskud til ASK fra fri opsparing. */
+  contribution: number;
+  /** ASK-afkast før skat. */
+  growthGross: number;
+  /** ASK-skat (positivt = betalt, fratrukket ASK). */
+  tax: number;
+  /** Brugt af fremført negativ skat i år. */
+  carryForwardUsed: number;
+  /** Fremført negativ skat ultimo. */
+  carryForwardEnd: number;
+  /** Udtræk fra ASK (efter depot er drænet). */
+  withdrawal: number;
+  /** Ultimo ASK. */
+  closing: number;
+  /** Ultimo almindeligt frit depot. */
+  freeDepotClosing: number;
 }
 
 /** Aggregeret effekt af aktive livsfaser i et givent år. */
