@@ -6,6 +6,7 @@ import {
   DebtYearDetail,
   Scenario,
   ScenarioInputs,
+  ShareIncomeFundingStrategy,
   YearRow,
 } from "./types";
 
@@ -407,6 +408,8 @@ export function projectWithStopAge(
   const depotTaxInput = inp.free.depotTax;
   const depotTaxActive = !!depotTaxInput?.enabled && depotTaxInput?.method !== "legacy";
   const depotTaxMethod = depotTaxInput?.method ?? "legacy";
+  const fundingStrategy: ShareIncomeFundingStrategy =
+    depotTaxInput?.shareIncomeFundingStrategy ?? "holdingFirst";
   const depotInitialValue = totalFreeOpening - askInitialValue;
   // Kostpris: null ⇒ markedsværdi (ingen latent gevinst).
   let depotCostBasis = depotTaxActive
@@ -647,6 +650,16 @@ export function projectWithStopAge(
           if (idx > -1) filtered.splice(idx, 1);
         }
       }
+      // shareIncomeFundingStrategy: reorder holding vs. free når depotTax er aktiv.
+      if (depotTaxActive && fundingStrategy === "holdingFirst") {
+        const holdingIdx = filtered.indexOf("holding");
+        const freeIdx = filtered.indexOf("free");
+        if (holdingIdx > -1 && freeIdx > -1 && holdingIdx > freeIdx) {
+          filtered.splice(holdingIdx, 1);
+          filtered.splice(freeIdx, 0, "holding");
+        }
+      }
+      // depotFirst og proRata: depot/free kommer først (standard withdrawOrder).
       return filtered;
     };
 
@@ -658,6 +671,33 @@ export function projectWithStopAge(
     const trackAskWithdraw = (n: number) => { askWithdrawYear += n; };
     const trackDepotWithdraw = (n: number) => { askDepotWithdrawYear += n; };
     const drainShortfall = (needed: number) => {
+      // proRata: når depotTax aktiv og både holding og free er i drain-order,
+      // split første pass proportionalt mellem dem efter disponible saldi.
+      if (
+        depotTaxActive &&
+        fundingStrategy === "proRata" &&
+        needed > 0 &&
+        order.includes("holding") &&
+        order.includes("free") &&
+        bal.holding > 0 &&
+        bal.free > 0
+      ) {
+        const total = bal.holding + bal.free;
+        const holdingShare = needed * (bal.holding / total);
+        const freeShare = needed - holdingShare;
+        for (const [b, share] of [["holding", holdingShare], ["free", freeShare]] as const) {
+          if (share <= 0) continue;
+          const r = withdrawFromBucket(b, share, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw, depotTaxState);
+          withdrawals[b] += r.netCovered;
+          withdrawalsGross[b] += r.gross;
+          if (b === "holding") {
+            holdingExtra.net += r.netCovered;
+            holdingExtra.gross += r.gross;
+            holdingExtra.tax += r.tax;
+          }
+          needed -= r.netCovered;
+        }
+      }
       for (const b of order) {
         if (needed <= 0) break;
         const r = withdrawFromBucket(b, needed, bal, a, rateTaxRate, askStrategy, trackAskWithdraw, trackDepotWithdraw, depotTaxState);
@@ -894,6 +934,17 @@ export function projectWithStopAge(
           const totalShareIncome = ctx.used;
           const taxedAtLow = Math.min(totalShareIncome, ctx.threshold);
           const taxedAtHigh = Math.max(0, totalShareIncome - ctx.threshold);
+          const holdingTotalGross = holdingPlanned.gross + holdingExtra.gross;
+          const holdingTotalTax = holdingPlanned.tax + holdingExtra.tax;
+          const fundedFromHolding = holdingPlanned.net + holdingExtra.net;
+          const fundedFromDepot = depotTaxState.grossSaleAcc - depotTaxState.saleTaxAcc;
+          const taxAllocatedHolding = holdingTotalGross > 0
+            ? (ctx.taxLow + ctx.taxHigh) * (holdingTotalGross / Math.max(1e-9, holdingTotalGross + realizedDepotGain + annualDepotTaxable))
+            : 0;
+          const taxAllocatedDepot = (ctx.taxLow + ctx.taxHigh) - taxAllocatedHolding;
+          // Fald tilbage til faktiske skattetal når muligt (mere præcist end pro-rata):
+          const taxAllocatedHoldingExact = Math.min(holdingTotalTax, ctx.taxLow + ctx.taxHigh);
+          const taxAllocatedDepotExact = Math.max(0, ctx.taxLow + ctx.taxHigh - taxAllocatedHoldingExact);
           return {
             threshold: ctx.threshold,
             lowRate: ctx.lowRate,
@@ -910,6 +961,11 @@ export function projectWithStopAge(
             taxTotal: ctx.taxLow + ctx.taxHigh,
             thresholdUsedByHolding,
             thresholdRemainingForDepot,
+            fundingStrategy,
+            fundedFromHolding,
+            fundedFromDepot,
+            taxAllocatedHolding: taxAllocatedHoldingExact || taxAllocatedHolding,
+            taxAllocatedDepot: taxAllocatedDepotExact || taxAllocatedDepot,
           };
         })() : undefined,
         depot: depotTaxState ? (() => {

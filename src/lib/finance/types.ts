@@ -42,12 +42,24 @@ export interface FreeBucketInputs {
  */
 export type DepotTaxMethod = "legacy" | "realizationSimple" | "annualShareIncomeTax";
 
+/**
+ * Udbetalingsrækkefølge mellem holding og almindeligt frit depot, når begge
+ * kan levere privat cashflow gennem den fælles aktieindkomst-pulje.
+ *  - "holdingFirst": holding-udlodning forsøges først (default).
+ *  - "depotFirst":   almindeligt depot bruges først, derefter holding.
+ *  - "proRata":      cashflow-behov fordeles proportionalt mellem kilderne.
+ * ASK indgår aldrig — ASK har sin egen withdrawalStrategy.
+ */
+export type ShareIncomeFundingStrategy = "holdingFirst" | "depotFirst" | "proRata";
+
 export interface DepotTaxInputs {
   enabled: boolean;
   method: DepotTaxMethod;
   /** Kostpris ved start. null ⇒ sættes lig depot markedsværdi (ingen latent gevinst). */
   costBasis: number | null;
   showDeferredTax: boolean;
+  /** Udbetalingsrækkefølge mellem holding og depot. Default "holdingFirst". */
+  shareIncomeFundingStrategy?: ShareIncomeFundingStrategy;
 }
 
 
@@ -396,6 +408,16 @@ export interface ShareIncomeTaxYearAudit {
   thresholdUsedByHolding: number;
   /** Resterende lav-grænse tilgængelig for depotgevinst efter holding. */
   thresholdRemainingForDepot: number;
+  /** Valgt udbetalingsrækkefølge mellem holding og depot. */
+  fundingStrategy?: ShareIncomeFundingStrategy;
+  /** Netto cashflow leveret af holding (planlagt + ekstra). */
+  fundedFromHolding?: number;
+  /** Netto cashflow leveret af almindeligt depot (efter skat). */
+  fundedFromDepot?: number;
+  /** Skat allokeret til holding-kilder. */
+  taxAllocatedHolding?: number;
+  /** Skat allokeret til depot-kilder. */
+  taxAllocatedDepot?: number;
 }
 
 /** Audit af almindeligt frit depot (ekskl. ASK), kun ved depotTax aktiv. */

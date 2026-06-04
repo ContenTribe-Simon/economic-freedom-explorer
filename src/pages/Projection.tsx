@@ -339,6 +339,24 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
         {f.shareIncome && (
           <section data-testid="audit-share-income">
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Personlig aktieindkomstskat</div>
+            {f.shareIncome.fundingStrategy && (
+              <div className="mb-2 p-2 rounded-md border border-border bg-muted/30" data-testid="audit-share-income-funding">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
+                  Udbetalingsrækkefølge: {f.shareIncome.fundingStrategy === "holdingFirst" ? "Holding først" : f.shareIncome.fundingStrategy === "depotFirst" ? "Depot først" : "Pro rata"}
+                </div>
+                <p className="text-[11px] text-muted-foreground mb-2 italic">
+                  {f.shareIncome.fundingStrategy === "holdingFirst" && "Modellen bruger holdingudlodning før almindeligt depot."}
+                  {f.shareIncome.fundingStrategy === "depotFirst" && "Modellen bruger almindeligt depot før holdingudlodning."}
+                  {f.shareIncome.fundingStrategy === "proRata" && "Modellen fordeler cashflow mellem holding og depot proportionalt med deres saldi."}
+                </p>
+                <Row label="Netto fra holding" value={f.shareIncome.fundedFromHolding ?? 0} indent />
+                <Row label="Brutto holdingudlodning" value={f.shareIncome.holdingGross + f.shareIncome.extraHoldingGross} indent />
+                <Row label="Skat allokeret til holding" value={-(f.shareIncome.taxAllocatedHolding ?? 0)} indent />
+                <Row label="Netto fra depot" value={f.shareIncome.fundedFromDepot ?? 0} indent />
+                <Row label="Brutto depotsalg + realiseret gevinst" value={f.shareIncome.realizedDepotGain} indent />
+                <Row label="Skat allokeret til depot" value={-(f.shareIncome.taxAllocatedDepot ?? 0)} indent />
+              </div>
+            )}
             <Row label="Holdingudlodning brutto" value={f.shareIncome.holdingGross} indent />
             <Row label="Ekstra holdingudlodning brutto" value={f.shareIncome.extraHoldingGross} indent />
             <Row label="Realiseret depotgevinst" value={f.shareIncome.realizedDepotGain} indent />
@@ -352,7 +370,7 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
             <Row label="Skat ved høj sats" value={-f.shareIncome.taxHigh} indent />
             <Row label="Aktieindkomstskat i alt" value={-f.shareIncome.taxTotal} strong />
             <p className="text-[11px] text-muted-foreground mt-2 italic">
-              Holding bruger lav-grænsen ({Math.round(f.shareIncome.thresholdUsedByHolding).toLocaleString("da-DK")} kr.) før depotgevinst. Resterende lav-grænse: {Math.round(f.shareIncome.thresholdRemainingForDepot).toLocaleString("da-DK")} kr.
+              27/42 %-grænsen bruges kun én gang pr. år, uanset rækkefølge. Lav-grænsen brugt af holding: {Math.round(f.shareIncome.thresholdUsedByHolding).toLocaleString("da-DK")} kr. Resterende lav-grænse til depot: {Math.round(f.shareIncome.thresholdRemainingForDepot).toLocaleString("da-DK")} kr.
             </p>
           </section>
         )}
