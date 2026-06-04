@@ -108,6 +108,9 @@ export default function Assumptions() {
           <li>Skatten fratrækkes ASK-værdien i modellen.</li>
           <li>Negativt afkast giver ingen skat — tabet fremføres og modregnes i senere gevinster.</li>
           <li>ASK aktiveres pr. scenarie under <em>Variabler → Aktiesparekonto</em>.</li>
+          <li>Nedsparingsrækkefølge (almindeligt depot først / ASK først / pro rata) vælges også pr. scenarie.</li>
+          <li>ASK kan vokse over indskudsloftet via afkast — det blokerer kun for yderligere indskud, ikke for udtræk.</li>
+
         </ul>
       </Card>
 
