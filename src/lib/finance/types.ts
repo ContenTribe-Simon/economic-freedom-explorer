@@ -38,6 +38,8 @@ export interface FreeBucketInputs {
  * giver samme resultater som tidligere. ASK-værdien tæller som en del af
  * den eksisterende fri kapital — ikke et beløb oveni.
  */
+export type AskWithdrawalStrategy = "depotFirst" | "askFirst" | "proRata";
+
 export interface AskInputs {
   enabled: boolean;
   /** Nuværende ASK-værdi — tæller som "heraf ASK" af fri kapital. */
@@ -54,7 +56,10 @@ export interface AskInputs {
   taxCreditCarryForward: number;
   /** Hvordan ASK-skat betales — i denne version altid fratrukket ASK. */
   taxPaymentMode: "deductFromASK";
+  /** Nedsparingsrækkefølge mellem alm. depot og ASK. Default "depotFirst". */
+  withdrawalStrategy?: AskWithdrawalStrategy;
 }
+
 
 export type LifeAnnuityMode = "gross" | "net";
 
