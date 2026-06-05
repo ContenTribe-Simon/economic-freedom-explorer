@@ -324,6 +324,7 @@ export type CapitalWithdrawalStrategy =
   | "holdingFirst"
   | "askFirst"
   | "pensionFirst"
+  | "pensionThenHolding"
   | "proRata"
   | "custom";
 

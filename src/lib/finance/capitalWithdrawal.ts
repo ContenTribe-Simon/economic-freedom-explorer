@@ -11,6 +11,7 @@ const DEFAULT_ORDERS: Record<Exclude<CapitalWithdrawalStrategy, "custom" | "proR
   holdingFirst: ["holding", "depot", "ask", "pension"],
   askFirst: ["ask", "depot", "holding", "pension"],
   pensionFirst: ["pension", "depot", "holding", "ask"],
+  pensionThenHolding: ["pension", "holding", "depot", "ask"],
 };
 
 /** Resolve den rækkefølge kilderne forsøges i for en given strategi. */

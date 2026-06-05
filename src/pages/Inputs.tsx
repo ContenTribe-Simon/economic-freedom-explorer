@@ -843,13 +843,19 @@ function DepotTaxSection({ inp, set }: { inp: ScenarioInputs; set: <K extends ke
                 value={method}
                 onChange={(e) => updateDepotTax({ method: e.target.value as "legacy" | "realizationSimple" | "annualShareIncomeTax" })}
               >
-                <option value="legacy">Legacy / ingen eksplicit skat</option>
+                <option value="legacy">Uden eksplicit depot-skat</option>
                 <option value="realizationSimple">Simpel realisationsskat ved udtræk</option>
                 <option value="annualShareIncomeTax">Simpel årlig aktieindkomstskat af positivt afkast</option>
               </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Holdingudlodning og realiserede depotgevinster deler den personlige aktieindkomstgrænse (27/42 %).
-              </p>
+              {method === "legacy" ? (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Modellen beregner ikke særskilt skat på almindeligt depot i denne indstilling. Brug en af de andre metoder, hvis depotafkast eller realiserede gevinster skal beskattes i fremskrivningen.
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Holdingudlodning og realiserede depotgevinster deler den personlige aktieindkomstgrænse (27/42 %).
+                </p>
+              )}
             </div>
             <NumField
               label="Skattemæssig kostpris"
@@ -883,9 +889,9 @@ function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K e
       <div>
         <h2 className="font-display text-xl font-semibold">Kapitaludtræk & nedsparing</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Én samlet rækkefølge for hvilke kapitalpuljer modellen bruger først ved nedsparing og shortfall.
+          Denne sektion styrer, hvilke kapitalpuljer modellen bruger først ved nedsparing og shortfall.
           Skatten afhænger stadig af kilden: holding og realiserede depotgevinster bruger personlig aktieindkomst,
-          ASK beskattes separat med 17 % lagerskat, og pension følger pensionslogikken.
+          ASK beskattes separat, og pension følger pensionslogikken.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -901,6 +907,7 @@ function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K e
             <option value="holdingFirst">Holding → Almindeligt depot → ASK → Pension</option>
             <option value="askFirst">ASK → Almindeligt depot → Holding → Pension</option>
             <option value="pensionFirst">Pension (når tilgængelig) → Almindeligt depot → Holding → ASK</option>
+            <option value="pensionThenHolding">Pension (når tilgængelig) → Holding → Almindeligt depot → ASK</option>
             <option value="proRata">Pro rata mellem depot, holding og ASK</option>
           </select>
         </div>
@@ -918,19 +925,45 @@ function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K e
           </select>
         </div>
         {view.plannedWithdrawalPolicy === "fixedAnnual" && (
-          <NumField label="Fast årligt brutto kapitaludtræk" value={view.plannedWithdrawalAmount} onChange={(v) => update({ plannedWithdrawalAmount: v })} suffix="kr/år" step={10000} />
+          <NumField
+            label="Fast årligt brutto kapitaludtræk"
+            value={view.plannedWithdrawalAmount}
+            onChange={(v) => update({ plannedWithdrawalAmount: v })}
+            suffix="kr/år"
+            step={10000}
+          />
         )}
-        <NumField label="Start planlagt kapitaludtræk ved alder" value={view.startAge ?? inp.stopAge} onChange={(v) => update({ startAge: v })} suffix="år" />
-        <div className="space-y-1.5 flex flex-col justify-end">
-          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
-            <input type="checkbox" checked={view.startAtStopAge} onChange={(e) => update({ startAtStopAge: e.target.checked })} />
-            <span className="text-sm">Start ved stopalder ({inp.stopAge})</span>
-          </label>
-        </div>
+        {view.plannedWithdrawalPolicy !== "none" && (
+          <>
+            {view.startAtStopAge ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Startalder for planlagt kapitaludtræk</Label>
+                <div
+                  data-testid="capital-withdrawal-start-age-locked"
+                  className="mt-1 w-full h-10 rounded-md border border-dashed border-input bg-muted/40 px-3 text-sm flex items-center text-muted-foreground"
+                >
+                  Starter ved stopalder: {inp.stopAge} år
+                </div>
+              </div>
+            ) : (
+              <NumField
+                label="Startalder for planlagt kapitaludtræk"
+                value={view.startAge ?? inp.stopAge}
+                onChange={(v) => update({ startAge: v })}
+                suffix="år"
+              />
+            )}
+            <div className="space-y-1.5 flex flex-col justify-end">
+              <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
+                <input type="checkbox" checked={view.startAtStopAge} onChange={(e) => update({ startAtStopAge: e.target.checked })} />
+                <span className="text-sm">Start ved stopalder ({inp.stopAge})</span>
+              </label>
+            </div>
+          </>
+        )}
         <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
-          Denne sektion er source of truth for udtræksrækkefølge. Gamle felter (holding.withdrawalStrategy,
-          ask.withdrawalStrategy, depotTax.shareIncomeFundingStrategy) bevares kun i data af hensyn til
-          bagudkompatibilitet og bruges udelukkende til migration af ældre modeller.
+          Denne sektion er source of truth for udtræksrækkefølge. Gamle felter på holding, ASK og depot-skat
+          bevares kun i data af hensyn til bagudkompatibilitet og bruges udelukkende til migration af ældre modeller.
         </div>
       </div>
     </Card>
