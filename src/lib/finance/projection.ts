@@ -389,6 +389,14 @@ export function projectWithStopAge(
   const pensionAvailableFromAge = inp.pension.payoutFromAge ?? inp.holding.pensionAvailableFromAge ?? 60;
   const plannedStopAge = resolvePlannedContributionStopAge(inp, stopAge);
 
+  // ---- Samlet kapitaludtræksstrategi (v1) ----
+  // Når inp.capitalWithdrawal er sat, bruger projection den nye samlede strategi
+  // som source of truth. Når undefined → al udtræk og planlagt holdingudlodning
+  // håndteres via det eksisterende legacy code path nedenfor (uændret adfærd).
+  const cw: CapitalWithdrawalInputs | undefined = inp.capitalWithdrawal;
+  const cwActive = !!cw;
+
+
   const debts: DebtItem[] = (inp.debts ?? []).map((d) => ({ ...d }));
 
   // ---- ASK (Aktiesparekonto) initialisering ----
