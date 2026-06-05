@@ -602,9 +602,203 @@ export function projectWithStopAge(
       }
     }
 
+    // ---- Samlet kapitaludtræk (capitalWithdrawal) — kun aktivt når cwActive ----
+    // Per-source drainere genbruger withdrawFromBucket og giver én samlet logik
+    // for planlagt udtræk + shortfall.
+    let askDepotWithdrawYear = 0;
+    const trackAskWithdrawCW = (n: number) => { askWithdrawYear += n; };
+    const trackDepotWithdrawCW = (n: number) => { askDepotWithdrawYear += n; };
 
+    const cwAudit: CapitalWithdrawalYearAudit | undefined = cwActive
+      ? {
+          strategy: cw!.strategy,
+          plannedPolicy: cw!.plannedWithdrawalPolicy,
+          startAge: cw!.startAtStopAge ? stopAge : cw!.startAge,
+          effectiveOrder: [],
+          grossBySource: { depot: 0, holding: 0, ask: 0, pension: 0 },
+          netBySource: { depot: 0, holding: 0, ask: 0, pension: 0 },
+          taxBySource: { depot: 0, holding: 0, ask: 0, pension: 0 },
+          totalGross: 0,
+          totalNet: 0,
+          totalTax: 0,
+        }
+      : undefined;
+
+    // Drainer der trækker fra én konkret kilde og tracker audit.
+    // Bruges af både planlagt og shortfall i CW-stien.
+    const drainSourceCW = (
+      src: CapitalSource,
+      netNeeded: number,
+    ): { net: number; gross: number; tax: number } => {
+      if (netNeeded <= 0) return { net: 0, gross: 0, tax: 0 };
+      let r: { netCovered: number; gross: number; tax: number } = { netCovered: 0, gross: 0, tax: 0 };
+      if (src === "pension") {
+        if (age < pensionAvailableFromAge) return { net: 0, gross: 0, tax: 0 };
+        r = withdrawFromBucket("pension", netNeeded, bal, a, rateTaxRate);
+      } else if (src === "holding") {
+        if (bal.holding <= 0) return { net: 0, gross: 0, tax: 0 };
+        r = withdrawFromBucket("holding", netNeeded, bal, a, rateTaxRate, "depotFirst", undefined, undefined, depotTaxState);
+      } else if (src === "depot") {
+        if (bal.free <= 0) return { net: 0, gross: 0, tax: 0 };
+        const savedAsk = bal.ask; bal.ask = 0;
+        r = withdrawFromBucket("free", netNeeded, bal, a, rateTaxRate, "depotFirst", undefined, trackDepotWithdrawCW, depotTaxState);
+        bal.ask = savedAsk;
+      } else if (src === "ask") {
+        if (bal.ask <= 0) return { net: 0, gross: 0, tax: 0 };
+        const savedFree = bal.free; bal.free = 0;
+        r = withdrawFromBucket("free", netNeeded, bal, a, rateTaxRate, "askFirst", trackAskWithdrawCW, undefined, depotTaxState);
+        bal.free = savedFree;
+      }
+      if (cwAudit && r.gross > 0) {
+        cwAudit.grossBySource[src] += r.gross;
+        cwAudit.netBySource[src] += r.netCovered;
+        cwAudit.taxBySource[src] += r.tax;
+      }
+      return { net: r.netCovered, gross: r.gross, tax: r.tax };
+    };
+
+    // Drainer der tager et BRUTTO beløb fra én kilde (bruges af fixedAnnual planned).
+    const drainSourceCWGross = (
+      src: CapitalSource,
+      grossAmount: number,
+    ): { net: number; gross: number; tax: number } => {
+      if (grossAmount <= 0) return { net: 0, gross: 0, tax: 0 };
+      if (src === "holding") {
+        if (bal.holding <= 0) return { net: 0, gross: 0, tax: 0 };
+        const take = Math.min(bal.holding, grossAmount);
+        let net = take, tax = 0;
+        if (shareCtx) {
+          const tr = applyShareIncomeTax(shareCtx, take);
+          net = tr.net; tax = tr.tax;
+        } else {
+          const tr = shareTax(take, a.tax);
+          net = tr.net; tax = tr.tax;
+        }
+        bal.holding -= take;
+        if (cwAudit) {
+          cwAudit.grossBySource.holding += take;
+          cwAudit.netBySource.holding += net;
+          cwAudit.taxBySource.holding += tax;
+        }
+        return { net, gross: take, tax };
+      }
+      if (src === "depot") {
+        if (bal.free <= 0) return { net: 0, gross: 0, tax: 0 };
+        const take = Math.min(bal.free, grossAmount);
+        let net = take, tax = 0;
+        if (depotTaxState && depotTaxState.realizationActive) {
+          const depotBefore = bal.free;
+          const gainRatio = Math.max(0, depotBefore - depotTaxState.costBasis) / depotBefore;
+          const realizedGain = take * gainRatio;
+          const tr = applyShareIncomeTax(depotTaxState.ctx, realizedGain);
+          tax = tr.tax;
+          net = take - tax;
+          const reductionRatio = take / depotBefore;
+          const costBasisReduction = Math.max(0, depotTaxState.costBasis * reductionRatio);
+          depotTaxState.costBasis = Math.max(0, depotTaxState.costBasis - costBasisReduction);
+          depotTaxState.grossSaleAcc += take;
+          depotTaxState.realizedGainAcc += realizedGain;
+          depotTaxState.saleTaxAcc += tax;
+          depotTaxState.costBasisReductionAcc += costBasisReduction;
+        }
+        bal.free = Math.max(0, bal.free - take);
+        askDepotWithdrawYear += take;
+        if (cwAudit) {
+          cwAudit.grossBySource.depot += take;
+          cwAudit.netBySource.depot += net;
+          cwAudit.taxBySource.depot += tax;
+        }
+        return { net, gross: take, tax };
+      }
+      if (src === "ask") {
+        if (bal.ask <= 0) return { net: 0, gross: 0, tax: 0 };
+        const take = Math.min(bal.ask, grossAmount);
+        bal.ask -= take;
+        askWithdrawYear += take;
+        if (cwAudit) {
+          cwAudit.grossBySource.ask += take;
+          cwAudit.netBySource.ask += take;
+        }
+        return { net: take, gross: take, tax: 0 };
+      }
+      // pension: skip i v1 for fixedAnnual (ratepension har egen plan-logik).
+      return { net: 0, gross: 0, tax: 0 };
+    };
+
+    // Beregn realiseret gevinst-ratio for depot (bruges af fillLow til at vurdere
+    // om depot reelt kan bidrage til aktieindkomst-puljen).
+    const depotGainRatio = (): number => {
+      if (!depotTaxState || !depotTaxState.realizationActive) return 0;
+      if (bal.free <= 0) return 0;
+      return Math.max(0, bal.free - depotTaxState.costBasis) / bal.free;
+    };
+
+    // CW planlagt kapitaludtræk — fixedAnnual & fillLow.
+    // Resulterende net pr. kilde tilføjes til incomeNet via plannedNetExtra
+    // (holding-delen lægges i holdingPlanned for bagudkompatibel audit).
+    let plannedNetExtra = 0;
+    if (cwActive && cw!.plannedWithdrawalPolicy !== "none") {
+      const effStartAge = cw!.startAtStopAge ? stopAge : cw!.startAge;
+      const canStart = effStartAge === null ? false : age >= effStartAge;
+      if (canStart) {
+        const orderAll = resolveOrder(cw!.strategy, cw!.customOrder);
+        // Filter ud fra rådighed + age-gates
+        const orderFiltered = orderAll.filter((s) => {
+          if (s === "pension") return age >= pensionAvailableFromAge && bal.pension > 0;
+          if (s === "ask") return askActive && bal.ask > 0;
+          if (s === "depot") return bal.free > 0;
+          if (s === "holding") return bal.holding > 0;
+          return false;
+        });
+
+        if (cw!.plannedWithdrawalPolicy === "fixedAnnual" && cw!.plannedWithdrawalAmount > 0) {
+          let remaining = cw!.plannedWithdrawalAmount;
+          for (const s of orderFiltered) {
+            if (remaining <= 0) break;
+            // pension springes over for fixedAnnual i v1.
+            if (s === "pension") continue;
+            const r = drainSourceCWGross(s, remaining);
+            if (s === "holding") {
+              holdingPlanned.gross += r.gross;
+              holdingPlanned.net += r.net;
+              holdingPlanned.tax += r.tax;
+            } else {
+              plannedNetExtra += r.net;
+            }
+            remaining -= r.gross;
+          }
+        } else if (cw!.plannedWithdrawalPolicy === "fillLowShareIncomeBracket") {
+          // Brug kun aktieindkomstkilder (holding + depot m. gevinst).
+          // Lav-grænse: a.tax.shareThreshold minus allerede brugt i puljen.
+          const usedSoFar = shareCtx?.used ?? 0;
+          let remainingLow = Math.max(0, a.tax.shareThreshold - usedSoFar);
+          for (const s of orderFiltered) {
+            if (remainingLow <= 0) break;
+            if (s === "holding" && bal.holding > 0) {
+              const take = Math.min(bal.holding, remainingLow);
+              const r = drainSourceCWGross("holding", take);
+              holdingPlanned.gross += r.gross;
+              holdingPlanned.net += r.net;
+              holdingPlanned.tax += r.tax;
+              remainingLow = Math.max(0, remainingLow - r.gross);
+            } else if (s === "depot") {
+              const gr = depotGainRatio();
+              if (gr <= 0) continue;
+              // For at få `remainingLow` ind i aktieindkomst-puljen, skal vi sælge
+              // gross = remainingLow / gr (eller hele depot, hvad end er mindst).
+              const grossNeeded = Math.min(bal.free, remainingLow / gr);
+              const r = drainSourceCWGross("depot", grossNeeded);
+              plannedNetExtra += r.net;
+              remainingLow = Math.max(0, remainingLow - (r.gross * gr));
+            }
+            // ask / pension må aldrig bruges til at fylde aktieindkomstgrænsen.
+          }
+        }
+      }
+    }
 
     // Gæld
+
     syncLinkedLiabilities(debts);
     const dt = processDebts(debts, bal.holding, calYear, inp.holding.exitYear);
     bal.debt = dt.totalBalanceNW;
