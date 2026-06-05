@@ -919,10 +919,25 @@ function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K e
             value={view.plannedWithdrawalPolicy}
             onChange={(e) => update({ plannedWithdrawalPolicy: e.target.value as any })}
           >
-            <option value="none">Ingen planlagt årligt kapitaludtræk</option>
+            <option value="none">Træk kun ved behov</option>
             <option value="fixedAnnual">Fast årligt brutto kapitaludtræk</option>
             <option value="fillLowShareIncomeBracket">Udnyt lav personlig aktieindkomstgrænse</option>
           </select>
+          {view.plannedWithdrawalPolicy === "none" && (
+            <p className="text-[11px] text-muted-foreground mt-1" data-testid="cw-policy-help-none">
+              Modellen hæver kun kapital, hvis årets cashflow ikke kan dække forbruget. Kilden vælges efter udtræksrækkefølgen, og udtrækket gross-up’es efter behov for at dække skat.
+            </p>
+          )}
+          {view.plannedWithdrawalPolicy === "fixedAnnual" && (
+            <p className="text-[11px] text-muted-foreground mt-1" data-testid="cw-policy-help-fixed">
+              Dette beløb trækkes årligt fra den valgte startalder, uanset om der er cashflow-behov. Brug “Træk kun ved behov”, hvis modellen kun skal hæve kapital for at dække underskud.
+            </p>
+          )}
+          {view.plannedWithdrawalPolicy === "fillLowShareIncomeBracket" && (
+            <p className="text-[11px] text-muted-foreground mt-1" data-testid="cw-policy-help-fill">
+              Modellen forsøger fra startalderen at bruge aktieindkomstkilder (holding og realiserede depotgevinster) op til lav sats-grænsen. ASK og pension bruges ikke til dette.
+            </p>
+          )}
         </div>
         {view.plannedWithdrawalPolicy === "fixedAnnual" && (
           <NumField
@@ -933,7 +948,7 @@ function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K e
             step={10000}
           />
         )}
-        {view.plannedWithdrawalPolicy !== "none" && (
+        {(view.plannedWithdrawalPolicy === "fixedAnnual" || view.plannedWithdrawalPolicy === "fillLowShareIncomeBracket") && (
           <>
             {view.startAtStopAge ? (
               <div className="space-y-1.5">
@@ -962,8 +977,7 @@ function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K e
           </>
         )}
         <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
-          Denne sektion er source of truth for udtræksrækkefølge. Gamle felter på holding, ASK og depot-skat
-          bevares kun i data af hensyn til bagudkompatibilitet og bruges udelukkende til migration af ældre modeller.
+          Denne sektion er source of truth for udtræksrækkefølge og planlagt kapitaludtræk. Gamle felter på holding, ASK og depot-skat bevares kun i data af hensyn til bagudkompatibilitet og bruges udelukkende til migration af ældre modeller.
         </div>
       </div>
     </Card>
