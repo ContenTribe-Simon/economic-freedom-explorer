@@ -441,6 +441,8 @@ export interface YearFlows {
   shareIncome?: ShareIncomeTaxYearAudit;
   /** Audit af almindeligt frit depot (kun udfyldt når depotTax er aktiv). */
   depot?: DepotYearAudit;
+  /** Audit af samlet kapitaludtræksstrategi (kun udfyldt når capitalWithdrawal er sat). */
+  capitalWithdrawal?: CapitalWithdrawalYearAudit;
 }
 
 /** Audit af personlig aktieindkomst-pulje (holding + depot deler 27/42 %-grænsen). */
