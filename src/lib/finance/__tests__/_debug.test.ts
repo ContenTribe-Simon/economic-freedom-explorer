@@ -1,21 +1,22 @@
-/**
- * tmp debug
- */
 import { describe, it } from "vitest";
 import { defaultAssumptions, makeBaseScenario } from "@/lib/finance/defaults";
 import { project } from "@/lib/finance/projection";
 
-describe("debug", () => {
-  it("logs", () => {
+describe("debug ask", () => {
+  it("logs ask scenario", () => {
     const s = makeBaseScenario();
-    s.inputs.capitalWithdrawal = { strategy: "holdingFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 80_000, startAge: 55, startAtStopAge: false };
-    console.log("cw set:", JSON.stringify(s.inputs.capitalWithdrawal));
-    console.log("stopAge:", s.inputs.stopAge, "currentAge:", s.inputs.person.currentAge);
+    s.inputs.capitalWithdrawal = { strategy: "askFirst", plannedWithdrawalPolicy: "none", plannedWithdrawalAmount: 0, startAge: null, startAtStopAge: false };
+    s.inputs.stopAge = 50;
+    s.inputs.fullRetireAge = 50;
+    s.inputs.holding.annualDistribution = 0;
+    s.inputs.free.balance = 400_000;
+    s.inputs.free.ask = { enabled: true, currentValue: 150_000, depositLimit: 174_200, taxRate: 0.17, autoFillFirst: false, taxCreditCarryForward: 0, taxPaymentMode: "deductFromASK" };
+    s.inputs.free.depotTax = { enabled: true, method: "realizationSimple", costBasis: 100_000, showDeferredTax: true };
     const years = project(s, defaultAssumptions);
-    const yr = years.find((y) => y.age === 55)!;
-    console.log("yr age:", yr.age);
-    console.log("holdingPlanned:", yr.flows.holdingPlanned);
-    console.log("capitalWithdrawal:", JSON.stringify(yr.flows.capitalWithdrawal));
-    console.log("opening holding:", yr.opening.holding, "closing holding:", yr.closing.holding);
+    for (let age = 50; age <= 55; age++) {
+      const y = years.find((y) => y.age === age);
+      if (y) console.log(`age=${age} cw=`, JSON.stringify(y.flows.capitalWithdrawal?.grossBySource), "shortfall:", y.shortfallAmount.toFixed(0), "balAsk:", y.flows.ask?.closing?.toFixed(0));
+    }
   });
 });
+
