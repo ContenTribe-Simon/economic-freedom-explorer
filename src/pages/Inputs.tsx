@@ -848,7 +848,7 @@ function DepotTaxSection({ inp, set }: { inp: ScenarioInputs; set: <K extends ke
                 <option value="annualShareIncomeTax">Simpel årlig aktieindkomstskat af positivt afkast</option>
               </select>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Holdingudlodning og depotgevinster deler samme 27/42 %-grænse. Holding bruger grænsen først.
+                Holdingudlodning og realiserede depotgevinster deler den personlige aktieindkomstgrænse (27/42 %).
               </p>
             </div>
             <NumField
@@ -859,25 +859,10 @@ function DepotTaxSection({ inp, set }: { inp: ScenarioInputs; set: <K extends ke
               step={1000}
               hint="Hvis du ikke kender kostprisen, kan du lade den være lig depotværdien. Så antager modellen ingen latent gevinst ved start."
             />
-            <div className="md:col-span-2">
-              <label className="text-xs uppercase tracking-wider text-muted-foreground">Udbetalingsrækkefølge: holding vs. depot</label>
-              <select
-                data-testid="share-income-funding-strategy"
-                className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                value={depotTax?.shareIncomeFundingStrategy ?? "holdingFirst"}
-                onChange={(e) => updateDepotTax({ shareIncomeFundingStrategy: e.target.value as "holdingFirst" | "depotFirst" | "proRata" })}
-              >
-                <option value="holdingFirst">Holding først, derefter almindeligt depot</option>
-                <option value="depotFirst">Almindeligt depot først, derefter holding</option>
-                <option value="proRata">Pro rata mellem holding og depot</option>
-              </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Bestemmer hvilken kilde modellen forsøger at bruge først, når der skal skabes privat cashflow fra aktieindkomstkilder. Skatten beregnes stadig samlet i én aktieindkomst-pulje med samme 27/42 %-grænse. ASK indgår ikke — ASK har sin egen nedsparingsrækkefølge.
-              </p>
-            </div>
             <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
-              ASK indgår ikke i denne pulje — ASK beskattes fortsat særskilt med 17 % lagerbeskatning.
+              Rækkefølgen mellem depot, holding, ASK og pension styres under <strong>Kapitaludtræk &amp; nedsparing</strong>. ASK indgår ikke i aktieindkomst-puljen — ASK beskattes fortsat særskilt med 17 % lagerbeskatning.
             </div>
+
           </>
         )}
       </div>
