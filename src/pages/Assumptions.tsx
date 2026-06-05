@@ -130,11 +130,11 @@ export default function Assumptions() {
           i denne version.
         </p>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
-          <li><strong>Legacy</strong> bevarer gammel modeladfærd uden eksplicit skat på depotet (default).</li>
-          <li><strong>Simpel realisationsskat</strong> beskatter kun gevinstandelen ved salg fra depotet og bruger samme 27/42 %-grænse som holding.</li>
-          <li><strong>Simpel årlig aktieindkomstskat</strong> beskatter positivt depotafkast årligt — udtræk udløser ingen yderligere skat.</li>
+          <li><strong>Uden eksplicit depot-skat</strong>: modellen beregner ikke særskilt skat på almindeligt depot.</li>
+          <li><strong>Simpel realisationsskat</strong>: beskatter kun gevinstandelen ved salg fra depotet og bruger samme 27/42 %-grænse som holding.</li>
+          <li><strong>Simpel årlig aktieindkomstskat</strong>: beskatter positivt depotafkast årligt — udtræk udløser ingen yderligere skat.</li>
           <li>Vælges pr. scenarie under <em>Variabler → Almindeligt frit depot</em>.</li>
-          <li>ASK indgår aldrig i denne pulje — ASK fortsætter med 17 % lagerbeskatning.</li>
+          <li>ASK indgår ikke i denne pulje — ASK beskattes separat med 17 % lagerbeskatning.</li>
         </ul>
       </Card>
 
