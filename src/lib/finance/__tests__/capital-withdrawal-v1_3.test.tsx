@@ -45,9 +45,10 @@ describe("Kapitaludtræk v1.3 — UI uden 'Legacy'", () => {
     const { container } = render(<MemoryRouter><Assumptions /></MemoryRouter>);
     expect(container.innerHTML).not.toMatch(/Legacy/);
   });
-  it("Depot-skat-optionen vises som 'Uden eksplicit depot-skat'", () => {
-    const { container } = render(<MemoryRouter><Inputs /></MemoryRouter>);
-    expect(container.innerHTML).toContain("Uden eksplicit depot-skat");
+  it("Inputs-koden bruger ikke 'Legacy /' option-label til depot-skat", async () => {
+    const src = await (await import("node:fs/promises")).readFile("src/pages/Inputs.tsx", "utf8");
+    expect(src).not.toMatch(/Legacy \//);
+    expect(src).toContain("Uden eksplicit depot-skat");
   });
 });
 
