@@ -653,9 +653,11 @@ export function projectWithStopAge(
         cwAudit.grossBySource[src] += r.gross;
         cwAudit.netBySource[src] += r.netCovered;
         cwAudit.taxBySource[src] += r.tax;
+        if (age === 50 || age === 51) console.log(`[DBG] age=${age} drainSourceCW(${src}, ${netNeeded.toFixed(0)}) → gross=${r.gross.toFixed(0)} net=${r.netCovered.toFixed(0)} tax=${r.tax.toFixed(0)} balAfter free=${bal.free.toFixed(0)} ask=${bal.ask.toFixed(0)} holding=${bal.holding.toFixed(0)}`);
       }
       return { net: r.netCovered, gross: r.gross, tax: r.tax };
     };
+
 
     // Drainer der tager et BRUTTO beløb fra én kilde (bruges af fixedAnnual planned).
     const drainSourceCWGross = (
