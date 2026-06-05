@@ -271,6 +271,9 @@ export default function Inputs() {
 
       <DepotTaxSection inp={inp} set={set} />
 
+      <CapitalWithdrawalSection inp={inp} set={set} />
+
+
 
 
 
