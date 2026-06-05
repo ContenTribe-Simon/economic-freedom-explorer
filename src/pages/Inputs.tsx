@@ -15,6 +15,7 @@ import {
   StatePensionMode,
   HoldingWithdrawalStrategy,
 } from "@/lib/finance/types";
+import { resolveCapitalWithdrawal } from "@/lib/finance/capitalWithdrawal";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
 import { Trash2, Link2, GitBranch } from "lucide-react";
