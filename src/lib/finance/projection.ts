@@ -613,6 +613,7 @@ export function projectWithStopAge(
       ? {
           strategy: cw!.strategy,
           plannedPolicy: cw!.plannedWithdrawalPolicy,
+          plannedAmount: cw!.plannedWithdrawalAmount ?? 0,
           startAge: cw!.startAtStopAge ? stopAge : cw!.startAge,
           effectiveOrder: [],
           grossBySource: { depot: 0, holding: 0, ask: 0, pension: 0 },

@@ -350,6 +350,8 @@ export interface CapitalWithdrawalInputs {
 export interface CapitalWithdrawalYearAudit {
   strategy: CapitalWithdrawalStrategy;
   plannedPolicy: PlannedWithdrawalPolicy;
+  /** Konfigureret planlagt brutto-beløb (kun relevant for fixedAnnual). */
+  plannedAmount: number;
   startAge: number | null;
   effectiveOrder: CapitalSource[];
   /** Brutto udtræk pr. kilde i året (planlagt + shortfall). */
