@@ -406,7 +406,27 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
 
 
 
+        {f.capitalWithdrawal && (
+          <section data-testid="audit-capital-withdrawal">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Kapitaludtræksstrategi</div>
+            <div className="text-[11px] text-muted-foreground mb-2">
+              Strategi: <strong>{f.capitalWithdrawal.strategy}</strong> · Planlagt politik: <strong>{f.capitalWithdrawal.plannedPolicy}</strong> · Startalder: <strong>{f.capitalWithdrawal.startAge ?? "—"}</strong> · Rækkefølge: {f.capitalWithdrawal.effectiveOrder.join(" → ")}
+            </div>
+            <Row label="Brutto fra depot" value={-f.capitalWithdrawal.grossBySource.depot} indent />
+            <Row label="Netto fra depot" value={f.capitalWithdrawal.netBySource.depot} indent />
+            <Row label="Skat depot" value={-f.capitalWithdrawal.taxBySource.depot} indent />
+            <Row label="Brutto fra holding" value={-f.capitalWithdrawal.grossBySource.holding} indent />
+            <Row label="Netto fra holding" value={f.capitalWithdrawal.netBySource.holding} indent />
+            <Row label="Skat holding" value={-f.capitalWithdrawal.taxBySource.holding} indent />
+            <Row label="Brutto fra ASK" value={-f.capitalWithdrawal.grossBySource.ask} indent />
+            <Row label="Brutto fra pension" value={-f.capitalWithdrawal.grossBySource.pension} indent />
+            <Row label="Skat pension" value={-f.capitalWithdrawal.taxBySource.pension} indent />
+            <Row label="Samlet netto kapitaludtræk" value={f.capitalWithdrawal.totalNet} strong />
+          </section>
+        )}
+
         <section>
+
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Udgående saldi</div>
           <Row label="Fri kapital (slut)" value={y.closing.free} strong />
           <Row label="Buffer (slut)" value={y.closing.buffer} />
