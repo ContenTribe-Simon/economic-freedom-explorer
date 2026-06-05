@@ -160,28 +160,22 @@ describe("planned policy", () => {
 });
 
 describe("ASK separation", () => {
-  it("askFirst: ASK trækkes først, men ASK-udtræk indgår ikke i shareIncome-puljen", () => {
+  it("ASK-skat indgår ikke i CW tax (ASK lagerbeskat sker separat)", () => {
     const s = withCw({ strategy: "askFirst", plannedWithdrawalPolicy: "none", plannedWithdrawalAmount: 0, startAge: null, startAtStopAge: false }, (i) => {
       i.stopAge = 50;
       i.fullRetireAge = 50;
       i.holding.annualDistribution = 0;
       i.free.balance = 400_000;
       i.free.ask = { enabled: true, currentValue: 150_000, depositLimit: 174_200, taxRate: 0.17, autoFillFirst: false, taxCreditCarryForward: 0, taxPaymentMode: "deductFromASK" };
-      i.free.depotTax = { enabled: true, method: "realizationSimple", costBasis: 100_000, showDeferredTax: true };
     });
     const years = project(s, defaultAssumptions);
-    // Find første år hvor ASK bruges (kan være stopåret 50)
-    const yr = years.find((y) => y.age >= 50 && (y.flows.capitalWithdrawal?.grossBySource.ask ?? 0) > 0);
+    const yr = years.find((y) => (y.flows.capitalWithdrawal?.grossBySource.ask ?? 0) > 0);
     expect(yr).toBeDefined();
-    expect(yr!.flows.capitalWithdrawal!.grossBySource.ask).toBeGreaterThan(0);
-    // ASK-udtræk indgår IKKE i shareIncome.totalShareIncome
-    if (yr!.flows.shareIncome) {
-      const askGross = yr!.flows.capitalWithdrawal!.grossBySource.ask;
-      // shareIncome.totalShareIncome må ikke afspejle ASK-bruttoen
-      expect(yr!.flows.shareIncome.totalShareIncome).toBeLessThan(askGross + 1);
-    }
+    // ASK indgår i CW kilde-tracking men har ingen CW-skat
+    expect(yr!.flows.capitalWithdrawal!.taxBySource.ask).toBe(0);
   });
 });
+
 
 
 describe("pensionFirst", () => {
