@@ -884,7 +884,53 @@ export function projectWithStopAge(
     const trackAskWithdraw = (n: number) => { askWithdrawYear += n; };
     const trackDepotWithdraw = (n: number) => { askDepotWithdrawYear += n; };
 
-    const drainShortfall = (needed: number) => {
+    // CW-aware shortfall drainer der bruger den samlede strategi.
+    const drainShortfallCW = (needed: number) => {
+      const orderAll = resolveOrder(cw!.strategy, cw!.customOrder);
+      const orderFiltered = orderAll.filter((s) => {
+        if (s === "pension") return age >= pensionAvailableFromAge;
+        if (s === "ask") return askActive;
+        return true;
+      });
+      if (cwAudit) cwAudit.effectiveOrder = orderFiltered.slice();
+
+      // proRata: split mellem depot+holding+ask (alle ikke-pension) efter saldi.
+      if (cw!.strategy === "proRata" && needed > 0) {
+        const candidates = orderFiltered.filter((s) => s !== "pension");
+        const balOf = (s: CapitalSource) => s === "depot" ? bal.free : s === "holding" ? bal.holding : s === "ask" ? bal.ask : 0;
+        const totalBal = candidates.reduce((sum, s) => sum + balOf(s), 0);
+        if (totalBal > 0) {
+          for (const s of candidates) {
+            const share = needed * (balOf(s) / totalBal);
+            if (share <= 0) continue;
+            const r = drainSourceCW(s, share);
+            withdrawals[s === "depot" || s === "ask" ? "free" : s as Bucket] += r.net;
+            withdrawalsGross[s === "depot" || s === "ask" ? "free" : s as Bucket] += r.gross;
+            if (s === "holding") { holdingExtra.net += r.net; holdingExtra.gross += r.gross; holdingExtra.tax += r.tax; }
+            needed -= r.net;
+          }
+        }
+      }
+      for (const s of orderFiltered) {
+        if (needed <= 0) break;
+        const r = drainSourceCW(s, needed);
+        const targetBucket: Bucket = s === "pension" ? "pension" : s === "holding" ? "holding" : "free";
+        withdrawals[targetBucket] += r.net;
+        withdrawalsGross[targetBucket] += r.gross;
+        if (s === "pension") { pensionExtra.net += r.net; pensionExtra.gross += r.gross; pensionExtra.tax += r.tax; }
+        if (s === "holding") { holdingExtra.net += r.net; holdingExtra.gross += r.gross; holdingExtra.tax += r.tax; }
+        needed -= r.net;
+      }
+      if (needed > 0 && inp.free.bufferUsableForShortfall && bal.buffer > 0) {
+        const take = Math.min(bal.buffer, needed);
+        bal.buffer -= take;
+        withdrawals.buffer += take;
+        withdrawalsGross.buffer += take;
+        needed -= take;
+      }
+    };
+
+    const drainShortfallLegacy = (needed: number) => {
       // proRata: når depotTax aktiv og både holding og free er i drain-order,
       // split første pass proportionalt mellem dem efter disponible saldi.
       if (
@@ -938,6 +984,10 @@ export function projectWithStopAge(
         needed -= take;
       }
     };
+
+    const drainShortfall = cwActive ? drainShortfallCW : drainShortfallLegacy;
+
+
 
     // Allokering af planlagt fri opsparing — fyld evt. ASK først.
     const allocateFreeContribution = (amount: number) => {
