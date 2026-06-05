@@ -816,7 +816,9 @@ export function projectWithStopAge(
     const pensionStreamNet = ratePension.net + lifeAnnuity.net;
     const incomeNet =
       salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet
+      + plannedNetExtra
       + (lifeEventEffects?.incomeDelta ?? 0);
+
     const cashflow = incomeNet - dt.privatePayment - spending;
 
     let freeContribution = 0;
