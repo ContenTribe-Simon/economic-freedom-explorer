@@ -13,8 +13,8 @@ import {
   DebtCashflowImpact,
   PartTimeMode,
   StatePensionMode,
-  HoldingWithdrawalStrategy,
 } from "@/lib/finance/types";
+import { resolveCapitalWithdrawal } from "@/lib/finance/capitalWithdrawal";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
 import { Trash2, Link2, GitBranch } from "lucide-react";
@@ -400,58 +400,15 @@ export default function Inputs() {
         </p>
       </Section>
 
-      <Section title="Holding" description="Selskabskapital. Udlodning beskattes som aktieindkomst.">
+      <Section title="Holding" description="Selskabskapital. Udlodning beskattes som personlig aktieindkomst.">
         <NumField label="Nuværende holdingkapital" value={inp.holding.balance} onChange={(v) => set("holding", { ...inp.holding, balance: v })} suffix="kr" step={50000} />
         <NumField label="Forventet exitværdi" value={inp.holding.expectedExitValue} onChange={(v) => set("holding", { ...inp.holding, expectedExitValue: v })} suffix="kr" step={100000} hint="Tilføjes til holding i exit-året (efter selskabsskat)" />
         <NumField label="Exit-år (kalenderår)" value={inp.holding.exitYear} onChange={(v) => set("holding", { ...inp.holding, exitYear: v })} step={1} />
-        <NumField label="Planlagt årlig udlodning" value={inp.holding.annualDistribution} onChange={(v) => set("holding", { ...inp.holding, annualDistribution: v })} suffix="kr/år" step={10000} />
-        <NumField
-          label="Holdingudlodning fra alder"
-          value={inp.holding.distributionFromAge}
-          onChange={(v) => set("holding", { ...inp.holding, distributionFromAge: v })}
-          suffix="år"
-          hint={inp.holding.startDistributionAtStopAge ? `Følger stopalder (${inp.stopAge})` : "Ignoreres når toggle er aktiv"}
-        />
-        {/* "Pension tilgængelig fra alder" er flyttet til Privat pension-sektionen */}
-        <div className="space-y-1.5 flex flex-col justify-end">
-          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
-            <input
-              type="checkbox"
-              checked={inp.holding.startDistributionAtStopAge}
-              onChange={(e) => set("holding", { ...inp.holding, startDistributionAtStopAge: e.target.checked, distributionFromAge: e.target.checked ? inp.stopAge : inp.holding.distributionFromAge })}
-            />
-            <span className="text-sm">Start holdingudlodning ved stopalder</span>
-          </label>
-        </div>
-        <div className="md:col-span-2 space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Holdingudtræksstrategi</Label>
-          {([
-            { v: "planned_only", t: "Kun planlagt årlig udlodning", d: "Ingen ekstra udtræk fra holding ved shortfall." },
-            { v: "up_to_low_threshold", t: "Udlod op til lav aktieindkomstgrænse", d: "Udlodder automatisk op til lav-sats grænsen pr. år (efter udlodningsalder)." },
-            { v: "allow_extra_on_shortfall", t: "Tillad ekstra holdingudtræk ved shortfall", d: "Holding kan bruges til at dække shortfall ud over planlagt udlodning." },
-            { v: "pension_before_extra_holding", t: "Brug pension før ekstra holdingudtræk", d: "Når pension er tilgængelig, prioriteres pension før ekstra holding." },
-          ] as { v: HoldingWithdrawalStrategy; t: string; d: string }[]).map((opt) => (
-            <label
-              key={opt.v}
-              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
-                (inp.holding.withdrawalStrategy ?? "planned_only") === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
-              }`}
-            >
-              <input
-                type="radio"
-                name="holdingStrategy"
-                checked={(inp.holding.withdrawalStrategy ?? "planned_only") === opt.v}
-                onChange={() => set("holding", { ...inp.holding, withdrawalStrategy: opt.v })}
-                className="mt-1"
-              />
-              <div>
-                <div className="font-medium text-sm">{opt.t}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
-              </div>
-            </label>
-          ))}
+        <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
+          Holdingens udtræksrækkefølge og planlagte udlodning styres nu under <strong>Kapitaludtræk &amp; nedsparing</strong>. Udlodning fra holding beskattes som personlig aktieindkomst og deler 27/42 %-grænsen med realiserede depotgevinster.
         </div>
       </Section>
+
 
       <Card className="p-6">
         <div className="flex items-center justify-between">
@@ -807,25 +764,13 @@ function AskSection({ inp, set }: { inp: ScenarioInputs; set: <K extends keyof S
               <span className="text-sm">Fyld ASK før almindeligt depot ved planlagt opsparing</span>
             </label>
           </div>
-          <div className="md:col-span-2">
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Udtræksrækkefølge ved nedsparing</label>
-            <select
-              data-testid="ask-withdrawal-strategy"
-              className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              value={ask?.withdrawalStrategy ?? "depotFirst"}
-              onChange={(e) => updateAsk({ withdrawalStrategy: e.target.value as "depotFirst" | "askFirst" | "proRata" })}
-            >
-              <option value="depotFirst">Almindeligt depot først, derefter ASK</option>
-              <option value="askFirst">ASK først, derefter almindeligt depot</option>
-              <option value="proRata">Pro rata mellem ASK og almindeligt depot</option>
-            </select>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Bestemmer hvordan frie udtræk fordeles mellem almindeligt frit depot og ASK. ASK er lagerbeskattet, mens almindeligt depot fortsat bruger den eksisterende fri kapital-logik.
-            </p>
+          <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
+            ASK indgår i den generelle udtræksrækkefølge under <strong>Kapitaludtræk &amp; nedsparing</strong>. ASK beskattes fortsat separat med 17 % lagerbeskatning.
           </div>
           <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
             ASK kan vokse over indskudsloftet via afkast. Det betyder ikke, at der skal hæves penge — det betyder blot, at der ikke kan indskydes yderligere, før der igen er indskudsrum.
           </div>
+
           {overflow && (
             <div className="md:col-span-2 p-3 rounded-md border border-destructive/40 bg-destructive/10 text-sm text-destructive">
               ASK-værdi ({currentValue.toLocaleString("da-DK")} kr.) er højere end samlet fri kapital ({totalFree.toLocaleString("da-DK")} kr.). Modellen begrænser ASK til den samlede fri kapital.
@@ -903,7 +848,7 @@ function DepotTaxSection({ inp, set }: { inp: ScenarioInputs; set: <K extends ke
                 <option value="annualShareIncomeTax">Simpel årlig aktieindkomstskat af positivt afkast</option>
               </select>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Holdingudlodning og depotgevinster deler samme 27/42 %-grænse. Holding bruger grænsen først.
+                Holdingudlodning og realiserede depotgevinster deler den personlige aktieindkomstgrænse (27/42 %).
               </p>
             </div>
             <NumField
@@ -914,25 +859,10 @@ function DepotTaxSection({ inp, set }: { inp: ScenarioInputs; set: <K extends ke
               step={1000}
               hint="Hvis du ikke kender kostprisen, kan du lade den være lig depotværdien. Så antager modellen ingen latent gevinst ved start."
             />
-            <div className="md:col-span-2">
-              <label className="text-xs uppercase tracking-wider text-muted-foreground">Udbetalingsrækkefølge: holding vs. depot</label>
-              <select
-                data-testid="share-income-funding-strategy"
-                className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                value={depotTax?.shareIncomeFundingStrategy ?? "holdingFirst"}
-                onChange={(e) => updateDepotTax({ shareIncomeFundingStrategy: e.target.value as "holdingFirst" | "depotFirst" | "proRata" })}
-              >
-                <option value="holdingFirst">Holding først, derefter almindeligt depot</option>
-                <option value="depotFirst">Almindeligt depot først, derefter holding</option>
-                <option value="proRata">Pro rata mellem holding og depot</option>
-              </select>
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Bestemmer hvilken kilde modellen forsøger at bruge først, når der skal skabes privat cashflow fra aktieindkomstkilder. Skatten beregnes stadig samlet i én aktieindkomst-pulje med samme 27/42 %-grænse. ASK indgår ikke — ASK har sin egen nedsparingsrækkefølge.
-              </p>
-            </div>
             <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
-              ASK indgår ikke i denne pulje — ASK beskattes fortsat særskilt med 17 % lagerbeskatning.
+              Rækkefølgen mellem depot, holding, ASK og pension styres under <strong>Kapitaludtræk &amp; nedsparing</strong>. ASK indgår ikke i aktieindkomst-puljen — ASK beskattes fortsat særskilt med 17 % lagerbeskatning.
             </div>
+
           </>
         )}
       </div>
@@ -941,82 +871,69 @@ function DepotTaxSection({ inp, set }: { inp: ScenarioInputs; set: <K extends ke
 }
 
 function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K extends keyof ScenarioInputs>(k: K, v: ScenarioInputs[K]) => void }) {
-  const cw = inp.capitalWithdrawal;
-  const enabled = !!cw;
-  const update = (patch: Partial<NonNullable<typeof cw>>) => {
-    const base = cw ?? {
-      strategy: "depotFirst" as const,
-      plannedWithdrawalPolicy: "none" as const,
-      plannedWithdrawalAmount: 0,
-      startAge: inp.holding?.distributionFromAge ?? null,
-      startAtStopAge: inp.holding?.startDistributionAtStopAge ?? true,
-    };
-    set("capitalWithdrawal", { ...base, ...patch });
+  // Source of truth: inp.capitalWithdrawal. Hvis ikke sat, vis resolved (migreret) værdier
+  // ud fra eksisterende legacy-felter — første brugerændring persisterer capitalWithdrawal.
+  const resolved = resolveCapitalWithdrawal(inp);
+  const view = inp.capitalWithdrawal ?? resolved;
+  const update = (patch: Partial<typeof view>) => {
+    set("capitalWithdrawal", { ...view, ...patch });
   };
   return (
     <Card className="p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-display text-xl font-semibold">Kapitaludtræk & nedsparing</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Vælg én samlet rækkefølge for hvilke kapitalpuljer modellen bruger først ved nedsparing.
-            Skatten afhænger stadig af kilden: holding og depotgevinster bruger personlig aktieindkomst,
-            ASK beskattes separat, og pension følger pensionslogikken.
-          </p>
-        </div>
-        <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40 shrink-0">
-          <input type="checkbox" checked={enabled} onChange={(e) => {
-            if (e.target.checked) update({});
-            else set("capitalWithdrawal", undefined as any);
-          }} />
-          <span className="text-sm">Aktivér samlet strategi</span>
-        </label>
+      <div>
+        <h2 className="font-display text-xl font-semibold">Kapitaludtræk & nedsparing</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Én samlet rækkefølge for hvilke kapitalpuljer modellen bruger først ved nedsparing og shortfall.
+          Skatten afhænger stadig af kilden: holding og realiserede depotgevinster bruger personlig aktieindkomst,
+          ASK beskattes separat med 17 % lagerskat, og pension følger pensionslogikken.
+        </p>
       </div>
-      {enabled && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          <div className="md:col-span-2">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Udtræksrækkefølge</Label>
-            <select
-              className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              value={cw!.strategy}
-              onChange={(e) => update({ strategy: e.target.value as any })}
-            >
-              <option value="depotFirst">Almindeligt depot → Holding → ASK → Pension</option>
-              <option value="holdingFirst">Holding → Almindeligt depot → ASK → Pension</option>
-              <option value="askFirst">ASK → Almindeligt depot → Holding → Pension</option>
-              <option value="pensionFirst">Pension (når tilgængelig) → Almindeligt depot → Holding → ASK</option>
-              <option value="proRata">Pro rata mellem depot, holding og ASK</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Planlagt årligt kapitaludtræk</Label>
-            <select
-              className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              value={cw!.plannedWithdrawalPolicy}
-              onChange={(e) => update({ plannedWithdrawalPolicy: e.target.value as any })}
-            >
-              <option value="none">Ingen planlagt årligt kapitaludtræk</option>
-              <option value="fixedAnnual">Fast årligt brutto kapitaludtræk</option>
-              <option value="fillLowShareIncomeBracket">Udnyt lav personlig aktieindkomstgrænse</option>
-            </select>
-          </div>
-          {cw!.plannedWithdrawalPolicy === "fixedAnnual" && (
-            <NumField label="Fast årligt brutto kapitaludtræk" value={cw!.plannedWithdrawalAmount} onChange={(v) => update({ plannedWithdrawalAmount: v })} suffix="kr/år" step={10000} />
-          )}
-          <NumField label="Start planlagt kapitaludtræk ved alder" value={cw!.startAge ?? inp.stopAge} onChange={(v) => update({ startAge: v })} suffix="år" />
-          <div className="space-y-1.5 flex flex-col justify-end">
-            <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
-              <input type="checkbox" checked={cw!.startAtStopAge} onChange={(e) => update({ startAtStopAge: e.target.checked })} />
-              <span className="text-sm">Start ved stopalder ({inp.stopAge})</span>
-            </label>
-          </div>
-          <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
-            Når aktiv, er denne sektion source of truth for udtræksrækkefølge. De gamle felter
-            (Holdingudtræksstrategi, ASK-nedsparingsrækkefølge, holding/depot funding-strategi) bruges
-            kun til at migrere gamle modeller — projection bruger din valgte strategi her.
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="md:col-span-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Udtræksrækkefølge</Label>
+          <select
+            data-testid="capital-withdrawal-strategy"
+            className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+            value={view.strategy}
+            onChange={(e) => update({ strategy: e.target.value as any })}
+          >
+            <option value="depotFirst">Almindeligt depot → Holding → ASK → Pension</option>
+            <option value="holdingFirst">Holding → Almindeligt depot → ASK → Pension</option>
+            <option value="askFirst">ASK → Almindeligt depot → Holding → Pension</option>
+            <option value="pensionFirst">Pension (når tilgængelig) → Almindeligt depot → Holding → ASK</option>
+            <option value="proRata">Pro rata mellem depot, holding og ASK</option>
+          </select>
         </div>
-      )}
+        <div className="md:col-span-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Planlagt årligt kapitaludtræk</Label>
+          <select
+            data-testid="capital-withdrawal-policy"
+            className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+            value={view.plannedWithdrawalPolicy}
+            onChange={(e) => update({ plannedWithdrawalPolicy: e.target.value as any })}
+          >
+            <option value="none">Ingen planlagt årligt kapitaludtræk</option>
+            <option value="fixedAnnual">Fast årligt brutto kapitaludtræk</option>
+            <option value="fillLowShareIncomeBracket">Udnyt lav personlig aktieindkomstgrænse</option>
+          </select>
+        </div>
+        {view.plannedWithdrawalPolicy === "fixedAnnual" && (
+          <NumField label="Fast årligt brutto kapitaludtræk" value={view.plannedWithdrawalAmount} onChange={(v) => update({ plannedWithdrawalAmount: v })} suffix="kr/år" step={10000} />
+        )}
+        <NumField label="Start planlagt kapitaludtræk ved alder" value={view.startAge ?? inp.stopAge} onChange={(v) => update({ startAge: v })} suffix="år" />
+        <div className="space-y-1.5 flex flex-col justify-end">
+          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
+            <input type="checkbox" checked={view.startAtStopAge} onChange={(e) => update({ startAtStopAge: e.target.checked })} />
+            <span className="text-sm">Start ved stopalder ({inp.stopAge})</span>
+          </label>
+        </div>
+        <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
+          Denne sektion er source of truth for udtræksrækkefølge. Gamle felter (holding.withdrawalStrategy,
+          ask.withdrawalStrategy, depotTax.shareIncomeFundingStrategy) bevares kun i data af hensyn til
+          bagudkompatibilitet og bruges udelukkende til migration af ældre modeller.
+        </div>
+      </div>
     </Card>
   );
 }
+
