@@ -764,25 +764,13 @@ function AskSection({ inp, set }: { inp: ScenarioInputs; set: <K extends keyof S
               <span className="text-sm">Fyld ASK før almindeligt depot ved planlagt opsparing</span>
             </label>
           </div>
-          <div className="md:col-span-2">
-            <label className="text-xs uppercase tracking-wider text-muted-foreground">Udtræksrækkefølge ved nedsparing</label>
-            <select
-              data-testid="ask-withdrawal-strategy"
-              className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              value={ask?.withdrawalStrategy ?? "depotFirst"}
-              onChange={(e) => updateAsk({ withdrawalStrategy: e.target.value as "depotFirst" | "askFirst" | "proRata" })}
-            >
-              <option value="depotFirst">Almindeligt depot først, derefter ASK</option>
-              <option value="askFirst">ASK først, derefter almindeligt depot</option>
-              <option value="proRata">Pro rata mellem ASK og almindeligt depot</option>
-            </select>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Bestemmer hvordan frie udtræk fordeles mellem almindeligt frit depot og ASK. ASK er lagerbeskattet, mens almindeligt depot fortsat bruger den eksisterende fri kapital-logik.
-            </p>
+          <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
+            ASK indgår i den generelle udtræksrækkefølge under <strong>Kapitaludtræk &amp; nedsparing</strong>. ASK beskattes fortsat separat med 17 % lagerbeskatning.
           </div>
           <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
             ASK kan vokse over indskudsloftet via afkast. Det betyder ikke, at der skal hæves penge — det betyder blot, at der ikke kan indskydes yderligere, før der igen er indskudsrum.
           </div>
+
           {overflow && (
             <div className="md:col-span-2 p-3 rounded-md border border-destructive/40 bg-destructive/10 text-sm text-destructive">
               ASK-værdi ({currentValue.toLocaleString("da-DK")} kr.) er højere end samlet fri kapital ({totalFree.toLocaleString("da-DK")} kr.). Modellen begrænser ASK til den samlede fri kapital.
