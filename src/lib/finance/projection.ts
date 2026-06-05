@@ -879,9 +879,9 @@ export function projectWithStopAge(
     const askStrategy: AskWithdrawalStrategy = askActive
       ? (askInput!.withdrawalStrategy ?? "depotFirst")
       : "depotFirst";
-    let askDepotWithdrawYear = 0;
     const trackAskWithdraw = (n: number) => { askWithdrawYear += n; };
     const trackDepotWithdraw = (n: number) => { askDepotWithdrawYear += n; };
+
     const drainShortfall = (needed: number) => {
       // proRata: når depotTax aktiv og både holding og free er i drain-order,
       // split første pass proportionalt mellem dem efter disponible saldi.
