@@ -129,9 +129,11 @@ describe("planned policy", () => {
     const s = withCw({ strategy: "holdingFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 80_000, startAge: 55, startAtStopAge: false });
     const years = project(s, defaultAssumptions);
     const yr = years.find((y) => y.age === 55)!;
+    console.log("DBG planlagt", yr.flows.holdingPlanned, "cw", JSON.stringify(yr.flows.capitalWithdrawal?.grossBySource));
     expect(yr.flows.holdingPlanned.gross).toBeCloseTo(80_000, 0);
     expect(yr.flows.capitalWithdrawal!.grossBySource.holding).toBeCloseTo(80_000, 0);
   });
+
 
   it("fixedAnnual + depotFirst: tager fra depot først (ASK skippes)", () => {
     const s = withCw({ strategy: "depotFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 60_000, startAge: 55, startAtStopAge: false }, (i) => {
