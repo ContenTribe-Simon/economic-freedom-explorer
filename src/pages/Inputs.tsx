@@ -13,7 +13,6 @@ import {
   DebtCashflowImpact,
   PartTimeMode,
   StatePensionMode,
-  HoldingWithdrawalStrategy,
 } from "@/lib/finance/types";
 import { resolveCapitalWithdrawal } from "@/lib/finance/capitalWithdrawal";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
