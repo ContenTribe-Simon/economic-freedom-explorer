@@ -1262,8 +1262,26 @@ export function projectWithStopAge(
             deferredTaxClosing,
           };
         })() : undefined,
+        capitalWithdrawal: cwAudit ? (() => {
+          // Sum totals fra per-source breakdown.
+          const sources: CapitalSource[] = ["depot", "holding", "ask", "pension"];
+          let tg = 0, tn = 0, tt = 0;
+          for (const s of sources) {
+            tg += cwAudit.grossBySource[s];
+            tn += cwAudit.netBySource[s];
+            tt += cwAudit.taxBySource[s];
+          }
+          cwAudit.totalGross = tg;
+          cwAudit.totalNet = tn;
+          cwAudit.totalTax = tt;
+          if (cwAudit.effectiveOrder.length === 0) {
+            cwAudit.effectiveOrder = resolveOrder(cw!.strategy, cw!.customOrder);
+          }
+          return cwAudit;
+        })() : undefined,
 
       },
+
       totalIncomeNet: incomeNet,
       netWorth,
       shortfall: stillShort > 0.5,
