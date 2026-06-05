@@ -200,15 +200,21 @@ describe("pensionFirst", () => {
 });
 
 describe("fillLowShareIncomeBracket", () => {
-  it("ASK må ikke bruges til at fylde aktieindkomstgrænsen", () => {
-    const s = withCw({ strategy: "askFirst", plannedWithdrawalPolicy: "fillLowShareIncomeBracket", plannedWithdrawalAmount: 0, startAge: 55, startAtStopAge: false }, (i) => {
-      i.free.ask = { enabled: true, currentValue: 200_000, depositLimit: 174_200, taxRate: 0.17, autoFillFirst: false, taxCreditCarryForward: 0, taxPaymentMode: "deductFromASK" };
+  it("ASK må ikke bruges til at fylde aktieindkomstgrænsen — kun holding+depot", () => {
+    // Spending sat lavt så shortfall ikke aktiveres → kun planlagt fillLow kører.
+    const s = withCw({ strategy: "askFirst", plannedWithdrawalPolicy: "fillLowShareIncomeBracket", plannedWithdrawalAmount: 0, startAge: 50, startAtStopAge: false }, (i) => {
+      i.spending.desiredMonthlyNet = 0;
+      i.free.ask = { enabled: true, currentValue: 100_000, depositLimit: 174_200, taxRate: 0.17, autoFillFirst: false, taxCreditCarryForward: 0, taxPaymentMode: "deductFromASK" };
     });
     const years = project(s, defaultAssumptions);
-    const yr = years.find((y) => y.age === 55)!;
+    const yr = years.find((y) => y.age === 50)!;
+    // Holding-udlodning skal fylde lav-grænsen
+    expect(yr.flows.capitalWithdrawal!.grossBySource.holding).toBeGreaterThan(0);
+    // ASK må ikke være brugt af fillLow (ingen shortfall trækker også fra ASK her)
     expect(yr.flows.capitalWithdrawal!.grossBySource.ask).toBe(0);
   });
 });
+
 
 describe("audit roundtrip", () => {
   it("JSON serialiserer og deserialiserer capitalWithdrawal", () => {
