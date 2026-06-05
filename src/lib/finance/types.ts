@@ -306,6 +306,60 @@ export interface ScenarioInputs {
   confidence?: ScenarioConfidence;
   /** Forberedt: generiske livsfaser/events. Påvirker IKKE beregningen endnu. */
   lifeEvents?: LifeEvent[];
+  /**
+   * Samlet kapitaludtræks-/nedsparingsstrategi (v1). Når undefined ⇒ legacy code path
+   * bruges, så gamle modeller giver præcis samme resultater som tidligere.
+   * Når sat, er denne struktur source of truth for udtræksrækkefølge og planlagt
+   * kapitaludtræk. Felterne holding.withdrawalStrategy, ask.withdrawalStrategy og
+   * depotTax.shareIncomeFundingStrategy bruges da kun til legacy migration.
+   */
+  capitalWithdrawal?: CapitalWithdrawalInputs;
+}
+
+/** Kilde til kapitaludtræk i den samlede nedsparingsstrategi. */
+export type CapitalSource = "depot" | "holding" | "ask" | "pension";
+
+export type CapitalWithdrawalStrategy =
+  | "depotFirst"
+  | "holdingFirst"
+  | "askFirst"
+  | "pensionFirst"
+  | "proRata"
+  | "custom";
+
+export type PlannedWithdrawalPolicy =
+  | "none"
+  | "fixedAnnual"
+  | "fillLowShareIncomeBracket";
+
+export interface CapitalWithdrawalInputs {
+  strategy: CapitalWithdrawalStrategy;
+  /** Bruges kun når strategy = "custom". */
+  customOrder?: CapitalSource[];
+  plannedWithdrawalPolicy: PlannedWithdrawalPolicy;
+  /** Brutto/source-beløb pr. år når policy = "fixedAnnual". */
+  plannedWithdrawalAmount: number;
+  /** Eksplicit startalder. null ⇒ ingen. */
+  startAge: number | null;
+  /** Hvis true følger startAge stopalder. */
+  startAtStopAge: boolean;
+}
+
+/** Audit af samlet kapitaludtræk pr. år. */
+export interface CapitalWithdrawalYearAudit {
+  strategy: CapitalWithdrawalStrategy;
+  plannedPolicy: PlannedWithdrawalPolicy;
+  startAge: number | null;
+  effectiveOrder: CapitalSource[];
+  /** Brutto udtræk pr. kilde i året (planlagt + shortfall). */
+  grossBySource: Record<CapitalSource, number>;
+  /** Netto cashflow leveret pr. kilde i året. */
+  netBySource: Record<CapitalSource, number>;
+  /** Skat pr. kilde i året (ASK-skat er separat lagerbeskatning). */
+  taxBySource: Record<CapitalSource, number>;
+  totalGross: number;
+  totalNet: number;
+  totalTax: number;
 }
 
 export type StressModifierKey = "noBarma" | "noPartTime" | "lowReturn" | "higherSpending" | "noFolkepension";
