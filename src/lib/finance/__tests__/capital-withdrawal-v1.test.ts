@@ -127,12 +127,14 @@ describe("source of truth", () => {
 describe("planned policy", () => {
   it("fixedAnnual: brutto-beløb tages fra første tilgængelige kilde (holdingFirst)", () => {
     const s = withCw({ strategy: "holdingFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 80_000, startAge: 55, startAtStopAge: false });
+    console.log("INPUT cw=", s.inputs.capitalWithdrawal, "holding.annualDist=", s.inputs.holding.annualDistribution, "holding.bal=", s.inputs.holding.balance, "stopAge=", s.inputs.stopAge);
     const years = project(s, defaultAssumptions);
     const yr = years.find((y) => y.age === 55)!;
+    console.log("OUT holdingPlanned=", yr.flows.holdingPlanned, "cw=", JSON.stringify(yr.flows.capitalWithdrawal));
     expect(yr.flows.holdingPlanned.gross).toBeCloseTo(80_000, 0);
-    // Audit-sum inkluderer både planlagt og shortfall — planlagt 80k er en undergrænse.
     expect(yr.flows.capitalWithdrawal!.grossBySource.holding).toBeGreaterThanOrEqual(80_000 - 1);
   });
+
 
 
 
