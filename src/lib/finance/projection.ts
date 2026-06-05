@@ -742,8 +742,8 @@ export function projectWithStopAge(
     if (cwActive && cw!.plannedWithdrawalPolicy !== "none") {
       const effStartAge = cw!.startAtStopAge ? stopAge : cw!.startAge;
       const canStart = effStartAge === null ? false : age >= effStartAge;
-      if (age === 55) console.log("DBG age55 cw.strategy=", cw!.strategy, "policy=", cw!.plannedWithdrawalPolicy, "amount=", cw!.plannedWithdrawalAmount, "effStartAge=", effStartAge, "canStart=", canStart);
       if (canStart) {
+
 
         const orderAll = resolveOrder(cw!.strategy, cw!.customOrder);
         // Filter ud fra rådighed + age-gates
