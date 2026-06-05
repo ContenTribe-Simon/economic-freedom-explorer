@@ -168,14 +168,19 @@ describe("ASK separation", () => {
       i.free.depotTax = { enabled: true, method: "realizationSimple", costBasis: 100_000, showDeferredTax: true };
     });
     const years = project(s, defaultAssumptions);
-    const yr = years.find((y) => y.age >= 51 && (y.flows.capitalWithdrawal?.grossBySource.ask ?? 0) > 0);
+    // Find første år hvor ASK bruges (kan være stopåret 50)
+    const yr = years.find((y) => y.age >= 50 && (y.flows.capitalWithdrawal?.grossBySource.ask ?? 0) > 0);
     expect(yr).toBeDefined();
-    if (yr?.flows.shareIncome) {
-      // ASK-udtræk indgår ikke i totalShareIncome
-      expect(yr.flows.shareIncome.totalShareIncome).toBeGreaterThanOrEqual(0);
+    expect(yr!.flows.capitalWithdrawal!.grossBySource.ask).toBeGreaterThan(0);
+    // ASK-udtræk indgår IKKE i shareIncome.totalShareIncome
+    if (yr!.flows.shareIncome) {
+      const askGross = yr!.flows.capitalWithdrawal!.grossBySource.ask;
+      // shareIncome.totalShareIncome må ikke afspejle ASK-bruttoen
+      expect(yr!.flows.shareIncome.totalShareIncome).toBeLessThan(askGross + 1);
     }
   });
 });
+
 
 describe("pensionFirst", () => {
   it("springes over før pensionAvailableFromAge", () => {
