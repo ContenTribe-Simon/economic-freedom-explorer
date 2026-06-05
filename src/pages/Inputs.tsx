@@ -400,58 +400,15 @@ export default function Inputs() {
         </p>
       </Section>
 
-      <Section title="Holding" description="Selskabskapital. Udlodning beskattes som aktieindkomst.">
+      <Section title="Holding" description="Selskabskapital. Udlodning beskattes som personlig aktieindkomst.">
         <NumField label="Nuværende holdingkapital" value={inp.holding.balance} onChange={(v) => set("holding", { ...inp.holding, balance: v })} suffix="kr" step={50000} />
         <NumField label="Forventet exitværdi" value={inp.holding.expectedExitValue} onChange={(v) => set("holding", { ...inp.holding, expectedExitValue: v })} suffix="kr" step={100000} hint="Tilføjes til holding i exit-året (efter selskabsskat)" />
         <NumField label="Exit-år (kalenderår)" value={inp.holding.exitYear} onChange={(v) => set("holding", { ...inp.holding, exitYear: v })} step={1} />
-        <NumField label="Planlagt årlig udlodning" value={inp.holding.annualDistribution} onChange={(v) => set("holding", { ...inp.holding, annualDistribution: v })} suffix="kr/år" step={10000} />
-        <NumField
-          label="Holdingudlodning fra alder"
-          value={inp.holding.distributionFromAge}
-          onChange={(v) => set("holding", { ...inp.holding, distributionFromAge: v })}
-          suffix="år"
-          hint={inp.holding.startDistributionAtStopAge ? `Følger stopalder (${inp.stopAge})` : "Ignoreres når toggle er aktiv"}
-        />
-        {/* "Pension tilgængelig fra alder" er flyttet til Privat pension-sektionen */}
-        <div className="space-y-1.5 flex flex-col justify-end">
-          <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
-            <input
-              type="checkbox"
-              checked={inp.holding.startDistributionAtStopAge}
-              onChange={(e) => set("holding", { ...inp.holding, startDistributionAtStopAge: e.target.checked, distributionFromAge: e.target.checked ? inp.stopAge : inp.holding.distributionFromAge })}
-            />
-            <span className="text-sm">Start holdingudlodning ved stopalder</span>
-          </label>
-        </div>
-        <div className="md:col-span-2 space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Holdingudtræksstrategi</Label>
-          {([
-            { v: "planned_only", t: "Kun planlagt årlig udlodning", d: "Ingen ekstra udtræk fra holding ved shortfall." },
-            { v: "up_to_low_threshold", t: "Udlod op til lav aktieindkomstgrænse", d: "Udlodder automatisk op til lav-sats grænsen pr. år (efter udlodningsalder)." },
-            { v: "allow_extra_on_shortfall", t: "Tillad ekstra holdingudtræk ved shortfall", d: "Holding kan bruges til at dække shortfall ud over planlagt udlodning." },
-            { v: "pension_before_extra_holding", t: "Brug pension før ekstra holdingudtræk", d: "Når pension er tilgængelig, prioriteres pension før ekstra holding." },
-          ] as { v: HoldingWithdrawalStrategy; t: string; d: string }[]).map((opt) => (
-            <label
-              key={opt.v}
-              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
-                (inp.holding.withdrawalStrategy ?? "planned_only") === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
-              }`}
-            >
-              <input
-                type="radio"
-                name="holdingStrategy"
-                checked={(inp.holding.withdrawalStrategy ?? "planned_only") === opt.v}
-                onChange={() => set("holding", { ...inp.holding, withdrawalStrategy: opt.v })}
-                className="mt-1"
-              />
-              <div>
-                <div className="font-medium text-sm">{opt.t}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
-              </div>
-            </label>
-          ))}
+        <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
+          Holdingens udtræksrækkefølge og planlagte udlodning styres nu under <strong>Kapitaludtræk &amp; nedsparing</strong>. Udlodning fra holding beskattes som personlig aktieindkomst og deler 27/42 %-grænsen med realiserede depotgevinster.
         </div>
       </Section>
+
 
       <Card className="p-6">
         <div className="flex items-center justify-between">
