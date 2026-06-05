@@ -575,28 +575,33 @@ export function projectWithStopAge(
       : undefined;
 
 
-    // ---- Planlagt holdingudlodning ----
+    // ---- Planlagt holdingudlodning (legacy code path) ----
+    // Springes over når capitalWithdrawal er aktiv — så håndteres planlagt udtræk
+    // af den samlede strategi nedenfor.
     const holdingPlanned = { gross: 0, net: 0, tax: 0 };
-    const canDistribute = bal.holding > 0 && age >= distFromAge;
-    if (canDistribute) {
-      if (holdingStrategy === "up_to_low_threshold") {
-        holdingPlanned.gross = Math.min(bal.holding, a.tax.shareThreshold);
-      } else if (inp.holding.annualDistribution > 0) {
-        holdingPlanned.gross = Math.min(bal.holding, inp.holding.annualDistribution);
-      }
-      if (holdingPlanned.gross > 0) {
-        if (shareCtx) {
-          const r = applyShareIncomeTax(shareCtx, holdingPlanned.gross);
-          holdingPlanned.net = r.net;
-          holdingPlanned.tax = r.tax;
-        } else {
-          const r = shareTax(holdingPlanned.gross, a.tax);
-          holdingPlanned.net = r.net;
-          holdingPlanned.tax = r.tax;
+    if (!cwActive) {
+      const canDistribute = bal.holding > 0 && age >= distFromAge;
+      if (canDistribute) {
+        if (holdingStrategy === "up_to_low_threshold") {
+          holdingPlanned.gross = Math.min(bal.holding, a.tax.shareThreshold);
+        } else if (inp.holding.annualDistribution > 0) {
+          holdingPlanned.gross = Math.min(bal.holding, inp.holding.annualDistribution);
         }
-        bal.holding -= holdingPlanned.gross;
+        if (holdingPlanned.gross > 0) {
+          if (shareCtx) {
+            const r = applyShareIncomeTax(shareCtx, holdingPlanned.gross);
+            holdingPlanned.net = r.net;
+            holdingPlanned.tax = r.tax;
+          } else {
+            const r = shareTax(holdingPlanned.gross, a.tax);
+            holdingPlanned.net = r.net;
+            holdingPlanned.tax = r.tax;
+          }
+          bal.holding -= holdingPlanned.gross;
+        }
       }
     }
+
 
 
     // Gæld
