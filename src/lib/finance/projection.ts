@@ -2,6 +2,9 @@ import {
   Assumptions,
   AskWithdrawalStrategy,
   Bucket,
+  CapitalSource,
+  CapitalWithdrawalInputs,
+  CapitalWithdrawalYearAudit,
   DebtItem,
   DebtYearDetail,
   Scenario,
@@ -9,6 +12,8 @@ import {
   ShareIncomeFundingStrategy,
   YearRow,
 } from "./types";
+import { resolveOrder } from "./capitalWithdrawal";
+
 
 import {
   applyShareIncomeTax,
