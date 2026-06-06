@@ -1196,7 +1196,7 @@ export function projectWithStopAge(
         employerPensionContribution: employerPension,
         ownPensionContribution,
         freeContribution,
-        bufferContribution,
+        bufferContribution: bufferContribution + bufferContributionAdj,
         spending,
         taxes: laborTaxAmt + totalHoldingTax + statePensionTax + ratePension.tax + lifeAnnuity.tax + pensionExtra.tax,
         debtInterest: dt.privateInterest + dt.holdingInterest,
