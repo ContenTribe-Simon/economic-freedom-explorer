@@ -62,9 +62,30 @@ export function AuditPanel({ y, inputs, fireYear, onClose, scenarioId, scenarioN
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Calculation audit</div>
           <h3 className="font-display text-2xl font-semibold">Alder {y.age}</h3>
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="copy-audit-json"
+            onClick={async () => {
+              try {
+                const json = buildYearAuditJson(
+                  { id: scenarioId ?? "", name: scenarioName ?? "" } as never,
+                  y,
+                );
+                await navigator.clipboard.writeText(json);
+                toast.success("Audit JSON kopieret.");
+              } catch {
+                toast.error("Kunne ikke kopiere");
+              }
+            }}
+          >
+            <Copy className="h-4 w-4 mr-1" /> JSON
+          </Button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
