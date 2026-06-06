@@ -834,7 +834,7 @@ export function projectWithStopAge(
     const cashflow = incomeNet - dt.privatePayment - spending;
 
     let freeContribution = 0;
-    const bufferContribution = 0;
+    let bufferContribution = 0;
     const withdrawals = { free: 0, pension: 0, holding: 0, buffer: 0 };
     const withdrawalsGross = { free: 0, pension: 0, holding: 0, buffer: 0 };
     let cashflowSurplus = 0;
