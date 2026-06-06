@@ -1220,26 +1220,15 @@ export function projectWithStopAge(
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
         lifeEventEffects: lifeEventEffects ?? undefined,
-        surplusAllocation: (() => {
-          const total = bufferContributionAdj + extraSpendingAdj + outOfModelAdj +
-            (surplusPolicy === "investExtra" || surplusPolicy === "bufferThenInvest" ? 0 : 0);
-          // toFreeInvestment = surplus routed to free via applySurplus
-          // We can't directly read here; recompute as max(0, cashflowSurplus) - other buckets when policy uses invest.
-          const surplus = Math.max(0, cashflowSurplus);
-          let toFree = 0;
-          if (surplusPolicy === "investExtra") toFree = surplus;
-          else if (surplusPolicy === "bufferThenInvest") toFree = Math.max(0, surplus - bufferContributionAdj);
-          if (surplus <= 0 && bufferContributionAdj + extraSpendingAdj + outOfModelAdj + toFree <= 0) return undefined;
-          return {
-            policy: surplusPolicy,
-            surplus,
-            toBuffer: bufferContributionAdj,
-            toFreeInvestment: toFree,
-            extraSpending: extraSpendingAdj,
-            outOfModel: outOfModelAdj,
-            bufferTarget: bufferTargetCfg ?? null,
-          };
-        })(),
+        surplusAllocation: surplusApplied > 0 ? {
+          policy: surplusPolicy,
+          surplus: surplusApplied,
+          toBuffer: bufferContributionAdj,
+          toFreeInvestment: surplusFreeInvest,
+          extraSpending: extraSpendingAdj,
+          outOfModel: outOfModelAdj,
+          bufferTarget: bufferTargetCfg ?? null,
+        } : undefined,
         ask: askActive ? {
           opening: askOpening,
           contribution: askContribYear,
