@@ -16,6 +16,7 @@ import CloudPage from "./pages/Cloud";
 import LifeEventsPage from "./pages/LifeEvents";
 import FirePage from "./pages/Fire";
 import CountriesPage from "./pages/Countries";
+import ModelValidation from "./pages/ModelValidation";
 import { AuthProvider } from "@/hooks/useAuth";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/life-events" element={<LifeEventsPage />} />
             <Route path="/fire" element={<FirePage />} />
             <Route path="/countries" element={<CountriesPage />} />
+            <Route path="/debug/model-validation" element={<ModelValidation />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>

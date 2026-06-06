@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDKK } from "@/lib/format";
 import { ScenarioInputs, YearRow } from "@/lib/finance/types";
 import { isLifeEventValid } from "@/lib/finance/lifeEvents";
-import { computeFireAnalysis, type FireYearStatus } from "@/lib/finance/fire";
-import { X } from "lucide-react";
+import { computeFireAnalysis, type FireYearStatus, type FireAnalysis } from "@/lib/finance/fire";
+import { buildProjectionExport, buildProjectionCsv, buildYearAuditJson } from "@/lib/finance/exportProjection";
+import { toast } from "sonner";
+import { Copy, Download, X } from "lucide-react";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
   return (
@@ -46,7 +50,7 @@ export function lifeAnnuityStatusText(
   return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
 }
 
-export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void }) {
+export function AuditPanel({ y, inputs, fireYear, onClose, scenarioId, scenarioName }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void; scenarioId?: string; scenarioName?: string }) {
   const f = y.flows;
   const incomeTotal =
     f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
@@ -58,9 +62,30 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Calculation audit</div>
           <h3 className="font-display text-2xl font-semibold">Alder {y.age}</h3>
         </div>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="copy-audit-json"
+            onClick={async () => {
+              try {
+                const json = buildYearAuditJson(
+                  { id: scenarioId ?? "", name: scenarioName ?? "" } as never,
+                  y,
+                );
+                await navigator.clipboard.writeText(json);
+                toast.success("Audit JSON kopieret.");
+              } catch {
+                toast.error("Kunne ikke kopiere");
+              }
+            }}
+          >
+            <Copy className="h-4 w-4 mr-1" /> JSON
+          </Button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -547,12 +572,56 @@ export default function Projection() {
   const selected = years.find((y) => y.age === selectedAge) ?? null;
   const selectedFire = selectedAge !== null ? fire.yearStatus.find((s) => s.age === selectedAge) : undefined;
 
+  const downloadFile = (filename: string, content: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const slug = scenario.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "scenario";
+  const date = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="space-y-6">
-      <header>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground">År-for-år</div>
-        <h1 className="font-display text-4xl font-semibold mt-1">{scenario.name}</h1>
-        <p className="text-muted-foreground mt-2">Komplet fremskrivning. Alle beløb i nutidskroner. Klik en række for fuld beregningsoversigt.</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">År-for-år</div>
+          <h1 className="font-display text-4xl font-semibold mt-1">{scenario.name}</h1>
+          <p className="text-muted-foreground mt-2">Komplet fremskrivning. Alle beløb i nutidskroner. Klik en række for fuld beregningsoversigt.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="export-projection-json"
+            onClick={() => {
+              const payload = buildProjectionExport(scenario, assumptions, years, fire as FireAnalysis);
+              downloadFile(`projection-${slug}-${date}.json`, JSON.stringify(payload, null, 2), "application/json");
+              toast.success("Projection eksporteret som JSON");
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" /> JSON
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="export-projection-csv"
+            onClick={() => {
+              const csv = buildProjectionCsv(years, fire as FireAnalysis);
+              downloadFile(`projection-${slug}-${date}.csv`, csv, "text/csv");
+              toast.success("Projection eksporteret som CSV");
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" /> CSV
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/debug/model-validation">Model validation</Link>
+          </Button>
+        </div>
       </header>
 
       <div className={`grid gap-6 ${selected ? "lg:grid-cols-[1fr_400px]" : ""}`}>
@@ -599,7 +668,14 @@ export default function Projection() {
 
         {selected && (
           <div>
-            <AuditPanel y={selected} inputs={scenario.inputs} fireYear={selectedFire} onClose={() => setSelectedAge(null)} />
+            <AuditPanel
+              y={selected}
+              inputs={scenario.inputs}
+              fireYear={selectedFire}
+              onClose={() => setSelectedAge(null)}
+              scenarioId={scenario.id}
+              scenarioName={scenario.name}
+            />
           </div>
         )}
       </div>
