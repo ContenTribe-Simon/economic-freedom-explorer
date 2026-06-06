@@ -481,6 +481,8 @@ export interface YearFlows {
   depot?: DepotYearAudit;
   /** Audit af samlet kapitaludtræksstrategi (kun udfyldt når capitalWithdrawal er sat). */
   capitalWithdrawal?: CapitalWithdrawalYearAudit;
+  /** Audit af cashflow surplus allokering (kun udfyldt når der var positivt overskud). */
+  surplusAllocation?: CashflowSurplusYearAudit;
 }
 
 /** Audit af personlig aktieindkomst-pulje (holding + depot deler 27/42 %-grænsen). */
