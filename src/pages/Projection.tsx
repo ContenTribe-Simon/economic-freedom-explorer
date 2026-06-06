@@ -572,12 +572,56 @@ export default function Projection() {
   const selected = years.find((y) => y.age === selectedAge) ?? null;
   const selectedFire = selectedAge !== null ? fire.yearStatus.find((s) => s.age === selectedAge) : undefined;
 
+  const downloadFile = (filename: string, content: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const slug = scenario.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "scenario";
+  const date = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="space-y-6">
-      <header>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground">År-for-år</div>
-        <h1 className="font-display text-4xl font-semibold mt-1">{scenario.name}</h1>
-        <p className="text-muted-foreground mt-2">Komplet fremskrivning. Alle beløb i nutidskroner. Klik en række for fuld beregningsoversigt.</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">År-for-år</div>
+          <h1 className="font-display text-4xl font-semibold mt-1">{scenario.name}</h1>
+          <p className="text-muted-foreground mt-2">Komplet fremskrivning. Alle beløb i nutidskroner. Klik en række for fuld beregningsoversigt.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="export-projection-json"
+            onClick={() => {
+              const payload = buildProjectionExport(scenario, assumptions, years, fire as FireAnalysis);
+              downloadFile(`projection-${slug}-${date}.json`, JSON.stringify(payload, null, 2), "application/json");
+              toast.success("Projection eksporteret som JSON");
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" /> JSON
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="export-projection-csv"
+            onClick={() => {
+              const csv = buildProjectionCsv(years, fire as FireAnalysis);
+              downloadFile(`projection-${slug}-${date}.csv`, csv, "text/csv");
+              toast.success("Projection eksporteret som CSV");
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" /> CSV
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/debug/model-validation">Model validation</Link>
+          </Button>
+        </div>
       </header>
 
       <div className={`grid gap-6 ${selected ? "lg:grid-cols-[1fr_400px]" : ""}`}>
