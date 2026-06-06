@@ -439,6 +439,13 @@ export function projectWithStopAge(
     ask: askInitialValue,
   };
 
+  // ---- Cashflow surplus allocation (v1) ----
+  const surplusPolicy = inp.cashflowAllocation?.surplusPolicy ?? "outOfModel";
+  const initialBuffer = inp.free.cashBuffer ?? 0;
+  const bufferTargetCfg = inp.cashflowAllocation?.bufferTarget;
+  const bufferTargetResolved =
+    bufferTargetCfg === null || bufferTargetCfg === undefined ? initialBuffer : bufferTargetCfg;
+
   /** Persisterende effekt af one_time privat-gælds-events. */
   let lifeEventDebtBalance = 0;
 
