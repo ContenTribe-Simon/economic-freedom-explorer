@@ -1103,16 +1103,17 @@ export function projectWithStopAge(
         // "planned" (also covers legacy "hybrid")
         const planned = plannedFreeContribution;
         cashflowSurplus = cashflow - planned;
-        if (cashflow < 0) {
-          // Real cashflow shortfall — no planned investment this year.
-          drainShortfall(-cashflow);
-        } else if (cashflow >= planned) {
+        if (cashflow >= planned) {
           freeContribution = planned;
           allocateFreeContribution(freeContribution);
           applySurplus(cashflow - planned);
         } else {
-          // 0 <= cashflow < planned: planned-savings shortfall (NOT consumption shortfall).
-          const available = cashflow;
+          // cashflow < planned — opsparings-shortfall (IKKE forbrugs-shortfall).
+          // Vi investerer kun det disponible positive cashflow + evt. buffer-dækning.
+          // Reelt forbrugs-shortfall (cashflow < 0) håndteres af det eksisterende
+          // stillShort/buffer-flow længere nede — capitalWithdrawal bruges ikke
+          // til at finansiere investering ud af ingenting.
+          const available = Math.max(0, cashflow);
           const gap = planned - available;
           let invest = available;
           let coveredByBuffer = 0;
