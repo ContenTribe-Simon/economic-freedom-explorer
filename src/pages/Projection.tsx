@@ -1,13 +1,17 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
 import { project } from "@/lib/finance/projection";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDKK } from "@/lib/format";
 import { ScenarioInputs, YearRow } from "@/lib/finance/types";
 import { isLifeEventValid } from "@/lib/finance/lifeEvents";
-import { computeFireAnalysis, type FireYearStatus } from "@/lib/finance/fire";
-import { X } from "lucide-react";
+import { computeFireAnalysis, type FireYearStatus, type FireAnalysis } from "@/lib/finance/fire";
+import { buildProjectionExport, buildProjectionCsv, buildYearAuditJson } from "@/lib/finance/exportProjection";
+import { toast } from "sonner";
+import { Copy, Download, X } from "lucide-react";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
   return (
