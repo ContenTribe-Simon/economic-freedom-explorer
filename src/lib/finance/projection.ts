@@ -1036,6 +1036,7 @@ export function projectWithStopAge(
     let surplusApplied = 0;
     const applySurplus = (amt: number) => {
       if (amt <= 0) return;
+      surplusApplied += amt;
       if (surplusPolicy === "toBuffer") {
         bal.buffer += amt;
         bufferContributionAdj += amt;
@@ -1049,10 +1050,12 @@ export function projectWithStopAge(
         const rest = amt - toBuf;
         if (rest > 0) {
           freeContribution += rest;
+          surplusFreeInvest += rest;
           allocateFreeContribution(rest);
         }
       } else if (surplusPolicy === "investExtra") {
         freeContribution += amt;
+        surplusFreeInvest += amt;
         allocateFreeContribution(amt);
       } else if (surplusPolicy === "extraSpending") {
         extraSpendingAdj += amt;
