@@ -1029,6 +1029,36 @@ export function projectWithStopAge(
     const plannedActive = plannedStopAge === null || age < plannedStopAge;
     const rawPlanned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
     const plannedFreeContribution = plannedActive ? rawPlanned : 0;
+    let bufferContributionAdj = 0;
+    let extraSpendingAdj = 0;
+    let outOfModelAdj = 0;
+    const applySurplus = (amt: number) => {
+      if (amt <= 0) return;
+      if (surplusPolicy === "toBuffer") {
+        bal.buffer += amt;
+        bufferContributionAdj += amt;
+      } else if (surplusPolicy === "bufferThenInvest") {
+        const need = Math.max(0, bufferTargetResolved - bal.buffer);
+        const toBuf = Math.min(amt, need);
+        if (toBuf > 0) {
+          bal.buffer += toBuf;
+          bufferContributionAdj += toBuf;
+        }
+        const rest = amt - toBuf;
+        if (rest > 0) {
+          freeContribution += rest;
+          allocateFreeContribution(rest);
+        }
+      } else if (surplusPolicy === "investExtra") {
+        freeContribution += amt;
+        allocateFreeContribution(amt);
+      } else if (surplusPolicy === "extraSpending") {
+        extraSpendingAdj += amt;
+      } else {
+        outOfModelAdj += amt;
+      }
+    };
+
     if (working || plannedActive) {
       const planned = plannedFreeContribution;
       cashflowSurplus = cashflow - planned;
@@ -1040,14 +1070,15 @@ export function projectWithStopAge(
       } else if (savingsLogic === "planned") {
         freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
         allocateFreeContribution(freeContribution);
-        // Overskydende cashflow ud over planlagt opsparing investeres IKKE — vises som ikke-allokeret.
-        unallocatedCashflow = Math.max(0, cashflow - freeContribution);
+        // Overskydende cashflow ud over planlagt opsparing håndteres af surplus-policy.
+        const surplus = Math.max(0, cashflow - freeContribution);
+        applySurplus(surplus);
       } else {
         freeContribution = planned;
         allocateFreeContribution(freeContribution);
         const net = cashflow - planned;
         if (net < 0) drainShortfall(-net);
-        else unallocatedCashflow = net;
+        else applySurplus(net);
       }
     } else {
       if (cashflow >= 0) {
@@ -1057,6 +1088,7 @@ export function projectWithStopAge(
         drainShortfall(-cashflow);
       }
     }
+    unallocatedCashflow = outOfModelAdj;
 
     if (working) bal.pension += ownPensionContribution + employerPension;
 
