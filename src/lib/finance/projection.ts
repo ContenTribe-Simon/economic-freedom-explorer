@@ -1126,7 +1126,10 @@ export function projectWithStopAge(
           }
           freeContribution = invest;
           if (invest > 0) allocateFreeContribution(invest);
-          if (gap > 0.5) {
+          // Plan-shortfall audit udfyldes kun når cashflow er positivt (ægte
+          // opsparings-shortfall). Negativt cashflow er forbrugs-shortfall og
+          // håndteres separat via stillShort.
+          if (cashflow >= 0 && gap > 0.5) {
             plannedSavingsShortfallAudit = {
               policy: plannedShortfallPolicy,
               plannedAmount: planned,
