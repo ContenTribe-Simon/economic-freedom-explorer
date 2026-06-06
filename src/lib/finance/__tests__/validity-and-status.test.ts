@@ -71,6 +71,9 @@ describe("Dashboard renames and notes", () => {
     const src = await import("fs").then((fs) =>
       fs.readFileSync("src/pages/Projection.tsx", "utf8"),
     );
-    expect(src).toMatch(/Årets overskud\/underskud og investering/);
+    // v1: "Årets overskud/underskud og investering" er erstattet af
+    // "Årets cashflow før opsparing" + "Opsparing og overskud".
+    expect(src).toMatch(/Årets cashflow før opsparing/);
+    expect(src).toMatch(/Opsparing og overskud/);
   });
 });

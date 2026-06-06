@@ -147,13 +147,40 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
         </section>
 
         <section>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Årets overskud/underskud og investering</div>
-          <Row label="Indkomst netto" value={incomeTotal} indent />
-          <Row label="Forbrug" value={-f.spending} indent />
-          <Row label="Renter + afdrag (privat)" value={-(f.debtInterest + f.debtPrincipal)} indent />
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Årets cashflow før opsparing</div>
+          {f.cashflowBridge ? (
+            <>
+              <Row label="Grundindkomst netto" value={f.cashflowBridge.baseIncomeNet} indent />
+              {Math.abs(f.cashflowBridge.lifeEventIncome) > 0.5 && (
+                <Row label="Livsfase-indkomst" value={f.cashflowBridge.lifeEventIncome} indent />
+              )}
+              <Row label="Indkomst i alt til cashflow" value={f.cashflowBridge.totalIncomeToCashflow} strong />
+              <Row label="Forbrug" value={-f.spending} indent />
+              <Row label="Renter + afdrag (privat)" value={-(f.debtInterest + f.debtPrincipal)} indent />
+              {Math.abs(f.cashflowBridge.lifeEventSpending) > 0.5 && (
+                <Row label="Livsfase-forbrug (delta)" value={-f.cashflowBridge.lifeEventSpending} indent />
+              )}
+              <Row label="Cashflow før opsparing" value={f.cashflowBridge.cashflowBeforeSavings} strong />
+            </>
+          ) : (
+            <>
+              <Row label="Indkomst netto" value={incomeTotal} indent />
+              <Row label="Forbrug" value={-f.spending} indent />
+              <Row label="Renter + afdrag (privat)" value={-(f.debtInterest + f.debtPrincipal)} indent />
+            </>
+          )}
+        </section>
+
+        <section>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Opsparing og overskud</div>
           {(() => {
-            const logic = inputs.savingsLogic ?? "planned";
-            const logicLabel = logic === "planned" ? "Planlagt opsparing" : logic === "cashflow" ? "Cashflow-baseret" : "Hybrid";
+            const ca = inputs.cashflowAllocation;
+            const method = ca?.plannedInvestmentMethod
+              ?? (inputs.savingsLogic === "cashflow" ? "cashflow" : "planned");
+            const methodLabel =
+              method === "cashflow" ? "Investér alt disponibelt cashflow"
+              : method === "none" ? "Ingen automatisk investering"
+              : "Brug planlagt opsparing";
             const rule = inputs.free.contributionStopRule ?? "stopAge";
             const ruleLabel =
               rule === "stopAge" ? `Stop ved jobstop (alder ${inputs.stopAge})`
@@ -164,9 +191,10 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
             const stopAge = f.plannedContributionStopAge;
             return (
               <>
-                <Row label={`Stopregel for fri opsparing`} value={ruleLabel} indent />
+                <Row label="Valgt opsparingsmetode" value={methodLabel} indent />
+                <Row label="Stopregel for fri opsparing" value={ruleLabel} indent />
                 <Row label="Planlagt opsparing aktiv" value={active ? "Ja" : "Nej"} indent />
-                <Row label={`Planlagt opsparing (${logicLabel})`} value={f.plannedFreeContribution} indent />
+                <Row label="Planlagt opsparing" value={f.plannedFreeContribution} indent />
                 {!active && stopAge !== null && (
                   <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
                     Planlagt opsparing: 0 kr — stoppet ved alder {stopAge}.
@@ -189,7 +217,31 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
                     )}
                   </div>
                 )}
-                {f.surplusAllocation && f.surplusAllocation.surplus > 0.5 && (() => {
+                {f.plannedSavingsShortfall && (() => {
+                  const ps = f.plannedSavingsShortfall!;
+                  const polLabel =
+                    ps.policy === "useBuffer" ? "Brug kontant buffer"
+                    : ps.policy === "showShortfall" ? "Vis manglende opsparing"
+                    : "Begræns investering til disponibelt cashflow";
+                  return (
+                    <div className="mt-2" data-testid="audit-planned-savings-shortfall">
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground">Planlagt opsparing kunne ikke dækkes</div>
+                      <Row label={`Policy: ${polLabel}`} value="" indent />
+                      <Row label="Planlagt beløb" value={ps.plannedAmount} indent />
+                      <Row label="Disponibelt cashflow" value={ps.availableCashflow} indent />
+                      {ps.coveredByBuffer > 0.5 && <Row label="Dækket af buffer" value={ps.coveredByBuffer} indent />}
+                      {ps.unmetPlannedInvestment > 0.5 && (
+                        <>
+                          <Row label="Ikke gennemført planlagt opsparing" value={ps.unmetPlannedInvestment} indent />
+                          <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                            Bemærk: dette er ikke et forbrugs-shortfall. Forbrug og gæld er dækket.
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+                {f.surplusAllocation && f.surplusAllocation.surplus > 0.5 && method !== "cashflow" && (() => {
                   const sa = f.surplusAllocation!;
                   const policyLabel =
                     sa.policy === "toBuffer" ? "Til kontant buffer"
@@ -199,8 +251,8 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
                     : "Uden for model";
                   return (
                     <div className="mt-2" data-testid="audit-surplus-allocation">
-                      <div className="text-xs uppercase tracking-wider text-muted-foreground">Årets overskydende cashflow</div>
-                      <Row label="Overskud efter planlagt opsparing" value={sa.surplus} indent />
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground">Overskud efter planlagt opsparing</div>
+                      <Row label="Overskud efter plan" value={sa.surplus} indent />
                       <Row label={`Håndtering: ${policyLabel}`} value="" indent />
                       {sa.toBuffer > 0.5 && <Row label="Til buffer" value={sa.toBuffer} indent />}
                       {sa.toFreeInvestment > 0.5 && <Row label="Ekstra investeret fri kapital" value={sa.toFreeInvestment} indent />}
@@ -216,8 +268,13 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
                     </div>
                   );
                 })()}
+                {method === "cashflow" && f.investedAmount > 0 && (
+                  <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                    Hele disponible cashflow investeres — separat overskudshåndtering bruges ikke.
+                  </div>
+                )}
                 {y.shortfallAmount > 0.5 && (
-                  <Row label="Cashflow-shortfall (udækket)" value={-y.shortfallAmount} indent />
+                  <Row label="Cashflow-shortfall (udækket forbrug)" value={-y.shortfallAmount} indent />
                 )}
               </>
             );
