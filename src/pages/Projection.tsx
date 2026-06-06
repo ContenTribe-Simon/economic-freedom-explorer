@@ -50,7 +50,7 @@ export function lifeAnnuityStatusText(
   return { kind: "info", text: "Aktiv – ingen udbetaling i år" };
 }
 
-export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void }) {
+export function AuditPanel({ y, inputs, fireYear, onClose, scenarioId, scenarioName }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void; scenarioId?: string; scenarioName?: string }) {
   const f = y.flows;
   const incomeTotal =
     f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
