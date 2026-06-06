@@ -1107,13 +1107,28 @@ export function projectWithStopAge(
           freeContribution = planned;
           allocateFreeContribution(freeContribution);
           applySurplus(cashflow - planned);
+        } else if (cashflow < 0) {
+          // Negativt cashflow = forbrugs-underskud, IKKE et opsparings-shortfall.
+          // Et underskud kan ikke finansiere opsparing: ingen planlagt investering
+          // og ingen buffer→fri-overførsel. Underskuddet skal tappes fra formuen,
+          // så nettoformuen falder med præcis underskuddet — bufferen (kontant)
+          // først, og rækker den ikke, følger vi modellens eksisterende
+          // udtræks-rækkefølge (drainShortfall ⇒ resolveOrder/capitalWithdrawal).
+          // Et evt. udækket restunderskud bæres videre som stillShort nedenfor.
+          freeContribution = 0;
+          let needed = -cashflow;
+          if (bal.buffer > 0) {
+            const take = Math.min(bal.buffer, needed);
+            bal.buffer -= take;
+            withdrawals.buffer += take;
+            withdrawalsGross.buffer += take;
+            needed -= take;
+          }
+          if (needed > 0) drainShortfall(needed);
         } else {
-          // cashflow < planned — opsparings-shortfall (IKKE forbrugs-shortfall).
+          // 0 <= cashflow < planned — ægte opsparings-shortfall (IKKE forbrugs-shortfall).
           // Vi investerer kun det disponible positive cashflow + evt. buffer-dækning.
-          // Reelt forbrugs-shortfall (cashflow < 0) håndteres af det eksisterende
-          // stillShort/buffer-flow længere nede — capitalWithdrawal bruges ikke
-          // til at finansiere investering ud af ingenting.
-          const available = Math.max(0, cashflow);
+          const available = cashflow;
           const gap = planned - available;
           let invest = available;
           let coveredByBuffer = 0;
@@ -1126,10 +1141,7 @@ export function projectWithStopAge(
           }
           freeContribution = invest;
           if (invest > 0) allocateFreeContribution(invest);
-          // Plan-shortfall audit udfyldes kun når cashflow er positivt (ægte
-          // opsparings-shortfall). Negativt cashflow er forbrugs-shortfall og
-          // håndteres separat via stillShort.
-          if (cashflow >= 0 && gap > 0.5) {
+          if (gap > 0.5) {
             plannedSavingsShortfallAudit = {
               policy: plannedShortfallPolicy,
               plannedAmount: planned,
