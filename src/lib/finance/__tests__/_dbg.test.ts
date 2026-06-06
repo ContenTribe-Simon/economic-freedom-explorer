@@ -2,16 +2,12 @@ import { test } from "vitest";
 import { defaultAssumptions, makeBaseScenario } from "../defaults";
 import { project } from "../projection";
 
-test("dbg", () => {
+test("dbg2", () => {
   const s = makeBaseScenario();
-  s.inputs.capitalWithdrawal = { strategy: "holdingFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 50000, startAge: null, startAtStopAge: true } as any;
+  s.inputs.capitalWithdrawal = { strategy: "depotFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 60000, startAge: 55, startAtStopAge: false } as any;
+  s.inputs.free.balance = 500_000;
   const ys = project(s, defaultAssumptions);
-  const stop = s.inputs.stopAge;
-  const before = ys.find(y => y.age === stop - 1)!;
-  console.log("stopAge:", stop, "age:", before.age);
-  console.log("totalIncomeNet:", before.totalIncomeNet, "spending:", before.flows.spending);
-  console.log("bridge:", before.flows.cashflowBridge);
-  console.log("cw:", before.flows.capitalWithdrawal);
-  console.log("planned:", before.flows.plannedFreeContribution, "invested:", before.flows.investedAmount);
-  console.log("withdrawals:", before.flows.withdrawals);
+  for (const y of ys.slice(0, 20)) {
+    console.log(`age=${y.age} cf=${Math.round(y.flows.cashflowBridge?.cashflowBeforeSavings ?? 0)} free=${Math.round(y.closing.free)} cw.depot=${Math.round(y.flows.capitalWithdrawal?.grossBySource.depot ?? 0)} cw.hold=${Math.round(y.flows.capitalWithdrawal?.grossBySource.holding ?? 0)}`);
+  }
 });
