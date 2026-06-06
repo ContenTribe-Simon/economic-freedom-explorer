@@ -314,6 +314,41 @@ export interface ScenarioInputs {
    * depotTax.shareIncomeFundingStrategy bruges da kun til legacy migration.
    */
   capitalWithdrawal?: CapitalWithdrawalInputs;
+  /**
+   * Cashflow allocation v1 — håndtering af positivt overskydende cashflow
+   * efter planlagte posteringer. Når undefined ⇒ fallback "outOfModel"
+   * (samme adfærd som tidligere; ikke-allokeret cashflow vises som før).
+   */
+  cashflowAllocation?: CashflowAllocationInputs;
+}
+
+/**
+ * Politik for hvad der sker med positivt overskydende cashflow efter
+ * planlagt opsparing, kapitaludtræk og øvrige posteringer.
+ */
+export type CashflowSurplusPolicy =
+  | "toBuffer"
+  | "bufferThenInvest"
+  | "investExtra"
+  | "extraSpending"
+  | "outOfModel";
+
+export interface CashflowAllocationInputs {
+  surplusPolicy: CashflowSurplusPolicy;
+  /** Mål for kontant buffer (kr). null ⇒ brug initialt cashBuffer som mål. */
+  bufferTarget: number | null;
+}
+
+/** Audit af cashflow surplus allokering for året. */
+export interface CashflowSurplusYearAudit {
+  policy: CashflowSurplusPolicy;
+  /** Brutto positivt overskud efter planlagte posteringer. */
+  surplus: number;
+  toBuffer: number;
+  toFreeInvestment: number;
+  extraSpending: number;
+  outOfModel: number;
+  bufferTarget: number | null;
 }
 
 /** Kilde til kapitaludtræk i den samlede nedsparingsstrategi. */
@@ -446,6 +481,8 @@ export interface YearFlows {
   depot?: DepotYearAudit;
   /** Audit af samlet kapitaludtræksstrategi (kun udfyldt når capitalWithdrawal er sat). */
   capitalWithdrawal?: CapitalWithdrawalYearAudit;
+  /** Audit af cashflow surplus allokering (kun udfyldt når der var positivt overskud). */
+  surplusAllocation?: CashflowSurplusYearAudit;
 }
 
 /** Audit af personlig aktieindkomst-pulje (holding + depot deler 27/42 %-grænsen). */

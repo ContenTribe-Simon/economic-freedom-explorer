@@ -189,16 +189,35 @@ export function AuditPanel({ y, inputs, fireYear, onClose }: { y: YearRow; input
                     )}
                   </div>
                 )}
-                {f.unallocatedCashflow > 0.5 && (
-                  <Row label="Ikke-allokeret cashflow" value={f.unallocatedCashflow} indent />
-                )}
+                {f.surplusAllocation && f.surplusAllocation.surplus > 0.5 && (() => {
+                  const sa = f.surplusAllocation!;
+                  const policyLabel =
+                    sa.policy === "toBuffer" ? "Til kontant buffer"
+                    : sa.policy === "bufferThenInvest" ? "Fyld buffer til mål, investér resten"
+                    : sa.policy === "investExtra" ? "Investér ekstra automatisk"
+                    : sa.policy === "extraSpending" ? "Ekstra forbrug/livsstil"
+                    : "Uden for model";
+                  return (
+                    <div className="mt-2" data-testid="audit-surplus-allocation">
+                      <div className="text-xs uppercase tracking-wider text-muted-foreground">Årets overskydende cashflow</div>
+                      <Row label="Overskud efter planlagt opsparing" value={sa.surplus} indent />
+                      <Row label={`Håndtering: ${policyLabel}`} value="" indent />
+                      {sa.toBuffer > 0.5 && <Row label="Til buffer" value={sa.toBuffer} indent />}
+                      {sa.toFreeInvestment > 0.5 && <Row label="Ekstra investeret fri kapital" value={sa.toFreeInvestment} indent />}
+                      {sa.extraSpending > 0.5 && <Row label="Ekstra forbrug/livsstil" value={sa.extraSpending} indent />}
+                      {sa.outOfModel > 0.5 && (
+                        <>
+                          <Row label="Uden for model" value={sa.outOfModel} indent />
+                          <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
+                            Beløbet medregnes ikke i balancefremskrivningen.
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
                 {y.shortfallAmount > 0.5 && (
                   <Row label="Cashflow-shortfall (udækket)" value={-y.shortfallAmount} indent />
-                )}
-                {f.unallocatedCashflow > 0.5 && logic !== "cashflow" && (
-                  <div className="text-[11px] text-muted-foreground italic mt-1 pl-4">
-                    Beløbet investeres ikke automatisk under {logicLabel.toLowerCase()} og indgår derfor ikke i formuefremskrivningen.
-                  </div>
                 )}
               </>
             );

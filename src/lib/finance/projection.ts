@@ -439,6 +439,13 @@ export function projectWithStopAge(
     ask: askInitialValue,
   };
 
+  // ---- Cashflow surplus allocation (v1) ----
+  const surplusPolicy = inp.cashflowAllocation?.surplusPolicy ?? "outOfModel";
+  const initialBuffer = inp.free.cashBuffer ?? 0;
+  const bufferTargetCfg = inp.cashflowAllocation?.bufferTarget;
+  const bufferTargetResolved =
+    bufferTargetCfg === null || bufferTargetCfg === undefined ? initialBuffer : bufferTargetCfg;
+
   /** Persisterende effekt af one_time privat-gælds-events. */
   let lifeEventDebtBalance = 0;
 
@@ -827,7 +834,7 @@ export function projectWithStopAge(
     const cashflow = incomeNet - dt.privatePayment - spending;
 
     let freeContribution = 0;
-    const bufferContribution = 0;
+    let bufferContribution = 0;
     const withdrawals = { free: 0, pension: 0, holding: 0, buffer: 0 };
     const withdrawalsGross = { free: 0, pension: 0, holding: 0, buffer: 0 };
     let cashflowSurplus = 0;
@@ -1022,6 +1029,41 @@ export function projectWithStopAge(
     const plannedActive = plannedStopAge === null || age < plannedStopAge;
     const rawPlanned = inp.free.monthlyContribution * 12 + inp.free.annualExtraContribution;
     const plannedFreeContribution = plannedActive ? rawPlanned : 0;
+    let bufferContributionAdj = 0;
+    let extraSpendingAdj = 0;
+    let outOfModelAdj = 0;
+    let surplusFreeInvest = 0;
+    let surplusApplied = 0;
+    const applySurplus = (amt: number) => {
+      if (amt <= 0) return;
+      surplusApplied += amt;
+      if (surplusPolicy === "toBuffer") {
+        bal.buffer += amt;
+        bufferContributionAdj += amt;
+      } else if (surplusPolicy === "bufferThenInvest") {
+        const need = Math.max(0, bufferTargetResolved - bal.buffer);
+        const toBuf = Math.min(amt, need);
+        if (toBuf > 0) {
+          bal.buffer += toBuf;
+          bufferContributionAdj += toBuf;
+        }
+        const rest = amt - toBuf;
+        if (rest > 0) {
+          freeContribution += rest;
+          surplusFreeInvest += rest;
+          allocateFreeContribution(rest);
+        }
+      } else if (surplusPolicy === "investExtra") {
+        freeContribution += amt;
+        surplusFreeInvest += amt;
+        allocateFreeContribution(amt);
+      } else if (surplusPolicy === "extraSpending") {
+        extraSpendingAdj += amt;
+      } else {
+        outOfModelAdj += amt;
+      }
+    };
+
     if (working || plannedActive) {
       const planned = plannedFreeContribution;
       cashflowSurplus = cashflow - planned;
@@ -1033,14 +1075,15 @@ export function projectWithStopAge(
       } else if (savingsLogic === "planned") {
         freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
         allocateFreeContribution(freeContribution);
-        // Overskydende cashflow ud over planlagt opsparing investeres IKKE — vises som ikke-allokeret.
-        unallocatedCashflow = Math.max(0, cashflow - freeContribution);
+        // Overskydende cashflow ud over planlagt opsparing håndteres af surplus-policy.
+        const surplus = Math.max(0, cashflow - freeContribution);
+        applySurplus(surplus);
       } else {
         freeContribution = planned;
         allocateFreeContribution(freeContribution);
         const net = cashflow - planned;
         if (net < 0) drainShortfall(-net);
-        else unallocatedCashflow = net;
+        else applySurplus(net);
       }
     } else {
       if (cashflow >= 0) {
@@ -1050,6 +1093,7 @@ export function projectWithStopAge(
         drainShortfall(-cashflow);
       }
     }
+    unallocatedCashflow = outOfModelAdj;
 
     if (working) bal.pension += ownPensionContribution + employerPension;
 
@@ -1157,7 +1201,7 @@ export function projectWithStopAge(
         employerPensionContribution: employerPension,
         ownPensionContribution,
         freeContribution,
-        bufferContribution,
+        bufferContribution: bufferContribution + bufferContributionAdj,
         spending,
         taxes: laborTaxAmt + totalHoldingTax + statePensionTax + ratePension.tax + lifeAnnuity.tax + pensionExtra.tax,
         debtInterest: dt.privateInterest + dt.holdingInterest,
@@ -1176,6 +1220,15 @@ export function projectWithStopAge(
         growth,
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
         lifeEventEffects: lifeEventEffects ?? undefined,
+        surplusAllocation: surplusApplied > 0 ? {
+          policy: surplusPolicy,
+          surplus: surplusApplied,
+          toBuffer: bufferContributionAdj,
+          toFreeInvestment: surplusFreeInvest,
+          extraSpending: extraSpendingAdj,
+          outOfModel: outOfModelAdj,
+          bufferTarget: bufferTargetCfg ?? null,
+        } : undefined,
         ask: askActive ? {
           opening: askOpening,
           contribution: askContribYear,

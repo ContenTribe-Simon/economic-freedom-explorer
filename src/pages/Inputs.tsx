@@ -292,6 +292,9 @@ export default function Inputs() {
         </div>
       </Section>
 
+      <CashflowAllocationSection inp={inp} set={set} />
+
+
       <Section title="Ratepension" description="Kapitalpulje der udbetales over en fast periode (fx 10–30 år). Beskattes som personlig indkomst.">
         <div className="md:col-span-2">
           <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
@@ -979,6 +982,57 @@ function CapitalWithdrawalSection({ inp, set }: { inp: ScenarioInputs; set: <K e
         <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
           Denne sektion er source of truth for udtræksrækkefølge og planlagt kapitaludtræk. Gamle felter på holding, ASK og depot-skat bevares kun i data af hensyn til bagudkompatibilitet og bruges udelukkende til migration af ældre modeller.
         </div>
+      </div>
+    </Card>
+  );
+}
+
+function CashflowAllocationSection({ inp, set }: { inp: ScenarioInputs; set: <K extends keyof ScenarioInputs>(k: K, v: ScenarioInputs[K]) => void }) {
+  const ca = inp.cashflowAllocation;
+  const policy = ca?.surplusPolicy ?? "outOfModel";
+  const bufferTarget = ca?.bufferTarget;
+  const update = (patch: Partial<NonNullable<ScenarioInputs["cashflowAllocation"]>>) => {
+    const next = { surplusPolicy: policy, bufferTarget: bufferTarget ?? null, ...ca, ...patch };
+    set("cashflowAllocation", next as ScenarioInputs["cashflowAllocation"]);
+  };
+  return (
+    <Card className="p-6" data-testid="cashflow-allocation-section">
+      <h2 className="font-display text-xl font-semibold">Håndtering af overskydende cashflow</h2>
+      <p className="text-sm text-muted-foreground mt-1 mb-4">
+        Bestem hvad positivt overskud efter planlagte posteringer skal bruges til, så pengene ikke bare forsvinder ud af modellen.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5 md:col-span-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Politik</Label>
+          <select
+            className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full"
+            value={policy}
+            onChange={(e) => update({ surplusPolicy: e.target.value as NonNullable<ScenarioInputs["cashflowAllocation"]>["surplusPolicy"] })}
+          >
+            <option value="toBuffer">Til kontant buffer</option>
+            <option value="bufferThenInvest">Fyld buffer til mål, investér resten</option>
+            <option value="investExtra">Investér ekstra automatisk</option>
+            <option value="extraSpending">Ekstra forbrug/livsstil</option>
+            <option value="outOfModel">Uden for model (beløb medregnes ikke)</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground">
+            {policy === "toBuffer" && "Hele overskuddet lægges til kontant buffer og tæller med i nettoformue."}
+            {policy === "bufferThenInvest" && "Buffer fyldes op til målet; resten investeres i fri kapital (ASK/depot efter eksisterende regler)."}
+            {policy === "investExtra" && "Hele overskuddet investeres som ekstra fri kapital."}
+            {policy === "extraSpending" && "Overskud behandles som ekstra forbrug i året — buffer og fri kapital påvirkes ikke."}
+            {policy === "outOfModel" && "Bevarer gammel adfærd: beløbet vises, men medregnes ikke i formuefremskrivningen."}
+          </p>
+        </div>
+        {policy === "bufferThenInvest" && (
+          <NumField
+            label="Ønsket kontant buffer (mål)"
+            value={bufferTarget ?? inp.free.cashBuffer ?? 0}
+            onChange={(v) => update({ bufferTarget: v })}
+            suffix="kr"
+            step={5000}
+            hint="Buffer fyldes til dette beløb før overskud investeres."
+          />
+        )}
       </div>
     </Card>
   );
