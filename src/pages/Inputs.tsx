@@ -651,34 +651,9 @@ export default function Inputs() {
         />
       </Section>
 
-      <Section title="Opsparingslogik" description="Hvordan modellen håndterer opsparing før stopalder.">
-        <div className="md:col-span-2 space-y-2">
-          {([
-            { v: "planned", t: "Planlagt opsparing", d: "Kun månedlig opsparing + årligt ekstra investeres." },
-            { v: "cashflow", t: "Cashflow-baseret", d: "Hele nettoindkomst minus forbrug investeres automatisk." },
-            { v: "hybrid", t: "Hybrid", d: "Planlagt opsparing bruges, cashflow-overskud/-underskud vises." },
-          ] as { v: SavingsLogic; t: string; d: string }[]).map((opt) => (
-            <label
-              key={opt.v}
-              className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
-                inp.savingsLogic === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
-              }`}
-            >
-              <input
-                type="radio"
-                name="savingsLogic"
-                checked={inp.savingsLogic === opt.v}
-                onChange={() => set("savingsLogic", opt.v)}
-                className="mt-1"
-              />
-              <div>
-                <div className="font-medium text-sm">{opt.t}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
-              </div>
-            </label>
-          ))}
-        </div>
-      </Section>
+      {/* "Opsparingslogik"-sektionen er erstattet af den samlede sektion
+          "Opsparing & overskydende cashflow" (CashflowAllocationSection),
+          som er placeret tidligere i siden. */}
     </div>
   );
 }
@@ -991,49 +966,129 @@ function CashflowAllocationSection({ inp, set }: { inp: ScenarioInputs; set: <K 
   const ca = inp.cashflowAllocation;
   const policy = ca?.surplusPolicy ?? "outOfModel";
   const bufferTarget = ca?.bufferTarget;
+  // Method: cashflowAllocation.plannedInvestmentMethod is source of truth; falls back to legacy savingsLogic.
+  const method: "planned" | "cashflow" | "none" =
+    ca?.plannedInvestmentMethod
+    ?? (inp.savingsLogic === "cashflow" ? "cashflow" : inp.savingsLogic === "hybrid" ? "planned" : "planned");
+  const shortfallPolicy = ca?.plannedShortfallPolicy ?? "capToCashflow";
+
   const update = (patch: Partial<NonNullable<ScenarioInputs["cashflowAllocation"]>>) => {
-    const next = { surplusPolicy: policy, bufferTarget: bufferTarget ?? null, ...ca, ...patch };
+    const next = {
+      surplusPolicy: policy,
+      bufferTarget: bufferTarget ?? null,
+      plannedInvestmentMethod: method,
+      plannedShortfallPolicy: shortfallPolicy,
+      ...ca,
+      ...patch,
+    };
     set("cashflowAllocation", next as ScenarioInputs["cashflowAllocation"]);
   };
+
+  const setMethod = (next: "planned" | "cashflow" | "none") => {
+    update({ plannedInvestmentMethod: next });
+    // Spejl til legacy savingsLogic for bagudkompatibilitet (tests/snapshots).
+    const legacy: SavingsLogic = next === "cashflow" ? "cashflow" : "planned";
+    set("savingsLogic", legacy);
+  };
+
+  const surplusDisabled = method === "cashflow";
+
   return (
     <Card className="p-6" data-testid="cashflow-allocation-section">
-      <h2 className="font-display text-xl font-semibold">Håndtering af overskydende cashflow</h2>
+      <h2 className="font-display text-xl font-semibold">Opsparing & overskydende cashflow</h2>
       <p className="text-sm text-muted-foreground mt-1 mb-4">
-        Bestem hvad positivt overskud efter planlagte posteringer skal bruges til, så pengene ikke bare forsvinder ud af modellen.
+        Bestem hvordan årets frie cashflow håndteres før stopalder: hvor meget der investeres planlagt, hvad der sker med overskud, og hvad der sker hvis cashflow ikke rækker.
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1.5 md:col-span-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Politik</Label>
-          <select
-            className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full"
-            value={policy}
-            onChange={(e) => update({ surplusPolicy: e.target.value as NonNullable<ScenarioInputs["cashflowAllocation"]>["surplusPolicy"] })}
+
+      {/* A. Planlagt investering */}
+      <div className="space-y-2 mb-6">
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Planlagt investering</Label>
+        {([
+          { v: "planned", t: "Brug planlagt opsparing", d: "Modellen forsøger at investere det planlagte beløb. Ekstra overskud håndteres efter overskudspolitikken nedenfor." },
+          { v: "cashflow", t: "Investér alt disponibelt cashflow", d: "Hele årets disponible overskud efter forbrug og gæld investeres automatisk. Separat overskudshåndtering bruges ikke." },
+          { v: "none", t: "Ingen automatisk investering", d: "Modellen investerer ikke automatisk i fri kapital. Eventuelt overskud håndteres efter overskudspolitikken." },
+        ] as { v: "planned" | "cashflow" | "none"; t: string; d: string }[]).map((opt) => (
+          <label
+            key={opt.v}
+            className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer ${
+              method === opt.v ? "border-accent bg-accent/5" : "border-border hover:bg-muted/40"
+            }`}
           >
-            <option value="toBuffer">Til kontant buffer</option>
-            <option value="bufferThenInvest">Fyld buffer til mål, investér resten</option>
-            <option value="investExtra">Investér ekstra automatisk</option>
-            <option value="extraSpending">Ekstra forbrug/livsstil</option>
-            <option value="outOfModel">Uden for model (beløb medregnes ikke)</option>
-          </select>
-          <p className="text-[11px] text-muted-foreground">
-            {policy === "toBuffer" && "Hele overskuddet lægges til kontant buffer og tæller med i nettoformue."}
-            {policy === "bufferThenInvest" && "Buffer fyldes op til målet; resten investeres i fri kapital (ASK/depot efter eksisterende regler)."}
-            {policy === "investExtra" && "Hele overskuddet investeres som ekstra fri kapital."}
-            {policy === "extraSpending" && "Overskud behandles som ekstra forbrug i året — buffer og fri kapital påvirkes ikke."}
-            {policy === "outOfModel" && "Bevarer gammel adfærd: beløbet vises, men medregnes ikke i formuefremskrivningen."}
-          </p>
-        </div>
-        {policy === "bufferThenInvest" && (
-          <NumField
-            label="Ønsket kontant buffer (mål)"
-            value={bufferTarget ?? inp.free.cashBuffer ?? 0}
-            onChange={(v) => update({ bufferTarget: v })}
-            suffix="kr"
-            step={5000}
-            hint="Buffer fyldes til dette beløb før overskud investeres."
-          />
+            <input
+              type="radio"
+              name="plannedInvestmentMethod"
+              checked={method === opt.v}
+              onChange={() => setMethod(opt.v)}
+              className="mt-1"
+            />
+            <div>
+              <div className="font-medium text-sm">{opt.t}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{opt.d}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+
+      {/* B. Overskudspolitik */}
+      <div className={`mb-6 ${surplusDisabled ? "opacity-60" : ""}`}>
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Håndtering af overskud efter plan</Label>
+        <select
+          className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full mt-1.5"
+          value={policy}
+          disabled={surplusDisabled}
+          onChange={(e) => update({ surplusPolicy: e.target.value as NonNullable<ScenarioInputs["cashflowAllocation"]>["surplusPolicy"] })}
+        >
+          <option value="toBuffer">Til kontant buffer</option>
+          <option value="bufferThenInvest">Fyld buffer til mål, investér resten</option>
+          <option value="investExtra">Investér ekstra automatisk</option>
+          <option value="extraSpending">Ekstra forbrug/livsstil</option>
+          <option value="outOfModel">Uden for model (beløb medregnes ikke)</option>
+        </select>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          {surplusDisabled
+            ? "Alt overskud investeres automatisk i denne opsparingsmetode."
+            : policy === "toBuffer" ? "Hele overskuddet lægges til kontant buffer og tæller med i nettoformue."
+            : policy === "bufferThenInvest" ? "Buffer fyldes op til målet; resten investeres i fri kapital."
+            : policy === "investExtra" ? "Hele overskuddet investeres som ekstra fri kapital."
+            : policy === "extraSpending" ? "Overskud behandles som ekstra forbrug i året — buffer og fri kapital påvirkes ikke."
+            : "Beløbet vises, men medregnes ikke i formuefremskrivningen."}
+        </p>
+        {!surplusDisabled && policy === "bufferThenInvest" && (
+          <div className="mt-3 max-w-xs">
+            <NumField
+              label="Ønsket kontant buffer (mål)"
+              value={bufferTarget ?? inp.free.cashBuffer ?? 0}
+              onChange={(v) => update({ bufferTarget: v })}
+              suffix="kr"
+              step={5000}
+              hint="Buffer fyldes til dette beløb før overskud investeres."
+            />
+          </div>
         )}
       </div>
+
+      {/* C. Shortfall-policy for planlagt opsparing */}
+      {method === "planned" && (
+        <div>
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Hvis planlagt investering overstiger årets disponible cashflow</Label>
+          <select
+            className="h-10 px-3 rounded-md border border-border bg-background text-sm w-full mt-1.5"
+            value={shortfallPolicy}
+            onChange={(e) => update({ plannedShortfallPolicy: e.target.value as NonNullable<ScenarioInputs["cashflowAllocation"]>["plannedShortfallPolicy"] })}
+          >
+            <option value="capToCashflow">Begræns investering til disponibelt cashflow</option>
+            <option value="useBuffer">Brug kontant buffer til at gennemføre planen</option>
+            <option value="showShortfall">Vis manglende opsparing</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Modellen må ikke investere mere end årets disponible cashflow, medmindre det tydeligt finansieres fra buffer eller vises som manglende planlagt opsparing.
+          </p>
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted-foreground mt-4 italic">
+        Planlagt opsparing er et mål for investering. Hvis årets cashflow ikke rækker, kan modellen enten begrænse investeringen, bruge buffer eller vise manglende opsparing afhængigt af din valgte policy.
+      </p>
     </Card>
   );
 }

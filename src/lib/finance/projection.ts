@@ -1034,13 +1034,30 @@ export function projectWithStopAge(
     let outOfModelAdj = 0;
     let surplusFreeInvest = 0;
     let surplusApplied = 0;
+
+    // Effective method — cashflowAllocation is source of truth when set.
+    const explicitMethod = inp.cashflowAllocation?.plannedInvestmentMethod;
+    const effectiveMethod: "planned" | "cashflow" | "none" = explicitMethod
+      ?? (savingsLogic === "cashflow" ? "cashflow" : savingsLogic === "hybrid" ? "planned" : "planned");
+    // If method=cashflow → surplus policy is bypassed (everything is invested).
+    const effectiveSurplusPolicy = effectiveMethod === "cashflow" ? "investExtra" : surplusPolicy;
+    const plannedShortfallPolicy = inp.cashflowAllocation?.plannedShortfallPolicy ?? "capToCashflow";
+
+    let plannedSavingsShortfallAudit: {
+      policy: typeof plannedShortfallPolicy;
+      plannedAmount: number;
+      availableCashflow: number;
+      coveredByBuffer: number;
+      unmetPlannedInvestment: number;
+    } | undefined;
+
     const applySurplus = (amt: number) => {
       if (amt <= 0) return;
       surplusApplied += amt;
-      if (surplusPolicy === "toBuffer") {
+      if (effectiveSurplusPolicy === "toBuffer") {
         bal.buffer += amt;
         bufferContributionAdj += amt;
-      } else if (surplusPolicy === "bufferThenInvest") {
+      } else if (effectiveSurplusPolicy === "bufferThenInvest") {
         const need = Math.max(0, bufferTargetResolved - bal.buffer);
         const toBuf = Math.min(amt, need);
         if (toBuf > 0) {
@@ -1053,11 +1070,11 @@ export function projectWithStopAge(
           surplusFreeInvest += rest;
           allocateFreeContribution(rest);
         }
-      } else if (surplusPolicy === "investExtra") {
+      } else if (effectiveSurplusPolicy === "investExtra") {
         freeContribution += amt;
         surplusFreeInvest += amt;
         allocateFreeContribution(amt);
-      } else if (surplusPolicy === "extraSpending") {
+      } else if (effectiveSurplusPolicy === "extraSpending") {
         extraSpendingAdj += amt;
       } else {
         outOfModelAdj += amt;
@@ -1065,25 +1082,59 @@ export function projectWithStopAge(
     };
 
     if (working || plannedActive) {
-      const planned = plannedFreeContribution;
-      cashflowSurplus = cashflow - planned;
-      if (savingsLogic === "cashflow") {
+      if (effectiveMethod === "cashflow") {
+        cashflowSurplus = 0;
         if (cashflow >= 0) {
           freeContribution = cashflow;
+          surplusApplied = cashflow; // entire cashflow is "the surplus" that was invested
+          surplusFreeInvest = cashflow;
           allocateFreeContribution(freeContribution);
-        } else drainShortfall(-cashflow);
-      } else if (savingsLogic === "planned") {
-        freeContribution = Math.max(0, Math.min(planned, Math.max(0, cashflow)));
-        allocateFreeContribution(freeContribution);
-        // Overskydende cashflow ud over planlagt opsparing håndteres af surplus-policy.
-        const surplus = Math.max(0, cashflow - freeContribution);
-        applySurplus(surplus);
+        } else {
+          drainShortfall(-cashflow);
+        }
+      } else if (effectiveMethod === "none") {
+        cashflowSurplus = cashflow;
+        if (cashflow >= 0) {
+          applySurplus(cashflow);
+        } else {
+          drainShortfall(-cashflow);
+        }
       } else {
-        freeContribution = planned;
-        allocateFreeContribution(freeContribution);
-        const net = cashflow - planned;
-        if (net < 0) drainShortfall(-net);
-        else applySurplus(net);
+        // "planned" (also covers legacy "hybrid")
+        const planned = plannedFreeContribution;
+        cashflowSurplus = cashflow - planned;
+        if (cashflow < 0) {
+          // Real cashflow shortfall — no planned investment this year.
+          drainShortfall(-cashflow);
+        } else if (cashflow >= planned) {
+          freeContribution = planned;
+          allocateFreeContribution(freeContribution);
+          applySurplus(cashflow - planned);
+        } else {
+          // 0 <= cashflow < planned: planned-savings shortfall (NOT consumption shortfall).
+          const available = cashflow;
+          const gap = planned - available;
+          let invest = available;
+          let coveredByBuffer = 0;
+          let unmet = gap;
+          if (plannedShortfallPolicy === "useBuffer" && bal.buffer > 0 && gap > 0) {
+            coveredByBuffer = Math.min(bal.buffer, gap);
+            bal.buffer -= coveredByBuffer;
+            invest += coveredByBuffer;
+            unmet = gap - coveredByBuffer;
+          }
+          freeContribution = invest;
+          if (invest > 0) allocateFreeContribution(invest);
+          if (gap > 0.5) {
+            plannedSavingsShortfallAudit = {
+              policy: plannedShortfallPolicy,
+              plannedAmount: planned,
+              availableCashflow: available,
+              coveredByBuffer,
+              unmetPlannedInvestment: Math.max(0, unmet),
+            };
+          }
+        }
       }
     } else {
       if (cashflow >= 0) {
@@ -1094,6 +1145,15 @@ export function projectWithStopAge(
       }
     }
     unallocatedCashflow = outOfModelAdj;
+
+    // Invariant guard (dev only): investment must come from cashflow + buffer.
+    // capitalWithdrawal/drainShortfall is for consumption shortfall, not investment.
+    const investCovered = Math.max(0, cashflow) + (plannedSavingsShortfallAudit?.coveredByBuffer ?? 0);
+    if (freeContribution - investCovered > 1) {
+      // eslint-disable-next-line no-console
+      console.warn(`projection: invariant breached year@age=${age} — freeContribution ${freeContribution} exceeds cashflow+buffer ${investCovered}`);
+    }
+
 
     if (working) bal.pension += ownPensionContribution + employerPension;
 
@@ -1221,7 +1281,7 @@ export function projectWithStopAge(
         holdingFinancingShortfall: dt.holdingFinancingShortfall,
         lifeEventEffects: lifeEventEffects ?? undefined,
         surplusAllocation: surplusApplied > 0 ? {
-          policy: surplusPolicy,
+          policy: effectiveSurplusPolicy,
           surplus: surplusApplied,
           toBuffer: bufferContributionAdj,
           toFreeInvestment: surplusFreeInvest,
@@ -1229,6 +1289,16 @@ export function projectWithStopAge(
           outOfModel: outOfModelAdj,
           bufferTarget: bufferTargetCfg ?? null,
         } : undefined,
+        cashflowBridge: {
+          baseIncomeNet:
+            salaryNet + partTimeNet + familyFundNet + statePensionNet
+            + holdingPlanned.net + pensionStreamNet + plannedNetExtra,
+          lifeEventIncome: lifeEventEffects?.incomeDelta ?? 0,
+          lifeEventSpending: lifeEventEffects?.spendingDelta ?? 0,
+          totalIncomeToCashflow: incomeNet,
+          cashflowBeforeSavings: cashflow,
+        },
+        plannedSavingsShortfall: plannedSavingsShortfallAudit,
         ask: askActive ? {
           opening: askOpening,
           contribution: askContribYear,

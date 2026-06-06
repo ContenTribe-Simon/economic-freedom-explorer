@@ -333,10 +333,30 @@ export type CashflowSurplusPolicy =
   | "extraSpending"
   | "outOfModel";
 
+/**
+ * Metode for planlagt investering før stopalder (Opsparing & cashflow v1).
+ *  - "planned":  invester planlagt beløb (månedlig + årligt ekstra).
+ *  - "cashflow": invester hele årets disponible cashflow.
+ *  - "none":     ingen automatisk investering.
+ */
+export type PlannedInvestmentMethod = "planned" | "cashflow" | "none";
+
+/**
+ * Hvad sker der hvis planlagt opsparing overstiger årets disponible cashflow.
+ *  - "capToCashflow":  invester kun det disponible cashflow (default).
+ *  - "useBuffer":      brug kontant buffer til at gennemføre planen.
+ *  - "showShortfall":  vis manglende planlagt opsparing — bruger ikke buffer.
+ */
+export type PlannedShortfallPolicy = "capToCashflow" | "useBuffer" | "showShortfall";
+
 export interface CashflowAllocationInputs {
   surplusPolicy: CashflowSurplusPolicy;
   /** Mål for kontant buffer (kr). null ⇒ brug initialt cashBuffer som mål. */
   bufferTarget: number | null;
+  /** Ny primær styring; falder tilbage til legacy savingsLogic når undefined. */
+  plannedInvestmentMethod?: PlannedInvestmentMethod;
+  /** Default "capToCashflow". */
+  plannedShortfallPolicy?: PlannedShortfallPolicy;
 }
 
 /** Audit af cashflow surplus allokering for året. */
@@ -349,6 +369,24 @@ export interface CashflowSurplusYearAudit {
   extraSpending: number;
   outOfModel: number;
   bufferTarget: number | null;
+}
+
+/** Cashflow bridge audit — synlig hvert år, også uden overskud. */
+export interface CashflowBridgeYearAudit {
+  baseIncomeNet: number;
+  lifeEventIncome: number;
+  lifeEventSpending: number;
+  totalIncomeToCashflow: number;
+  cashflowBeforeSavings: number;
+}
+
+/** Audit af planlagt opsparing der ikke kunne dækkes (ikke et forbrugs-shortfall). */
+export interface PlannedSavingsShortfallYearAudit {
+  policy: PlannedShortfallPolicy;
+  plannedAmount: number;
+  availableCashflow: number;
+  coveredByBuffer: number;
+  unmetPlannedInvestment: number;
 }
 
 /** Kilde til kapitaludtræk i den samlede nedsparingsstrategi. */
@@ -483,6 +521,10 @@ export interface YearFlows {
   capitalWithdrawal?: CapitalWithdrawalYearAudit;
   /** Audit af cashflow surplus allokering (kun udfyldt når der var positivt overskud). */
   surplusAllocation?: CashflowSurplusYearAudit;
+  /** Cashflow bridge — altid udfyldt fra v1 og frem. */
+  cashflowBridge?: CashflowBridgeYearAudit;
+  /** Audit af manglende planlagt opsparing (ikke et forbrugs-shortfall). */
+  plannedSavingsShortfall?: PlannedSavingsShortfallYearAudit;
 }
 
 /** Audit af personlig aktieindkomst-pulje (holding + depot deler 27/42 %-grænsen). */
