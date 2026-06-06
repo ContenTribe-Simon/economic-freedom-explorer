@@ -292,6 +292,9 @@ export default function Inputs() {
         </div>
       </Section>
 
+      <CashflowAllocationSection inp={inp} set={set} />
+
+
       <Section title="Ratepension" description="Kapitalpulje der udbetales over en fast periode (fx 10–30 år). Beskattes som personlig indkomst.">
         <div className="md:col-span-2">
           <label className="flex items-center gap-2 p-3 rounded-md border border-border cursor-pointer hover:bg-muted/40">
