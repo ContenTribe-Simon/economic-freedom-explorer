@@ -1032,6 +1032,8 @@ export function projectWithStopAge(
     let bufferContributionAdj = 0;
     let extraSpendingAdj = 0;
     let outOfModelAdj = 0;
+    let surplusFreeInvest = 0;
+    let surplusApplied = 0;
     const applySurplus = (amt: number) => {
       if (amt <= 0) return;
       if (surplusPolicy === "toBuffer") {
