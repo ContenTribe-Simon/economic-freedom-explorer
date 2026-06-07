@@ -78,3 +78,85 @@ describe("Konservering — negativt cashflow i opsparingsfasen kan ikke skabe pe
     expect(closingNetWorth).toBeCloseTo(openingNetWorth + cashflow, 1);
   });
 });
+
+describe("Buffer-politik ved negativt cashflow (bufferUsableForShortfall)", () => {
+  /**
+   * Fælles opsætning: ren opsparingsfase (alder 40), planned-metode, klart negativt
+   * cashflow, ingen afkast, ingen gæld og ingen pensionsstrømme. Hvilke andre
+   * kapitalkilder der findes styres via free/holding-saldi i den enkelte test.
+   *
+   * Vigtigt: plannedShortfallPolicy="useBuffer" er sat med vilje. Den politik gælder
+   * KUN opsparings-shortfall (positivt cashflow under det planlagte beløb) og må
+   * ALDRIG dræne buffer ved et negativt forbrugs-cashflow — dér er
+   * inp.free.bufferUsableForShortfall den eneste kontrol.
+   */
+  function negativeCashflowScenario() {
+    const s = makeBaseScenario();
+    s.inputs.pension.balance = 0;
+    s.inputs.pension.monthlyContribution = 0;
+    s.inputs.pension.employerContribution = 0;
+    s.inputs.holding.balance = 0;
+    s.inputs.debts = [];
+    s.inputs.spending.desiredMonthlyNet = 100000; // langt over indkomsten ⇒ negativt cashflow
+    s.inputs.cashflowAllocation = {
+      surplusPolicy: "outOfModel",
+      bufferTarget: null,
+      plannedInvestmentMethod: "planned",
+      plannedShortfallPolicy: "useBuffer",
+    };
+    return s;
+  }
+
+  it("A: bufferUsableForShortfall=false + ingen anden kapital ⇒ buffer urørt, underskud vises som shortfall", () => {
+    const s = negativeCashflowScenario();
+    s.inputs.free.balance = 0; // ingen fri kapital at tappe
+    s.inputs.free.cashBuffer = 300000; // buffer findes, men må ikke bruges
+    s.inputs.free.bufferUsableForShortfall = false;
+
+    const y0 = project(s, zeroReturnAssumptions)[0];
+    const deficit = -y0.flows.cashflowBridge!.cashflowBeforeSavings;
+
+    expect(deficit).toBeGreaterThan(0);
+    // Ingen planlagt investering finansieret ud af et underskud.
+    expect(y0.flows.investedAmount).toBeLessThanOrEqual(0.5);
+    // Bufferen er IKKE rørt (bufferUsableForShortfall=false), selv om useBuffer er sat.
+    expect(y0.closing.buffer).toBeCloseTo(y0.opening.buffer, 1);
+    expect(y0.flows.withdrawals.buffer).toBeCloseTo(0, 1);
+    // Hele underskuddet fremgår som reelt shortfall — ikke skjult / "skabte penge".
+    expect(y0.shortfallAmount).toBeCloseTo(deficit, 1);
+  });
+
+  it("B: bufferUsableForShortfall=true ⇒ buffer dækker underskuddet, intet shortfall", () => {
+    const s = negativeCashflowScenario();
+    s.inputs.free.balance = 0;
+    s.inputs.free.cashBuffer = 1500000; // rigeligt til at dække underskuddet
+    s.inputs.free.bufferUsableForShortfall = true;
+
+    const y0 = project(s, zeroReturnAssumptions)[0];
+    const deficit = -y0.flows.cashflowBridge!.cashflowBeforeSavings;
+
+    expect(deficit).toBeGreaterThan(0);
+    // Buffer reduceret med præcis underskuddet (op til tilgængelig buffer).
+    expect(y0.closing.buffer).toBeCloseTo(y0.opening.buffer - deficit, 1);
+    expect(y0.flows.withdrawals.buffer).toBeCloseTo(deficit, 1);
+    // Buffer dækkede alt ⇒ intet restshortfall.
+    expect(y0.shortfallAmount).toBeLessThanOrEqual(0.5);
+  });
+
+  it("C: anden tilladt kapital findes + bufferUsableForShortfall=false ⇒ kapital dækker, buffer urørt", () => {
+    const s = negativeCashflowScenario();
+    s.inputs.free.balance = 2000000; // fri kapital kan dække underskuddet
+    s.inputs.free.cashBuffer = 300000; // buffer findes, men er ikke tilladt til shortfall
+    s.inputs.free.bufferUsableForShortfall = false;
+
+    const y0 = project(s, zeroReturnAssumptions)[0];
+    const deficit = -y0.flows.cashflowBridge!.cashflowBeforeSavings;
+
+    expect(deficit).toBeGreaterThan(0);
+    // Underskuddet dækket via udtræks-rækkefølgen (fri kapital), ikke buffer.
+    expect(y0.closing.free).toBeCloseTo(y0.opening.free - deficit, 1);
+    expect(y0.closing.buffer).toBeCloseTo(y0.opening.buffer, 1);
+    expect(y0.flows.withdrawals.buffer).toBeCloseTo(0, 1);
+    expect(y0.shortfallAmount).toBeLessThanOrEqual(0.5);
+  });
+});

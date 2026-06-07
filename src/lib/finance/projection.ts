@@ -1109,22 +1109,17 @@ export function projectWithStopAge(
           applySurplus(cashflow - planned);
         } else if (cashflow < 0) {
           // Negativt cashflow = forbrugs-underskud, IKKE et opsparings-shortfall.
-          // Et underskud kan ikke finansiere opsparing: ingen planlagt investering
-          // og ingen buffer→fri-overførsel. Underskuddet skal tappes fra formuen,
-          // så nettoformuen falder med præcis underskuddet — bufferen (kontant)
-          // først, og rækker den ikke, følger vi modellens eksisterende
-          // udtræks-rækkefølge (drainShortfall ⇒ resolveOrder/capitalWithdrawal).
-          // Et evt. udækket restunderskud bæres videre som stillShort nedenfor.
+          // Et underskud kan ikke finansiere opsparing: ingen planlagt investering.
+          // Underskuddet dækkes via den eksisterende drainShortfall-sti, som følger
+          // modellens udtræks-rækkefølge (resolveOrder/capitalWithdrawal) OG
+          // respekterer inp.free.bufferUsableForShortfall — bufferen tappes kun, hvis
+          // den indstilling tillader det (drainShortfall rører aldrig bal.buffer
+          // ellers). plannedShortfallPolicy="useBuffer" gælder kun opsparings-
+          // shortfall (positivt cashflow under planlagt) og må ikke dræne buffer her.
+          // Et udækket restunderskud bæres videre som stillShort nedenfor og fremgår
+          // dermed af y.shortfallAmount.
           freeContribution = 0;
-          let needed = -cashflow;
-          if (bal.buffer > 0) {
-            const take = Math.min(bal.buffer, needed);
-            bal.buffer -= take;
-            withdrawals.buffer += take;
-            withdrawalsGross.buffer += take;
-            needed -= take;
-          }
-          if (needed > 0) drainShortfall(needed);
+          drainShortfall(-cashflow);
         } else {
           // 0 <= cashflow < planned — ægte opsparings-shortfall (IKKE forbrugs-shortfall).
           // Vi investerer kun det disponible positive cashflow + evt. buffer-dækning.
