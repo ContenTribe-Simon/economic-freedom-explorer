@@ -4,6 +4,9 @@ import { defineConfig, devices } from "@playwright/test";
  * Playwright smoke-test config — runs against the LOCAL Vite dev server (port 8080),
  * not the Lovable preview. Tests live in ./e2e (outside src/, so Vitest's
  * `src/**` include never picks them up, and Playwright's testDir never picks up unit tests).
+ *
+ * First run / CI: the Chromium binary is NOT installed by `npm install` / `npm ci`. Install it
+ * once via `npm run test:e2e:install` (or `npm run test:e2e:ci` on Linux CI). See e2e/README.md.
  */
 export default defineConfig({
   testDir: "./e2e",

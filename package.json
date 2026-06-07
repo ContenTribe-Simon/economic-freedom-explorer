@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
+    "test:e2e:ci": "playwright install --with-deps chromium && playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
