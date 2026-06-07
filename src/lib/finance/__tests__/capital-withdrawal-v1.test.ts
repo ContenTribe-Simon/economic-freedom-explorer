@@ -136,6 +136,10 @@ describe("planned policy", () => {
   it("fixedAnnual + depotFirst: tager fra depot først (ASK skippes)", () => {
     const s = withCw({ strategy: "depotFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 60_000, startAge: 55, startAtStopAge: false }, (i) => {
       i.free.balance = 500_000;
+      // Hold scenariet solvent gennem hele perioden, så det eneste kapitaludtræk
+      // er den planlagte fixedAnnual-udtrækning. Ellers tapper et forbrugs-underskud
+      // formuen før alder 55 og forurener ordering-assertionen (depot før holding).
+      i.spending.desiredMonthlyNet = 10_000;
     });
     const years = project(s, defaultAssumptions);
     const yr = years.find((y) => y.age === 55)!;
@@ -144,7 +148,12 @@ describe("planned policy", () => {
   });
 
   it("startAtStopAge=true bruger stopAge som startalder", () => {
-    const s = withCw({ strategy: "holdingFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 50_000, startAge: null, startAtStopAge: true });
+    const s = withCw({ strategy: "holdingFirst", plannedWithdrawalPolicy: "fixedAnnual", plannedWithdrawalAmount: 50_000, startAge: null, startAtStopAge: true }, (i) => {
+      // Solvent i arbejdsårene, så der ikke sker shortfall-dræning før stopAge.
+      // Testen skal kun måle, at det PLANLAGTE udtræk først starter ved stopAge —
+      // ikke at et tidligere forbrugs-underskud allerede har tappet balancerne.
+      i.spending.desiredMonthlyNet = 10_000;
+    });
     const stop = s.inputs.stopAge;
     const years = project(s, defaultAssumptions);
     const before = years.find((y) => y.age === stop - 1)!;
