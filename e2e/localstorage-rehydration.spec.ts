@@ -41,24 +41,36 @@ async function expectNotBlank(page: Page): Promise<void> {
 }
 
 /**
- * Keys where `null` is an INTENTIONAL valid domain value (see types.ts):
- *   cashflowAllocation.bufferTarget, capitalWithdrawal.startAge, depotTax.costBasis : number | null
- *   lifeEvent.confidenceKey : ConfidenceKey | null
- * `null` on any OTHER key is treated as an unexpected/corrupted value.
+ * PATH-scoped allowlist of fields where `null` is an INTENTIONAL valid domain value
+ * (verified against src/lib/finance/types.ts — only these `… | null` fields live inside a
+ * persisted scenario's `inputs`):
+ *   - CashflowAllocationInputs.bufferTarget : number | null
+ *   - CapitalWithdrawalInputs.startAge      : number | null
+ *   - DepotTaxInputs.costBasis              : number | null
+ *   - LifeEvent.confidenceKey               : ConfidenceKey | null
+ *
+ * Matching by PATH (not field name) is deliberate: e.g. `lifeEvents[N].startAge` is a
+ * REQUIRED number, so a null there must be rejected even though `capitalWithdrawal.startAge`
+ * legitimately allows null (Codex finding — name-only allowlisting was too broad).
  */
-const NULLABLE_KEYS = new Set(["bufferTarget", "startAge", "costBasis", "confidenceKey"]);
+const ALLOWED_NULL_PATHS: RegExp[] = [
+  /\.inputs\.cashflowAllocation\.bufferTarget$/,
+  /\.inputs\.capitalWithdrawal\.startAge$/,
+  /\.inputs\.free\.depotTax\.costBasis$/,
+  /\.inputs\.lifeEvents\[\d+\]\.confidenceKey$/,
+];
 
 /**
  * Recursively collect paths holding an invalid value in a critical field:
  *   - a number that is NaN / Infinity / -Infinity
  *   - `undefined`
- *   - `null` on a key that is NOT in NULLABLE_KEYS
- * `null` is handled BEFORE the object branch — the previous `v && typeof v === "object"`
+ *   - `null` at a PATH not explicitly permitted by ALLOWED_NULL_PATHS
+ * `null` is handled BEFORE the object branch — the original `v && typeof v === "object"`
  * guard skipped null entirely, so a null in a numeric field went undetected (Codex finding).
  */
-function findBadNumericValues(v: unknown, key = "", path = "root", acc: string[] = []): string[] {
+function findBadNumericValues(v: unknown, path = "root", acc: string[] = []): string[] {
   if (v === null) {
-    if (!NULLABLE_KEYS.has(key)) acc.push(`${path}=null (unexpected)`);
+    if (!ALLOWED_NULL_PATHS.some((re) => re.test(path))) acc.push(`${path}=null (unexpected)`);
     return acc;
   }
   if (v === undefined) {
@@ -70,11 +82,11 @@ function findBadNumericValues(v: unknown, key = "", path = "root", acc: string[]
     return acc;
   }
   if (Array.isArray(v)) {
-    v.forEach((x, i) => findBadNumericValues(x, key, `${path}[${i}]`, acc));
+    v.forEach((x, i) => findBadNumericValues(x, `${path}[${i}]`, acc));
     return acc;
   }
   if (typeof v === "object") {
-    for (const [k, val] of Object.entries(v)) findBadNumericValues(val, k, `${path}.${k}`, acc);
+    for (const [k, val] of Object.entries(v)) findBadNumericValues(val, `${path}.${k}`, acc);
   }
   return acc;
 }
@@ -119,6 +131,43 @@ function legacyBlob(): string {
 }
 
 test.describe("localStorage persistence & rehydration", () => {
+  // Pure-function regression for the null-detection helper (no browser needed). Proves the
+  // allowlist is PATH-scoped: a null in a required numeric field is detected, while nulls in
+  // genuinely nullable fields are allowed.
+  test("findBadNumericValues rejects null at required numeric paths but allows model-permitted nulls", () => {
+    // Required number (lifeEvents[].startAge) = null ⇒ MUST be flagged.
+    const badLifeEventStartAge = {
+      scenarios: [{ inputs: { lifeEvents: [{ name: "X", amount: 1, startAge: null, frequency: "monthly", effectTarget: "privateSpending" }] } }],
+    };
+    const flagged = findBadNumericValues(badLifeEventStartAge);
+    expect(flagged.some((p) => p.includes("lifeEvents[0].startAge"))).toBe(true);
+
+    // Same field NAME but a genuinely nullable path (capitalWithdrawal.startAge) ⇒ NOT flagged.
+    const okCapitalWithdrawalStartAge = {
+      scenarios: [{ inputs: { capitalWithdrawal: { strategy: "depotFirst", plannedWithdrawalPolicy: "none", plannedWithdrawalAmount: 0, startAge: null, startAtStopAge: true } } }],
+    };
+    expect(findBadNumericValues(okCapitalWithdrawalStartAge)).toEqual([]);
+
+    // Mixed: allowed nulls (bufferTarget, depotTax.costBasis, lifeEvents[].confidenceKey) pass;
+    // a stray null in a required numeric field (free.balance) is flagged.
+    const mixed = {
+      scenarios: [{ inputs: {
+        cashflowAllocation: { surplusPolicy: "outOfModel", bufferTarget: null, plannedInvestmentMethod: "planned" },
+        free: { balance: null, depotTax: { enabled: true, method: "realizationSimple", costBasis: null } },
+        lifeEvents: [{ name: "Y", amount: 2, startAge: 40, frequency: "annual", effectTarget: "privateIncome", confidenceKey: null }],
+      } }],
+    };
+    const mixedFlagged = findBadNumericValues(mixed);
+    expect(mixedFlagged.some((p) => p.includes("free.balance"))).toBe(true);          // unexpected null ⇒ flagged
+    expect(mixedFlagged.some((p) => p.includes("bufferTarget"))).toBe(false);         // allowed
+    expect(mixedFlagged.some((p) => p.includes("depotTax.costBasis"))).toBe(false);   // allowed
+    expect(mixedFlagged.some((p) => p.includes("confidenceKey"))).toBe(false);        // allowed
+
+    // NaN / Infinity are always flagged.
+    expect(findBadNumericValues({ a: NaN }).length).toBe(1);
+    expect(findBadNumericValues({ a: Infinity }).length).toBe(1);
+  });
+
   test("scenario changes are persisted to localStorage", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "+ Nyt" }).click(); // adds "Scenarie 2" and makes it active
