@@ -12,8 +12,8 @@ dist
 dist-ssr
 *.local
 
-# Env files
-.env
+# Local-only env overrides
+
 .env.local
 .env.*.local
 
