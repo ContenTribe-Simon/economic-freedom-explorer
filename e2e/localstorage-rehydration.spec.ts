@@ -40,14 +40,41 @@ async function expectNotBlank(page: Page): Promise<void> {
   expect(text.length, "page should not be blank").toBeGreaterThan(40);
 }
 
-/** Recursively collect paths whose value is a non-finite number OR null-where-number-expected. */
-function findBadNumbers(v: unknown, path = "root", acc: string[] = []): string[] {
+/**
+ * Keys where `null` is an INTENTIONAL valid domain value (see types.ts):
+ *   cashflowAllocation.bufferTarget, capitalWithdrawal.startAge, depotTax.costBasis : number | null
+ *   lifeEvent.confidenceKey : ConfidenceKey | null
+ * `null` on any OTHER key is treated as an unexpected/corrupted value.
+ */
+const NULLABLE_KEYS = new Set(["bufferTarget", "startAge", "costBasis", "confidenceKey"]);
+
+/**
+ * Recursively collect paths holding an invalid value in a critical field:
+ *   - a number that is NaN / Infinity / -Infinity
+ *   - `undefined`
+ *   - `null` on a key that is NOT in NULLABLE_KEYS
+ * `null` is handled BEFORE the object branch — the previous `v && typeof v === "object"`
+ * guard skipped null entirely, so a null in a numeric field went undetected (Codex finding).
+ */
+function findBadNumericValues(v: unknown, key = "", path = "root", acc: string[] = []): string[] {
+  if (v === null) {
+    if (!NULLABLE_KEYS.has(key)) acc.push(`${path}=null (unexpected)`);
+    return acc;
+  }
+  if (v === undefined) {
+    acc.push(`${path}=undefined`);
+    return acc;
+  }
   if (typeof v === "number") {
     if (!Number.isFinite(v)) acc.push(`${path}=${v}`);
-  } else if (Array.isArray(v)) {
-    v.forEach((x, i) => findBadNumbers(x, `${path}[${i}]`, acc));
-  } else if (v && typeof v === "object") {
-    for (const [k, val] of Object.entries(v)) findBadNumbers(val, `${path}.${k}`, acc);
+    return acc;
+  }
+  if (Array.isArray(v)) {
+    v.forEach((x, i) => findBadNumericValues(x, key, `${path}[${i}]`, acc));
+    return acc;
+  }
+  if (typeof v === "object") {
+    for (const [k, val] of Object.entries(v)) findBadNumericValues(val, k, `${path}.${k}`, acc);
   }
   return acc;
 }
@@ -170,6 +197,9 @@ test.describe("localStorage persistence & rehydration", () => {
     const persisted = await readPersisted(page);
     expect(Array.isArray(persisted!.state.scenarios[0].inputs.debts)).toBe(true);
     expect(Array.isArray(persisted!.state.snapshots)).toBe(true);
+    // Migration introduced no NaN/Infinity/undefined and no unexpected null in critical fields.
+    const badAfterMigrate = findBadNumericValues({ scenarios: persisted!.state.scenarios, assumptions: persisted!.state.assumptions });
+    expect(badAfterMigrate, `invalid numeric values after migration: ${badAfterMigrate.join(", ")}`).toEqual([]);
 
     // Projection renders finite numbers (no NaN/Infinity/undefined leaking into the table).
     await page.goto("/projection");
@@ -225,9 +255,10 @@ test.describe("localStorage persistence & rehydration", () => {
 
     const persisted = await readPersisted(page);
     expect(persisted).not.toBeNull();
-    // The persisted scenarios + assumptions contain no non-finite numbers.
-    const bad = findBadNumbers({ scenarios: persisted!.state.scenarios, assumptions: persisted!.state.assumptions });
-    expect(bad, `non-finite numbers in persisted state: ${bad.join(", ")}`).toEqual([]);
+    // The persisted scenarios + assumptions contain no NaN/Infinity/undefined and no
+    // unexpected null in a critical (numeric) field.
+    const bad = findBadNumericValues({ scenarios: persisted!.state.scenarios, assumptions: persisted!.state.assumptions });
+    expect(bad, `invalid numeric values in persisted state: ${bad.join(", ")}`).toEqual([]);
     // A key input is a real finite number.
     expect(Number.isFinite(persisted!.state.scenarios[0].inputs.free.balance)).toBe(true);
 
