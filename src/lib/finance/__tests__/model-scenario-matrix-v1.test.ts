@@ -421,24 +421,68 @@ describe("Matrix C — Capital withdrawal", () => {
 // ───────────────────────────────────────────────────────────────────────────
 describe("Matrix D — Tax buckets", () => {
   it("ASK tax stays separate and does NOT consume the 27/42 share-income bracket", () => {
-    const inp = JSON.parse(JSON.stringify(defaultInputs));
-    inp.free.depotTax = { enabled: true, method: "annualShareIncomeTax", costBasis: null, showDeferredTax: true };
-    inp.free.ask = {
-      enabled: true,
-      currentValue: 100_000,
-      priorYearEndValue: 100_000,
-      depositLimit: 174_200,
-      taxRate: 0.17,
-      autoFillFirst: false,
-      taxCreditCarryForward: 0,
-      taxPaymentMode: "deductFromASK",
-      withdrawalStrategy: "depotFirst",
-    };
-    const y0 = projectWithStopAge(inp, defaultAssumptions, inp.stopAge)[0];
-    // ASK has its own (17%) tax line.
-    expect(y0.flows.ask!.tax).toBeGreaterThan(0);
-    // Share-income pool only sees the depot return, never the ASK growth.
-    expect(y0.flows.shareIncome!.annualDepotTaxable).toBeCloseTo(Math.max(0, y0.flows.depot!.growthGross), 0);
+    const ASK_TAX_RATE = 0.17;
+    const DEPOT_PORTION = 400_000;
+    const ASK_VALUE = 100_000;
+
+    // Two scenarios with an IDENTICAL depot portion (DEPOT_PORTION). The only difference is
+    // an extra ASK pot of ASK_VALUE that grows at the same rate. If ASK growth leaked into
+    // the share-income pool, the shareIncome fields below would differ between the two runs.
+    function inputs(withAsk: boolean) {
+      const inp = JSON.parse(JSON.stringify(defaultInputs));
+      inp.free.depotTax = { enabled: true, method: "annualShareIncomeTax", costBasis: null, showDeferredTax: true };
+      // free.balance includes the ASK carve-out, so the depot portion is constant in both runs.
+      inp.free.balance = withAsk ? DEPOT_PORTION + ASK_VALUE : DEPOT_PORTION;
+      if (withAsk) {
+        inp.free.ask = {
+          enabled: true,
+          currentValue: ASK_VALUE,
+          priorYearEndValue: ASK_VALUE,
+          depositLimit: 174_200,
+          taxRate: ASK_TAX_RATE,
+          autoFillFirst: false, // contributions go to depot, not ASK ⇒ depot inflow identical
+          taxCreditCarryForward: 0,
+          taxPaymentMode: "deductFromASK",
+          withdrawalStrategy: "depotFirst",
+        };
+      }
+      return inp;
+    }
+
+    const withAsk = projectWithStopAge(inputs(true), defaultAssumptions, defaultInputs.stopAge)[0];
+    const noAsk = projectWithStopAge(inputs(false), defaultAssumptions, defaultInputs.stopAge)[0];
+
+    const ask = withAsk.flows.ask!;
+    const si = withAsk.flows.shareIncome!;
+    const siBase = noAsk.flows.shareIncome!;
+
+    // Precondition: ASK actually grew this year (otherwise the test proves nothing).
+    expect(ask.growthGross).toBeGreaterThan(0);
+
+    // (1) ASK growth is taxed ONLY through flows.ask.tax (its own 17% lager-tax line).
+    expect(ask.tax).toBeCloseTo(ask.growthGross * ASK_TAX_RATE, 6);
+
+    // (2) ASK growth is NOT included in shareIncome.totalShareIncome.
+    //     Equal to the no-ASK baseline ⇒ the extra ASK pot contributed nothing to the pool.
+    expect(si.totalShareIncome).toBeCloseTo(siBase.totalShareIncome, 0);
+    //     And explicitly: the pool is NOT the depot taxable + ASK growth.
+    expect(si.totalShareIncome).not.toBeCloseTo(si.annualDepotTaxable + ask.growthGross, 0);
+
+    // (3) ASK growth is NOT included in taxedAtLow or taxedAtHigh (bracket split unchanged).
+    expect(si.taxedAtLow).toBeCloseTo(siBase.taxedAtLow, 0);
+    expect(si.taxedAtHigh).toBeCloseTo(siBase.taxedAtHigh, 0);
+
+    // (4) Total share income equals ONLY the depot/holding taxable components.
+    expect(si.totalShareIncome).toBeCloseTo(
+      si.holdingGross + si.extraHoldingGross + si.realizedDepotGain + si.annualDepotTaxable,
+      0,
+    );
+    expect(si.annualDepotTaxable).toBeCloseTo(Math.max(0, withAsk.flows.depot!.growthGross), 0);
+
+    // (5) The 27/42 bracket is not consumed by ASK growth: low-bracket usage is identical
+    //     with and without the ASK pot (and never exceeds the threshold).
+    expect(si.taxedAtLow).toBeCloseTo(siBase.taxedAtLow, 0);
+    expect(si.taxedAtLow).toBeLessThanOrEqual(si.threshold + 1);
   });
 
   it("holding distributions and realized depot gains share ONE personal 27/42 bracket (used once/year)", () => {
