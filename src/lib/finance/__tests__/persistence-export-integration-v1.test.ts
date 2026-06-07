@@ -65,11 +65,33 @@ function assertNoNegativeBuckets(years: YearRow[]): void {
   }
 }
 
+/**
+ * Paired walk over a LIVE object and its JSON-roundtripped copy. For every numeric leaf in
+ * the live object this asserts:
+ *   (a) the live value is finite — catches NaN/Infinity AT THE SOURCE (before stringify), and
+ *   (b) the parsed value is still the same finite number — JSON.stringify turns NaN/Infinity
+ *       into `null`, so a number silently becoming `null` after parse is rejected here.
+ * (assertAllFinite() alone misses this because `typeof null === "object"`, so a corrupted
+ *  field would be skipped rather than failed.)
+ */
+function assertFiniteNumbersSurvive(live: unknown, parsed: unknown, path = "root"): void {
+  if (typeof live === "number") {
+    expect(Number.isFinite(live), `live value finite at ${path} (got ${live})`).toBe(true);
+    expect(parsed, `numeric field became null after serialization at ${path}`).not.toBeNull();
+    expect(typeof parsed, `numeric field still a number at ${path}`).toBe("number");
+    expect(parsed, `numeric field unchanged by roundtrip at ${path}`).toBe(live);
+  } else if (Array.isArray(live)) {
+    live.forEach((x, i) => assertFiniteNumbersSurvive(x, (parsed as Record<number, unknown> | undefined)?.[i], `${path}[${i}]`));
+  } else if (live && typeof live === "object") {
+    for (const [k, val] of Object.entries(live)) assertFiniteNumbersSurvive(val, (parsed as Record<string, unknown> | undefined)?.[k], `${path}.${k}`);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Legacy scenario migration
 // ─────────────────────────────────────────────────────────────────────────────
 describe("1. Legacy scenario migration", () => {
-  it("a scenario missing all newer fields still projects without crash, NaN/Infinity, or negative buckets", () => {
+  it("project() tolerates a scenario missing all newer fields (engine-level tolerance, not the store migration path)", () => {
     const s = makeBaseScenario();
     // Strip every post-v0 optional field a legacy model would not have.
     delete (s.inputs as Record<string, unknown>).cashflowAllocation;
@@ -166,6 +188,69 @@ describe("1. Legacy scenario migration", () => {
     expect(ev.frequency).toBeTruthy();
     expect(ev.effectTarget).toBeTruthy();
   });
+
+  it("REAL store migration path: a legacy persisted payload is migrated by persist.migrate on rehydrate, then projects", async () => {
+    // Seed a pre-v16 persisted blob in the exact shape Zustand persist reads
+    // ({ state, version }) with legacy field shapes that the store's migrate() must upgrade:
+    //   - singular `inputs.debt` instead of `inputs.debts[]`
+    //   - `free` without `contributionStopRule`
+    //   - an old-shape life event (pre-normalization)
+    //   - scenario without `type`, no `confidence`
+    //   - no snapshots / countryProfiles / countryAnalysisSettings
+    //   - assumptions.tax.pensionPayoutRate (removed in v7)
+    const legacyInputs: Record<string, unknown> = structuredClone(defaultInputs) as unknown as Record<string, unknown>;
+    delete legacyInputs.debts;
+    (legacyInputs as { debt?: unknown }).debt = { balance: 1_200_000, interestRate: 0.04, monthlyPayment: 8_000 };
+    legacyInputs.free = { balance: 400_000, monthlyContribution: 8_000, annualExtraContribution: 0, cashBuffer: 100_000, bufferUsableForShortfall: false }; // no contributionStopRule / ask / depotTax
+    legacyInputs.lifeEvents = [{ name: "Gammelt event", amount: 1_000, startAge: 45 }]; // pre-normalization shape
+    delete (legacyInputs as { confidence?: unknown }).confidence;
+
+    const legacyAssumptions = structuredClone(defaultAssumptions) as unknown as { tax: Record<string, unknown> };
+    legacyAssumptions.tax = { ...legacyAssumptions.tax, pensionPayoutRate: 0.4 }; // v7 must strip this
+
+    const persisted = {
+      state: {
+        scenarios: [{ id: "legacy-persist-1", name: "Legacy persisted", createdAt: 1_700_000_000_000, inputs: legacyInputs }], // no `type`
+        activeScenarioId: "legacy-persist-1",
+        assumptions: legacyAssumptions,
+        // intentionally NO snapshots / countryProfiles / countryAnalysisSettings
+      },
+      version: 6, // < 16 ⇒ store.migrate() runs on rehydrate
+    };
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(persisted));
+
+    // Drive the ACTUAL Zustand persist migration + rehydration (not project() tolerance).
+    await useFinanceStore.persist.rehydrate();
+
+    const st = useFinanceStore.getState();
+    const sc = st.scenarios.find((x) => x.id === "legacy-persist-1");
+    expect(sc, "legacy scenario survived migration").toBeDefined();
+
+    // Modern fields are populated by the migration (safe defaults / upgrades).
+    expect(sc!.type, "v11 classify").toBeDefined();
+    expect(Array.isArray(sc!.inputs.debts), "singular debt → debts[]").toBe(true);
+    expect(sc!.inputs.debts.length).toBeGreaterThan(0);
+    expect(sc!.inputs.debts[0].balance).toBe(1_200_000); // legacy debt value preserved
+    expect(sc!.inputs.free.contributionStopRule, "v12 stop rule").toBe("stopAge");
+    expect(sc!.inputs.confidence, "v9 confidence").toBeDefined();
+    expect(Array.isArray(sc!.inputs.lifeEvents)).toBe(true);
+    const ev = sc!.inputs.lifeEvents![0];
+    expect(ev.id).toBeTruthy();
+    expect(typeof ev.enabled).toBe("boolean");
+    expect(ev.effectTarget).toBeTruthy();
+    expect(Array.isArray(st.snapshots), "v13 snapshots[]").toBe(true);
+    expect(st.countryProfiles.length, "v15 country profiles").toBeGreaterThan(0);
+    expect(st.countryAnalysisSettings, "v16 analysis settings").toBeDefined();
+    expect("pensionPayoutRate" in (st.assumptions.tax as Record<string, unknown>), "v7 strips pensionPayoutRate").toBe(false);
+
+    // The migrated scenario projects cleanly — no crash, no NaN/Infinity/null, no negative buckets.
+    const years = project(sc!, st.assumptions);
+    expect(years.length).toBeGreaterThan(0);
+    assertAllFinite(years);
+    assertNoNegativeBuckets(years);
+    expect(runIntegrityChecks(sc!, years)).toEqual([]);
+    expect(runModelValidation(sc!, years).failed).toBe(0);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -224,20 +309,44 @@ describe("3. Snapshot & cloud payload preservation", () => {
     expect(reproject.map((y) => y.netWorth)).toEqual(snap.years.map((y) => y.netWorth));
   });
 
-  it("cloud serialize → apply preserves scenarios and reproduces projection outputs", () => {
+  it("cloud serialize → apply preserves scenarios AND a frozen snapshot (full reproducible shape)", () => {
     const rich = richScenario();
     useFinanceStore.setState({ scenarios: [rich], activeScenarioId: rich.id, assumptions: defaultAssumptions, snapshots: [] });
     const before = project(useFinanceStore.getState().scenarios[0], useFinanceStore.getState().assumptions);
 
+    // Freeze a real snapshot BEFORE serialization so the cloud payload must carry it.
+    const snapId = useFinanceStore.getState().saveSnapshot({ name: "Cloud snap", notes: "frozen" });
+    const original = useFinanceStore.getState().snapshots.find((x) => x.snapshotId === snapId)!;
+    expect(original).toBeDefined();
+
     const payload = serializeStoreState();
+    // Wipe to a clean store (no snapshots) so a dropped snapshot would be caught.
     useFinanceStore.setState({ scenarios: [makeBaseScenario()], snapshots: [] });
     applyStateToStore(payload);
 
     const st = useFinanceStore.getState();
     const back = st.scenarios.find((x) => x.id === rich.id)!;
     expect(back).toBeDefined();
-    const after = project(back, st.assumptions);
-    expect(after.map((y) => y.netWorth)).toEqual(before.map((y) => y.netWorth));
+    expect(project(back, st.assumptions).map((y) => y.netWorth)).toEqual(before.map((y) => y.netWorth));
+
+    // The snapshot is actually PRESERVED through the cloud roundtrip with the fields the app
+    // needs to reproduce/display it.
+    const restored = st.snapshots.find((x) => x.snapshotId === snapId);
+    expect(restored, "snapshot survives cloud roundtrip").toBeDefined();
+    expect(restored!.snapshotName).toBe(original.snapshotName);
+    expect(restored!.notes).toBe(original.notes);
+    expect(restored!.modelVersion).toBe(original.modelVersion);
+    expect(restored!.modelRelease).toBe(original.modelRelease);
+    expect(restored!.scenarioId).toBe(original.scenarioId);
+    expect(restored!.scenarioName).toBe(original.scenarioName);
+    expect(restored!.scenarioType).toBe(original.scenarioType);
+    expect(restored!.resolvedInputs).toEqual(original.resolvedInputs);
+    expect(restored!.kpis).toEqual(original.kpis);
+    expect(restored!.years.map((y) => y.netWorth)).toEqual(original.years.map((y) => y.netWorth));
+    expect(restored!.chartData).toEqual(original.chartData);
+    // Frozen snapshot still re-projects to its own frozen years (independent of live scenario).
+    const reproject = project({ ...back, inputs: restored!.resolvedInputs }, restored!.assumptions);
+    expect(reproject.map((y) => y.netWorth)).toEqual(restored!.years.map((y) => y.netWorth));
   });
 
   it("snapshots survive an export/import roundtrip and stay frozen", () => {
@@ -388,15 +497,24 @@ describe("6. No hidden invalid values", () => {
     assertAllFinite(snap.chartData);
   });
 
-  it("full store export JSON re-parses and contains no NaN/Infinity numbers", () => {
+  it("full store export: LIVE payload is finite before serialization and no numeric field becomes null after parse", () => {
     const rich = richScenario();
     useFinanceStore.setState({ scenarios: [rich], activeScenarioId: rich.id, assumptions: defaultAssumptions, snapshots: [] });
     useFinanceStore.getState().saveSnapshot({ name: "S" });
+
+    // 1) Assert finiteness on the LIVE store objects BEFORE any JSON.stringify. JSON.stringify
+    //    coerces NaN/Infinity to null, so checking only the parsed output (where typeof null is
+    //    "object") would let a corrupted number slip through silently.
+    const liveScenarios = useFinanceStore.getState().scenarios;
+    const liveSnapshots = useFinanceStore.getState().snapshots;
+    assertAllFinite(liveScenarios);
+    assertAllFinite(liveSnapshots);
+
+    // 2) Export, then prove every LIVE number survived as the same finite number (none → null).
     const json = useFinanceStore.getState().exportJson();
-    // JSON.stringify already drops NaN/Infinity to null, so also assert the source objects are finite.
-    const parsed = JSON.parse(json);
     expect(json).not.toMatch(/NaN|Infinity/);
-    assertAllFinite(parsed.scenarios);
-    assertAllFinite(parsed.snapshots);
+    const parsed = JSON.parse(json);
+    assertFiniteNumbersSurvive(liveScenarios, parsed.scenarios, "scenarios");
+    assertFiniteNumbersSurvive(liveSnapshots, parsed.snapshots, "snapshots");
   });
 });
