@@ -189,61 +189,89 @@ describe("1. Legacy scenario migration", () => {
     expect(ev.effectTarget).toBeTruthy();
   });
 
-  it("REAL store migration path: a legacy persisted payload is migrated by persist.migrate on rehydrate, then projects", async () => {
-    // Seed a pre-v16 persisted blob in the exact shape Zustand persist reads
-    // ({ state, version }) with legacy field shapes that the store's migrate() must upgrade:
-    //   - singular `inputs.debt` instead of `inputs.debts[]`
-    //   - `free` without `contributionStopRule`
-    //   - an old-shape life event (pre-normalization)
-    //   - scenario without `type`, no `confidence`
-    //   - no snapshots / countryProfiles / countryAnalysisSettings
-    //   - assumptions.tax.pensionPayoutRate (removed in v7)
+  /**
+   * Build a pre-v16 persisted INNER state with legacy field shapes the store's migrate()
+   * must upgrade:
+   *   - singular `inputs.debt` instead of `inputs.debts[]`
+   *   - `free` without `contributionStopRule`
+   *   - an old-shape life event (pre-normalization)
+   *   - scenario without `type`, no `confidence`
+   *   - NO snapshots / countryProfiles / countryAnalysisSettings (must be added by migrate)
+   *   - assumptions.tax.pensionPayoutRate (removed in v7)
+   */
+  function legacyPersistedState(): Record<string, unknown> {
     const legacyInputs: Record<string, unknown> = structuredClone(defaultInputs) as unknown as Record<string, unknown>;
     delete legacyInputs.debts;
     (legacyInputs as { debt?: unknown }).debt = { balance: 1_200_000, interestRate: 0.04, monthlyPayment: 8_000 };
-    legacyInputs.free = { balance: 400_000, monthlyContribution: 8_000, annualExtraContribution: 0, cashBuffer: 100_000, bufferUsableForShortfall: false }; // no contributionStopRule / ask / depotTax
-    legacyInputs.lifeEvents = [{ name: "Gammelt event", amount: 1_000, startAge: 45 }]; // pre-normalization shape
+    legacyInputs.free = { balance: 400_000, monthlyContribution: 8_000, annualExtraContribution: 0, cashBuffer: 100_000, bufferUsableForShortfall: false };
+    legacyInputs.lifeEvents = [{ name: "Gammelt event", amount: 1_000, startAge: 45 }];
     delete (legacyInputs as { confidence?: unknown }).confidence;
 
     const legacyAssumptions = structuredClone(defaultAssumptions) as unknown as { tax: Record<string, unknown> };
-    legacyAssumptions.tax = { ...legacyAssumptions.tax, pensionPayoutRate: 0.4 }; // v7 must strip this
+    legacyAssumptions.tax = { ...legacyAssumptions.tax, pensionPayoutRate: 0.4 };
 
-    const persisted = {
-      state: {
-        scenarios: [{ id: "legacy-persist-1", name: "Legacy persisted", createdAt: 1_700_000_000_000, inputs: legacyInputs }], // no `type`
-        activeScenarioId: "legacy-persist-1",
-        assumptions: legacyAssumptions,
-        // intentionally NO snapshots / countryProfiles / countryAnalysisSettings
-      },
-      version: 6, // < 16 ⇒ store.migrate() runs on rehydrate
+    return {
+      scenarios: [{ id: "legacy-persist-1", name: "Legacy persisted", createdAt: 1_700_000_000_000, inputs: legacyInputs }], // no `type`
+      activeScenarioId: "legacy-persist-1",
+      assumptions: legacyAssumptions,
+      // intentionally NO snapshots / countryProfiles / countryAnalysisSettings
     };
-    localStorage.setItem(PERSIST_KEY, JSON.stringify(persisted));
+  }
+
+  it("store migrate() ADDS the missing modern top-level fields (asserted on raw migrated state, before any merge)", () => {
+    // Call the store's actual migrate() directly via the persist API, on a legacy state that is
+    // MISSING snapshots/countryProfiles/countryAnalysisSettings. Asserting on the raw migrate()
+    // output (not the rehydrated store) guarantees the fields come from migration — they cannot
+    // be inherited from the in-memory store defaults via Zustand's shallow merge.
+    const migrate = useFinanceStore.persist.getOptions().migrate;
+    expect(migrate, "store exposes a migrate() function").toBeTypeOf("function");
+
+    const legacy = legacyPersistedState();
+    // Sanity: the input genuinely lacks these fields, so a pass proves migrate() created them.
+    expect("snapshots" in legacy).toBe(false);
+    expect("countryProfiles" in legacy).toBe(false);
+    expect("countryAnalysisSettings" in legacy).toBe(false);
+
+    const migrated = migrate!(structuredClone(legacy), 6) as Record<string, any>;
+
+    // Top-level fields ADDED by migration (these are the ones a merge could otherwise mask).
+    expect(Array.isArray(migrated.snapshots), "v13 snapshots[] added").toBe(true);
+    expect(Array.isArray(migrated.countryProfiles) && migrated.countryProfiles.length > 0, "v15 countryProfiles added").toBe(true);
+    expect(migrated.countryAnalysisSettings, "v16 countryAnalysisSettings added").toBeDefined();
+    expect("pensionPayoutRate" in migrated.assumptions.tax, "v7 strips pensionPayoutRate").toBe(false);
+
+    // Scenario-level upgrades, also straight from migrate().
+    const msc = migrated.scenarios[0];
+    expect(msc.type, "v11 classify").toBeDefined();
+    expect(Array.isArray(msc.inputs.debts), "singular debt → debts[]").toBe(true);
+    expect(msc.inputs.debts[0].balance).toBe(1_200_000);
+    expect(msc.inputs.free.contributionStopRule, "v12 stop rule").toBe("stopAge");
+    expect(msc.inputs.confidence, "v9 confidence").toBeDefined();
+    expect(Array.isArray(msc.inputs.lifeEvents)).toBe(true);
+    expect(msc.inputs.lifeEvents[0].id).toBeTruthy();
+    expect(typeof msc.inputs.lifeEvents[0].enabled).toBe("boolean");
+    expect(msc.inputs.lifeEvents[0].effectTarget).toBeTruthy();
+  });
+
+  it("REAL rehydrate path: a legacy persisted payload migrates end-to-end and projects cleanly", async () => {
+    localStorage.setItem(PERSIST_KEY, JSON.stringify({ state: legacyPersistedState(), version: 6 }));
 
     // Drive the ACTUAL Zustand persist migration + rehydration (not project() tolerance).
     await useFinanceStore.persist.rehydrate();
 
     const st = useFinanceStore.getState();
     const sc = st.scenarios.find((x) => x.id === "legacy-persist-1");
-    expect(sc, "legacy scenario survived migration").toBeDefined();
+    expect(sc, "legacy scenario survived rehydrate").toBeDefined();
+    // Scenario array is replaced wholesale by the migrated persisted state (not merged per-item),
+    // so these scenario-level upgrades genuinely come from the migration.
+    expect(sc!.type).toBeDefined();
+    expect(Array.isArray(sc!.inputs.debts)).toBe(true);
+    expect(sc!.inputs.debts[0].balance).toBe(1_200_000);
+    expect(sc!.inputs.free.contributionStopRule).toBe("stopAge");
+    expect(sc!.inputs.confidence).toBeDefined();
+    expect(sc!.inputs.lifeEvents![0].id).toBeTruthy();
 
-    // Modern fields are populated by the migration (safe defaults / upgrades).
-    expect(sc!.type, "v11 classify").toBeDefined();
-    expect(Array.isArray(sc!.inputs.debts), "singular debt → debts[]").toBe(true);
-    expect(sc!.inputs.debts.length).toBeGreaterThan(0);
-    expect(sc!.inputs.debts[0].balance).toBe(1_200_000); // legacy debt value preserved
-    expect(sc!.inputs.free.contributionStopRule, "v12 stop rule").toBe("stopAge");
-    expect(sc!.inputs.confidence, "v9 confidence").toBeDefined();
-    expect(Array.isArray(sc!.inputs.lifeEvents)).toBe(true);
-    const ev = sc!.inputs.lifeEvents![0];
-    expect(ev.id).toBeTruthy();
-    expect(typeof ev.enabled).toBe("boolean");
-    expect(ev.effectTarget).toBeTruthy();
-    expect(Array.isArray(st.snapshots), "v13 snapshots[]").toBe(true);
-    expect(st.countryProfiles.length, "v15 country profiles").toBeGreaterThan(0);
-    expect(st.countryAnalysisSettings, "v16 analysis settings").toBeDefined();
-    expect("pensionPayoutRate" in (st.assumptions.tax as Record<string, unknown>), "v7 strips pensionPayoutRate").toBe(false);
-
-    // The migrated scenario projects cleanly — no crash, no NaN/Infinity/null, no negative buckets.
+    // The migrated scenario projects cleanly — no crash, no NaN/Infinity, no negative buckets.
     const years = project(sc!, st.assumptions);
     expect(years.length).toBeGreaterThan(0);
     assertAllFinite(years);
@@ -497,24 +525,35 @@ describe("6. No hidden invalid values", () => {
     assertAllFinite(snap.chartData);
   });
 
-  it("full store export: LIVE payload is finite before serialization and no numeric field becomes null after parse", () => {
+  it("full store export: the WHOLE LIVE payload is finite before serialization and no numeric field becomes null after parse", () => {
     const rich = richScenario();
     useFinanceStore.setState({ scenarios: [rich], activeScenarioId: rich.id, assumptions: defaultAssumptions, snapshots: [] });
     useFinanceStore.getState().saveSnapshot({ name: "S" });
 
-    // 1) Assert finiteness on the LIVE store objects BEFORE any JSON.stringify. JSON.stringify
-    //    coerces NaN/Infinity to null, so checking only the parsed output (where typeof null is
-    //    "object") would let a corrupted number slip through silently.
-    const liveScenarios = useFinanceStore.getState().scenarios;
-    const liveSnapshots = useFinanceStore.getState().snapshots;
-    assertAllFinite(liveScenarios);
-    assertAllFinite(liveSnapshots);
+    // exportJson() serializes numeric fields across the ENTIRE store payload — not just
+    // scenarios/snapshots, but also assumptions, countryProfiles and countryAnalysisSettings.
+    // JSON.stringify coerces NaN/Infinity to null, and checking only the parsed output (where
+    // typeof null === "object") would let a corrupted number slip through. So we (1) assert the
+    // LIVE objects are finite before stringify, and (2) prove each LIVE number survives as the
+    // same finite number after parse — across every top-level export key.
+    const st = useFinanceStore.getState();
+    const live: Record<string, unknown> = {
+      scenarios: st.scenarios,
+      snapshots: st.snapshots,
+      assumptions: st.assumptions,
+      countryProfiles: st.countryProfiles,
+      countryAnalysisSettings: st.countryAnalysisSettings,
+    };
 
-    // 2) Export, then prove every LIVE number survived as the same finite number (none → null).
-    const json = useFinanceStore.getState().exportJson();
+    const json = st.exportJson();
     expect(json).not.toMatch(/NaN|Infinity/);
-    const parsed = JSON.parse(json);
-    assertFiniteNumbersSurvive(liveScenarios, parsed.scenarios, "scenarios");
-    assertFiniteNumbersSurvive(liveSnapshots, parsed.snapshots, "snapshots");
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+
+    for (const key of ["scenarios", "snapshots", "assumptions", "countryProfiles", "countryAnalysisSettings"] as const) {
+      // Each of these top-level keys is present in the exported payload...
+      expect(parsed[key], `export payload includes ${key}`).toBeDefined();
+      // ...is finite live, and survives the roundtrip with no number → null coercion.
+      assertFiniteNumbersSurvive(live[key], parsed[key], key);
+    }
   });
 });
