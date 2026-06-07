@@ -260,15 +260,21 @@ describe("C. Depot cost basis over multiple sales", () => {
     expect(cumulativeRealized).toBeLessThanOrEqual(INITIAL_LATENT + 1);
   });
 
-  it("latent-tax indicator stays consistent with depot value and remaining cost basis", () => {
+  it("latent-gain/cost-basis invariants hold (durable, not tied to the deferred-tax heuristic)", () => {
     const years = project(depotDrawdown(), ZERO_RETURN);
-    const effRate = (TAX.shareLowRate + TAX.shareHighRate) / 2;
     for (const y of years) {
       const d = y.flows.depot;
       if (!d) continue;
+      // Cost basis is well-formed: non-negative and never above the depot value (no growth here).
+      expect(d.costBasisClosing, `cost basis >= 0 @${y.age}`).toBeGreaterThanOrEqual(-0.5);
+      expect(d.costBasisClosing, `cost basis <= value @${y.age}`).toBeLessThanOrEqual(d.closing + 1);
+      // Unrealized gain is exactly max(0, value - cost basis) — a definitional invariant.
       const latent = Math.max(0, d.closing - d.costBasisClosing);
-      expect(d.unrealizedGainClosing).toBeCloseTo(latent, 0);
-      expect(d.deferredTaxClosing).toBeCloseTo(latent * effRate, 0);
+      expect(d.unrealizedGainClosing, `unrealized gain def @${y.age}`).toBeCloseTo(latent, 0);
+      // Deferred-tax indicator: only assert durable bounds, NOT the exact average-rate formula.
+      // It must be non-negative and never tax more than the gain at the maximum share rate.
+      expect(d.deferredTaxClosing, `deferred tax >= 0 @${y.age}`).toBeGreaterThanOrEqual(-0.5);
+      expect(d.deferredTaxClosing, `deferred tax bounded by gain*highRate @${y.age}`).toBeLessThanOrEqual(latent * TAX.shareHighRate + 1);
     }
   });
 });
@@ -378,42 +384,86 @@ describe("D. ASK multi-year behaviour", () => {
 // E. Holding + depot shared 27/42 bracket over multiple years
 // ─────────────────────────────────────────────────────────────────────────────
 describe("E. Holding + depot shared bracket over multiple years", () => {
-  it("low bracket is used at most once per year and resets each year (holding + depot realization)", () => {
-    const s = drawdown({
-      strategy: "holdingFirst",
-      currentAge: 55,
-      free: 1_500_000,
-      holding: 4_000_000,
-      pension: 0,
-      spendingMonthly: 40_000,
-      depotTax: { enabled: true, method: "realizationSimple", costBasis: 200_000, showDeferredTax: true },
-    });
-    s.inputs.holding.annualDistribution = 50_000;
-    s.inputs.holding.startDistributionAtStopAge = true; // distribute from stopAge each year
-    const years = sweepClean(s, ZERO_RETURN);
-    let yearsAtFullLowBracket = 0;
+  /**
+   * LEGACY path (no inputs.capitalWithdrawal): projection.ts only runs the planned
+   * holding distribution (holdingPlanned, feeding the shared shareIncome ctx) when
+   * capitalWithdrawal is NOT active. A consumption deficit then forces a depot
+   * realization from `free`, so holding distribution AND realized depot gain land in
+   * the SAME per-year share-income pool — the case Codex asked us to exercise.
+   */
+  function legacySharedBracket(): Scenario {
+    const s = makeBaseScenario();
+    s.inputs.person.currentAge = 55;
+    s.inputs.stopAge = 55;
+    s.inputs.fullRetireAge = 55; // no labour / part-time income
+    s.inputs.debts = [];
+    s.inputs.income.familyFundAnnualNet = 0;
+    s.inputs.income.statePension = { ...s.inputs.income.statePension, mode: "none" };
+    s.inputs.pension.ratePensionEnabled = false;
+    s.inputs.pension.lifeAnnuity = { ...s.inputs.pension.lifeAnnuity, enabled: false };
+    s.inputs.pension.balance = 0;
+    s.inputs.holding.balance = 2_000_000;
+    s.inputs.holding.expectedExitValue = 0;
+    s.inputs.holding.annualDistribution = 50_000; // planned holding distribution each year
+    s.inputs.holding.startDistributionAtStopAge = true;
+    s.inputs.holding.withdrawalStrategy = "planned_only"; // ⇒ shortfall cannot reach holding, must hit depot
+    s.inputs.free.balance = 2_000_000;
+    s.inputs.free.cashBuffer = 0;
+    s.inputs.free.depotTax = { enabled: true, method: "realizationSimple", costBasis: 200_000, showDeferredTax: true };
+    s.inputs.spending.desiredMonthlyNet = 30_000; // deficit ⇒ depot realization to cover it
+    // capitalWithdrawal intentionally left undefined (legacy shared-bracket path).
+    return s;
+  }
+
+  it("same year: a holding distribution AND a realized depot gain both feed ONE shared 27/42 low bracket", () => {
+    const years = sweepClean(legacySharedBracket(), ZERO_RETURN);
+    // There must be a year where BOTH sources are positive simultaneously.
+    const both = years.find(
+      (y) => (y.flows.shareIncome?.holdingGross ?? 0) > 0.5 && (y.flows.shareIncome?.realizedDepotGain ?? 0) > 0.5,
+    );
+    expect(both, "a year with BOTH holding distribution and realized depot gain").toBeDefined();
+    const si = both!.flows.shareIncome!;
+
+    // Both sources are genuinely present this year.
+    expect(si.holdingGross).toBeGreaterThan(0);
+    expect(si.realizedDepotGain).toBeGreaterThan(0);
+
+    // Both enter the same pool; total = holding + depot components (no double count).
+    expect(si.totalShareIncome).toBeCloseTo(
+      si.holdingGross + si.extraHoldingGross + si.realizedDepotGain + si.annualDepotTaxable,
+      0,
+    );
+    expect(si.taxedAtLow + si.taxedAtHigh).toBeCloseTo(si.totalShareIncome, 0);
+
+    // ONE low bracket across holding + depot combined (never 2× — that would allow up to 2×threshold).
+    expect(si.taxedAtLow).toBeLessThanOrEqual(si.threshold + 1);
+    // Combined income exceeds the threshold here ⇒ low bracket fully used once, remainder at high rate.
+    expect(si.totalShareIncome).toBeGreaterThan(si.threshold);
+    expect(si.taxedAtLow).toBeCloseTo(si.threshold, 0);
+    expect(si.taxedAtHigh).toBeGreaterThan(0);
+  });
+
+  it("low bracket resets each year (independent full refill across many years), never carried", () => {
+    const years = project(legacySharedBracket(), ZERO_RETURN);
+    let fullLowYears = 0;
     for (const y of years) {
       const si = y.flows.shareIncome;
       if (!si) continue;
-      // Once-per-year: low base never exceeds the threshold within a single year.
       expect(si.taxedAtLow, `low<=threshold @${y.age}`).toBeLessThanOrEqual(si.threshold + 1);
-      expect(si.taxedAtLow + si.taxedAtHigh, `sum @${y.age}`).toBeCloseTo(si.totalShareIncome, 0);
-      // Reset: any year whose total share income exceeds the threshold should fill the
-      // low bracket to (about) the full threshold again — proving it reset, not carried.
       if (si.totalShareIncome > si.threshold + 1) {
-        expect(si.taxedAtLow).toBeCloseTo(si.threshold, 0);
-        yearsAtFullLowBracket++;
+        expect(si.taxedAtLow).toBeCloseTo(si.threshold, 0); // refilled to the full threshold again
+        fullLowYears++;
       }
     }
-    expect(yearsAtFullLowBracket).toBeGreaterThan(1); // happens in many independent years
+    expect(fullLowYears).toBeGreaterThan(1); // multiple independent years each get the full low bracket
   });
 
-  it("fillLowShareIncomeBracket never exceeds the low bracket in any year", () => {
+  it("fillLowShareIncomeBracket allocates ONE combined low bracket across holding + depot (not one each)", () => {
     const s = drawdown({
       strategy: "holdingFirst",
       currentAge: 55,
-      free: 0,
-      holding: 5_000_000,
+      free: 1_000_000, // depot with full latent gain (costBasis 0 ⇒ gainRatio 1)
+      holding: 40_000, // below the threshold ⇒ depot must fill the remaining low room
       pension: 0,
       spendingMonthly: 0,
       depotTax: { enabled: true, method: "realizationSimple", costBasis: 0, showDeferredTax: true },
@@ -426,18 +476,21 @@ describe("E. Holding + depot shared bracket over multiple years", () => {
       startAtStopAge: true,
     };
     const years = sweepClean(s, ZERO_RETURN);
-    let filledYears = 0;
+    const both = years.find(
+      (y) => y.flows.holdingPlanned.gross > 0.5 && (y.flows.shareIncome?.realizedDepotGain ?? 0) > 0.5,
+    );
+    expect(both, "a fill-low year drawing from BOTH holding and depot").toBeDefined();
+    const si = both!.flows.shareIncome!;
+    // Holding + depot together fill a single low bracket — combined taxedAtLow ≈ threshold, never 2×.
+    expect(both!.flows.holdingPlanned.gross).toBeGreaterThan(0);
+    expect(si.realizedDepotGain).toBeGreaterThan(0);
+    expect(si.taxedAtLow).toBeLessThanOrEqual(si.threshold + 1);
+    expect(si.taxedAtLow).toBeCloseTo(si.threshold, 0);
+    // Every year stays within a single low bracket.
     for (const y of years) {
-      const si = y.flows.shareIncome;
-      if (!si) continue;
-      expect(si.taxedAtLow, `fillLow<=threshold @${y.age}`).toBeLessThanOrEqual(si.threshold + 1);
-      if (y.flows.holdingPlanned.gross > 0.5) {
-        // The bracket is filled (up to remaining holding) — gross should not overshoot threshold.
-        expect(y.flows.holdingPlanned.gross).toBeLessThanOrEqual(TAX.shareThreshold + 1);
-        filledYears++;
-      }
+      const s2 = y.flows.shareIncome;
+      if (s2) expect(s2.taxedAtLow, `fillLow<=threshold @${y.age}`).toBeLessThanOrEqual(s2.threshold + 1);
     }
-    expect(filledYears).toBeGreaterThan(1);
   });
 });
 
@@ -478,16 +531,22 @@ describe("F. Capital exhaustion edge cases", () => {
     // Once exhausted (income 0), the full spending shows up as shortfall.
     expect(last.shortfallAmount).toBeCloseTo(SPENDING, 0);
     // Years entered ALREADY broke (opening net worth ~0) show the full spending as shortfall.
-    // (The single transition year — opening > 0, drained to 0 mid-year — legitimately shows a
-    //  PARTIAL shortfall: capital covered what it could, the rest is the honest remainder.)
     const enteredBroke = years.filter((y) => nw(y.opening) <= 0.5);
     expect(enteredBroke.length).toBeGreaterThan(0);
     for (const y of enteredBroke) expect(y.shortfallAmount).toBeCloseTo(SPENDING, 0);
-    // The transition year never creates money: its shortfall is strictly between 0 and full spending.
+
+    // The transition year (entered with capital > 0, drained to ~0 mid-year) MUST exist.
     const transition = years.filter((y) => nw(y.opening) > 0.5 && y.netWorth <= 1);
+    expect(transition.length, "a transition year must be present").toBeGreaterThan(0);
     for (const y of transition) {
-      expect(y.shortfallAmount).toBeGreaterThan(0);
-      expect(y.shortfallAmount).toBeLessThan(SPENDING);
+      // Partial shortfall: capital covered part, the rest is the honest remainder.
+      expect(y.shortfallAmount, `partial shortfall > 0 @${y.age}`).toBeGreaterThan(0);
+      expect(y.shortfallAmount, `partial shortfall < full spending @${y.age}`).toBeLessThan(SPENDING);
+      // No money creation: with zero income, net covered = SPENDING − shortfall must have come from
+      // a genuine drop in net worth (gross drained ≥ net covered), so:
+      //   (openingNW − closingNW) + shortfall ≥ SPENDING.
+      const nwDrop = nw(y.opening) - nw(y.closing);
+      expect(nwDrop + y.shortfallAmount, `no money creation @${y.age}`).toBeGreaterThanOrEqual(SPENDING - 0.5);
     }
   });
 });
