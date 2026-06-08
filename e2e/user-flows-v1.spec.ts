@@ -1,0 +1,171 @@
+/**
+ * Playwright user-flow tests — a small, robust set of the most important end-to-end product
+ * flows (create / duplicate scenario, input → output, snapshot, export/import JSON).
+ *
+ * Runs against the local Vite dev server (see playwright.config.ts), NOT the Lovable preview.
+ * Robust text/role selectors; no pixel/layout assertions; no overfitting to exact decimals.
+ * Every test fails on any uncaught browser pageerror.
+ */
+import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+let pageErrors: string[] = [];
+test.beforeEach(({ page }) => {
+  pageErrors = [];
+  page.on("pageerror", (err) => pageErrors.push(err.message));
+});
+test.afterEach(() => {
+  expect(pageErrors, `uncaught runtime errors: ${pageErrors.join(" | ")}`).toEqual([]);
+});
+
+async function expectNotBlank(page: Page): Promise<void> {
+  await expect(page.locator("body")).toBeVisible();
+  const text = (await page.locator("body").innerText()).trim();
+  expect(text.length, "page should not be blank").toBeGreaterThan(40);
+}
+
+/** The active-scenario selector lives in the sidebar (<aside>); scope to it to stay unique. */
+function scenarioSelect(page: Page) {
+  return page.locator("aside").getByRole("combobox");
+}
+
+/** A NumField on /inputs: locate by its label text, then the inner numeric textbox. */
+function numField(page: Page, label: string) {
+  return page.locator("div.space-y-1\\.5").filter({ hasText: label }).getByRole("textbox");
+}
+
+test.describe("User flows", () => {
+  test("1. create a new scenario — it becomes active and appears in the selector", async ({ page }) => {
+    await page.goto("/");
+    await scenarioSelect(page).waitFor();
+
+    await page.getByRole("button", { name: "+ Nyt" }).click();
+
+    // New scenario "Scenarie 2" is active (shown in the selector) and projects without crash.
+    await expect(scenarioSelect(page)).toContainText("Scenarie 2");
+    await page.goto("/inputs");
+    await expect(page.locator("header input")).toHaveValue("Scenarie 2");
+
+    // It is also present in the selector dropdown list.
+    await page.goto("/");
+    await scenarioSelect(page).click();
+    await expect(page.getByRole("option", { name: /Scenarie 2/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expectNotBlank(page);
+  });
+
+  test("2. duplicate a scenario — duplicate becomes active and preserves edited values", async ({ page }) => {
+    await page.goto("/inputs");
+    // Give the source scenario a recognizable name + a distinctive edited value.
+    await page.locator("header input").fill("Edit Me 123");
+    const age = numField(page, "Nuværende alder");
+    await age.click();
+    await age.fill("47");
+    await age.blur();
+
+    // Duplicate via the sidebar.
+    await page.getByRole("button", { name: "Dupliker" }).click();
+
+    // The duplicate is active and carries over the edited name + value.
+    await expect(page.locator("header input")).toHaveValue("Edit Me 123 (kopi)");
+    await expect(numField(page, "Nuværende alder")).toHaveValue("47");
+    await expect(scenarioSelect(page)).toContainText("Edit Me 123 (kopi)");
+    await expectNotBlank(page);
+  });
+
+  test("3. changing an input updates the projection output", async ({ page }) => {
+    // Baseline projection output.
+    await page.goto("/projection");
+    await expect(page.getByRole("columnheader", { name: "Nettoformue" })).toBeVisible();
+    const before = await page.locator("table").innerText();
+
+    // Change a meaningful input (desired monthly spending) substantially. Lowering spending
+    // reduces the cashflow gap and shifts net worth across the projection.
+    await page.goto("/inputs");
+    const spending = numField(page, "Ønsket forbrug (netto)");
+    await spending.click();
+    await spending.fill("15000");
+    await spending.blur();
+
+    // Output changed, still renders, and contains no invalid numeric tokens.
+    await page.goto("/projection");
+    await expect(page.getByRole("columnheader", { name: "Nettoformue" })).toBeVisible();
+    const after = await page.locator("table").innerText();
+    expect(after).not.toBe(before);
+    expect(after).not.toMatch(/NaN|Infinity|undefined/);
+    await expectNotBlank(page);
+  });
+
+  test("4. create a snapshot — it appears in history and survives reload", async ({ page }) => {
+    await page.goto("/inputs");
+    await page.locator("header input").fill("Snapshot Source");
+
+    await page.goto("/report");
+    await page.getByRole("button", { name: "Gem snapshot" }).click();
+
+    await page.goto("/snapshots");
+    await expect(page.getByText(/Historik \(1\)/)).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByText(/Historik \(1\)/)).toBeVisible();
+    await expectNotBlank(page);
+  });
+
+  test("5. export JSON — downloads a parseable model payload with core data", async ({ page }) => {
+    await page.goto("/");
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: /Eksporter JSON/ }).click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(/finance-snapshot-.*\.json$/);
+    const path = await download.path();
+    const raw = readFileSync(path, "utf8");
+    // No invalid numeric tokens in the exported file.
+    expect(raw).not.toMatch(/NaN|Infinity/);
+
+    const parsed = JSON.parse(raw);
+    // Core top-level data needed to restore the model.
+    expect(Array.isArray(parsed.scenarios) && parsed.scenarios.length > 0).toBe(true);
+    expect(parsed.assumptions).toBeTruthy();
+    expect(parsed).toHaveProperty("activeScenarioId");
+    expect(parsed).toHaveProperty("snapshots"); // present (possibly empty) for round-trip
+  });
+
+  test("6. import JSON — replaces the model and the imported scenario renders", async ({ page }) => {
+    await page.goto("/");
+    // Get a valid payload by exporting the current model, then rename its scenario.
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: /Eksporter JSON/ }).click();
+    const download = await downloadPromise;
+    const parsed = JSON.parse(readFileSync(await download.path(), "utf8"));
+    parsed.scenarios[0].name = "Imported Scenario";
+    parsed.activeScenarioId = parsed.scenarios[0].id;
+    const payload = JSON.stringify(parsed);
+
+    // Import via the hidden file input, then confirm the replace dialog.
+    await page.locator('input[type="file"]').setInputFiles({ name: "model.json", mimeType: "application/json", buffer: Buffer.from(payload) });
+    await expect(page.getByText("Importer model?")).toBeVisible();
+    await page.getByRole("button", { name: "Erstat data" }).click();
+
+    // The imported scenario is active and the model renders.
+    await expect(scenarioSelect(page)).toContainText("Imported Scenario");
+    await page.goto("/projection");
+    await expect(page.getByRole("columnheader", { name: "Nettoformue" })).toBeVisible();
+    expect(await page.locator("table").innerText()).not.toMatch(/NaN|Infinity|undefined/);
+    await expectNotBlank(page);
+  });
+
+  test("7. importing invalid JSON shows an error and does not blank-screen", async ({ page }) => {
+    await page.goto("/");
+    await page.locator('input[type="file"]').setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{ this is not valid json ]") });
+    await expect(page.getByText("Importer model?")).toBeVisible();
+    await page.getByRole("button", { name: "Erstat data" }).click();
+
+    // The app surfaces an error (toast) and stays alive — no blank screen, no uncaught error.
+    // Exact text: a substring like /gyldig/i would also match the dashboard's "Modelstatus: ugyldigt".
+    await expect(page.getByText("Filen er ikke gyldig JSON.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Frihedsmodel")).toBeVisible();
+    await expect(scenarioSelect(page)).toBeVisible();
+    await expectNotBlank(page);
+  });
+});
