@@ -29,9 +29,13 @@ function scenarioSelect(page: Page) {
   return page.locator("aside").getByRole("combobox");
 }
 
-/** A NumField on /inputs: locate by its label text, then the inner numeric textbox. */
+/**
+ * A NumField on /inputs: locate by its <label> TEXT, then the input in the sibling field row.
+ * Uses the label element + DOM structure (not a Tailwind/layout class) so it isn't coupled to
+ * styling. NumField renders: <label>…</label> followed by a sibling <div> wrapping the input.
+ */
 function numField(page: Page, label: string) {
-  return page.locator("div.space-y-1\\.5").filter({ hasText: label }).getByRole("textbox");
+  return page.locator(`xpath=//label[normalize-space(.)=${JSON.stringify(label)}]/following-sibling::div//input`);
 }
 
 test.describe("User flows", () => {
@@ -131,24 +135,54 @@ test.describe("User flows", () => {
     expect(parsed).toHaveProperty("snapshots"); // present (possibly empty) for round-trip
   });
 
-  test("6. import JSON — replaces the model and the imported scenario renders", async ({ page }) => {
+  test("6. import JSON — REPLACES current data (local-only data is gone, imported is active)", async ({ page }) => {
     await page.goto("/");
-    // Get a valid payload by exporting the current model, then rename its scenario.
-    const downloadPromise = page.waitForEvent("download");
+    // Grab a valid, full-shape scenario template by exporting the default model.
+    const dl = page.waitForEvent("download");
     await page.getByRole("button", { name: /Eksporter JSON/ }).click();
-    const download = await downloadPromise;
-    const parsed = JSON.parse(readFileSync(await download.path(), "utf8"));
-    parsed.scenarios[0].name = "Imported Scenario";
-    parsed.activeScenarioId = parsed.scenarios[0].id;
-    const payload = JSON.stringify(parsed);
+    const template = JSON.parse(readFileSync(await (await dl).path(), "utf8"));
+    const baseScenario = template.scenarios[0];
 
-    // Import via the hidden file input, then confirm the replace dialog.
+    // Seed LOCAL-ONLY data that import must wipe: an extra scenario AND a snapshot.
+    await page.getByRole("button", { name: "+ Nyt" }).click(); // "Scenarie 2"
+    await expect(scenarioSelect(page)).toContainText("Scenarie 2");
+    await page.goto("/report");
+    await page.getByRole("button", { name: "Gem snapshot" }).click();
+    await page.goto("/snapshots");
+    await expect(page.getByText(/Historik \(/)).toBeVisible(); // a snapshot exists locally now
+    await page.goto("/");
+
+    // Build a DISJOINT payload: a single, differently-identified scenario and NO snapshots.
+    const importedId = "imported-only-1";
+    const payload = JSON.stringify({
+      modelVersion: template.modelVersion ?? 16,
+      activeScenarioId: importedId,
+      scenarios: [{ ...baseScenario, id: importedId, name: "Imported Only", type: "custom" }],
+      assumptions: template.assumptions,
+      snapshots: [],
+    });
+
     await page.locator('input[type="file"]').setInputFiles({ name: "model.json", mimeType: "application/json", buffer: Buffer.from(payload) });
     await expect(page.getByText("Importer model?")).toBeVisible();
     await page.getByRole("button", { name: "Erstat data" }).click();
 
-    // The imported scenario is active and the model renders.
-    await expect(scenarioSelect(page)).toContainText("Imported Scenario");
+    // Imported scenario is active...
+    await expect(scenarioSelect(page)).toContainText("Imported Only");
+    await page.goto("/inputs");
+    await expect(page.locator("header input")).toHaveValue("Imported Only"); // activeScenarioId → imported
+
+    // ...the old LOCAL-ONLY scenario is gone (full replace, not merge)...
+    await page.goto("/");
+    await scenarioSelect(page).click();
+    await expect(page.getByRole("option", { name: "Imported Only" })).toBeVisible();
+    await expect(page.getByRole("option", { name: "Scenarie 2" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // ...the local-only snapshot is gone...
+    await page.goto("/snapshots");
+    await expect(page.getByText(/Ingen snapshots gemt endnu/i)).toBeVisible();
+
+    // ...and the imported model still renders.
     await page.goto("/projection");
     await expect(page.getByRole("columnheader", { name: "Nettoformue" })).toBeVisible();
     expect(await page.locator("table").innerText()).not.toMatch(/NaN|Infinity|undefined/);
@@ -161,9 +195,14 @@ test.describe("User flows", () => {
     await expect(page.getByText("Importer model?")).toBeVisible();
     await page.getByRole("button", { name: "Erstat data" }).click();
 
-    // The app surfaces an error (toast) and stays alive — no blank screen, no uncaught error.
-    // Exact text: a substring like /gyldig/i would also match the dashboard's "Modelstatus: ugyldigt".
-    await expect(page.getByText("Filen er ikke gyldig JSON.", { exact: true })).toBeVisible();
+    // A stable, copy-insensitive error surface appears: a sonner toast (scoped via its data
+    // attribute so we don't accidentally match the dashboard's "Modelstatus: ugyldigt"), whose
+    // text references the invalid JSON. We assert the pattern, not the exact sentence/punctuation.
+    const toast = page.locator("[data-sonner-toast]");
+    await expect(toast).toBeVisible();
+    await expect(toast).toContainText(/JSON|gyldig/i);
+
+    // The app shell stays alive — no blank screen, no uncaught error (asserted in afterEach).
     await expect(page.getByText("Frihedsmodel")).toBeVisible();
     await expect(scenarioSelect(page)).toBeVisible();
     await expectNotBlank(page);
