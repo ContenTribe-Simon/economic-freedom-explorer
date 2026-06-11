@@ -90,8 +90,11 @@ These two are *locale-independent* and should be preserved verbatim in any publi
 
 ### 4.3 Income streams
 - **General:** time-windowed inflows, each gross or net, taxed by a stream-specific function.
-- **Current:** salary (`income.salaryGross`), `partTime`, `familyFund`, `statePension`,
-  pension payout streams (`ratePension`, `lifeAnnuity`), holding distributions.
+- **Current:** salary (`income.salaryGross`), part-time (`income.partTime`), family fund
+  (`income.familyFundAnnualNet` / `income.familyFundUntilAge`), state pension
+  (`income.statePension`), pension payout streams — ratepension (`pension.ratePension*` inputs
+  → `flows.ratePension`) and life annuity (`pension.lifeAnnuity*` inputs → `flows.lifeAnnuity`)
+  — and holding distributions.
 - **Generalization:** a generic **`IncomeStream` primitive** `{ amount, gross|net, fromAge,
   untilAge, taxRule }`. Folkepension/familyFund are *presets* of this; salary is the always-on
   stream during accumulation.
@@ -182,9 +185,11 @@ These two are *locale-independent* and should be preserved verbatim in any publi
   `allowedFields`, `ModelExport`, `Snapshot`, versioned `persist.migrate`.
 - **Generalization:** the scenario/stress *mechanism* is general; the *specific* modifiers are
   presets. Some are Simon- or Denmark-specific — e.g. `noBarma` is a Simon-specific **internal**
-  modifier that removes a particular named income stream, and `noFolkepension` removes the
-  Danish state pension. The public-facing concept should be generic (e.g. *"remove a named
-  income stream"* / *"remove business income"*) rather than personally-named keys.
+  modifier that removes/zeroes a holding/business capital and distribution source
+  (`inputs.holding.balance`, `inputs.holding.expectedExitValue`, `inputs.holding.annualDistribution`),
+  and `noFolkepension` removes the Danish state pension. The public-facing concept should be
+  generic — e.g. *"remove business capital and distributions"* or *"remove a named
+  capital / distribution source"* — rather than personally-named keys.
 
 ### 4.15 Outputs
 - **General:** a per-year audit row, aggregated KPIs, a CSV/JSON export, and frozen snapshots.
@@ -206,7 +211,7 @@ These two are *locale-independent* and should be preserved verbatim in any publi
 | ASK 17% lager tax + carry-forward | **Account tax treatment** (annual mark-to-market) | tax rate + carry-forward as parameters |
 | Folkepension / familyFund | **IncomeStream** presets | amount + fromAge + tax rule |
 | `capitalWithdrawal.fillLowShareIncomeBracket` | **Tax-aware withdrawal policy** | gate behind locale tax pack |
-| Stress modifiers (e.g. `noBarma`, `noFolkepension`) | **Scenario modifier** presets | `noBarma` is a Simon-specific internal example; expose generic concepts ("remove a named income stream" / "remove business income") instead of personally-named keys |
+| Stress modifiers (e.g. `noBarma`, `noFolkepension`) | **Scenario modifier** presets | `noBarma` is a Simon-specific internal example that zeroes holding/business capital + distributions; expose generic concepts ("remove business capital and distributions" / "remove a named capital/distribution source") instead of personally-named keys |
 | `desiredMonthlyNet`, buffer, life events, debts, savings/withdrawal policies | **Already general primitives** | keep as-is |
 
 **Rule of thumb:** *mechanisms* generalize; *numbers, brackets, and named local programs* are
