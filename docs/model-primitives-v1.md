@@ -85,7 +85,7 @@ These two are *locale-independent* and should be preserved verbatim in any publi
 - **Generalization:** this is the prime candidate for a **generic `Account` primitive**
   `{ kind, balance, realReturn, taxTreatment, availableFromAge, withdrawable }`. Today's
   buckets become *instances/presets* of one type, the cash buffer becomes a zero-return account
-  variant, and ASK becomes a first-class account rather than a sub-account of `free`. ASK,
+  variant, and ASK could become a first-class account rather than a sub-account of `free`. ASK,
   depot, holding, pension are tax-treatment + availability variations of the same idea.
 
 ### 4.3 Income streams
@@ -303,8 +303,9 @@ These are the contracts a generalization effort must not regress.
 - Joint households (two earners, shared accounts) — today is single-person.
 - Progressive/locale tax engines beyond the simplified two-bracket model.
 - Region selection UX and a locale-pack registry.
-- Whether the generic `Account` refactor is worth the churn vs. keeping the four fixed buckets
-  with pluggable tax treatments (a smaller step).
+- Whether the generic `Account` refactor is worth the churn vs. keeping the current fixed
+  bucket structure — three invested buckets, a cash buffer, and ASK as a sub-account / tax
+  treatment — with pluggable tax treatments (a smaller step).
 
 ---
 
