@@ -174,7 +174,7 @@ These two are *locale-independent* and should be preserved verbatim in any publi
 - **General:** returns, inflation, and a tax profile; plus per-assumption confidence that
   affects *scoring* but never the year-by-year math.
 - **Current:** `Assumptions { realReturn{free,pension,holding}, inflation, tax{…},
-  statePensionAnnualNet, withdrawOrder }`; `scenario.confidence`.
+  statePensionAnnualNet, withdrawOrder }`; `scenario.inputs.confidence` (read through `getConfidence()`).
 - **Generalization:** split into a **return/inflation profile** and a **tax locale pack**.
   Confidence is already audience-general.
 
