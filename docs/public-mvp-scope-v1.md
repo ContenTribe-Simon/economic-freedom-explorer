@@ -5,8 +5,8 @@
 >
 > **Audience:** product + engineering.
 >
-> **Companion docs:** `docs/model-primitives-v1.md` (the conceptual model map; merged in a
-> parallel PR) and `src/lib/finance/MODEL.md` (internal implementation note). This document
+> **Companion docs:** `docs/model-primitives-v1.md` (the merged model-primitives / conceptual
+> model map) and `src/lib/finance/MODEL.md` (internal implementation note). This document
 > turns those primitives into a concrete public-product scope.
 
 ---
@@ -70,12 +70,12 @@ minimal set and maps everything else to safe defaults.
 |---|---|---|
 | Current age | `person.currentAge` | |
 | Planning horizon / life expectancy | `person.lifeExpectancy` | default ~90; one field, not a slider war |
-| Current annual income | `income.salaryGross` (or a net equivalent) | locale tax pack converts gross↔net |
+| Current annual income | `income.salaryGross` (gross today) | the current model takes gross income; a future public input layer may accept a net-equivalent figure and map it through a locale/tax presentation layer |
 | Current annual/monthly spending | `spending.desiredMonthlyNet` | real terms; the dominant lever |
 | Current savings/investments | one investment account balance (`free.balance`) | "what you've invested so far" |
 | Monthly/annual saving | `free.monthlyContribution` (+ optional annual extra) | |
 | Basic pension | `pension.balance` + a single access age (`pension.payoutFromAge`) | one simple pension figure, not ratepension/livrente split |
-| Expected real return | `assumptions.realReturn` (single rate applied to the simple accounts) | one number, with a sane default |
+| Expected real return | `assumptions.realReturn.*` — real-return assumptions held **per bucket** (`free` / `pension` / `holding`) | the MVP exposes **one** simple field and maps it onto the underlying per-bucket assumptions; sane default |
 | Desired stop age / FI target | `stopAge` and/or `target.minNetWorthAtEnd` | the user's goal |
 
 ### Nice-to-have (optional, still simple)
