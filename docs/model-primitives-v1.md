@@ -78,12 +78,15 @@ These two are *locale-independent* and should be preserved verbatim in any publi
 ### 4.2 Capital buckets (the central abstraction)
 - **General:** an *account* with attributes: balance, expected real return, tax treatment,
   liquidity, **availability age**, and a place in a **withdrawal order**.
-- **Current:** four concrete buckets — `free` (incl. optional `ask` sub-account and
-  `depotTax` treatment), `pension`, `holding`, plus a non-invested `buffer`.
+- **Current:** three *invested* buckets — `free`, `pension`, `holding` — plus a non-invested
+  cash buffer (`free.cashBuffer`) that counts toward net worth but earns no return. `ask`
+  (Aktiesparekonto) is currently a **sub-account / tax treatment inside `free`** (alongside the
+  `depotTax` treatment of the ordinary depot), not a fully independent bucket.
 - **Generalization:** this is the prime candidate for a **generic `Account` primitive**
   `{ kind, balance, realReturn, taxTreatment, availableFromAge, withdrawable }`. Today's
-  four buckets become four *instances/presets* of one type. ASK, depot, holding, pension
-  are tax-treatment + availability variations of the same idea.
+  buckets become *instances/presets* of one type, the cash buffer becomes a zero-return account
+  variant, and ASK becomes a first-class account rather than a sub-account of `free`. ASK,
+  depot, holding, pension are tax-treatment + availability variations of the same idea.
 
 ### 4.3 Income streams
 - **General:** time-windowed inflows, each gross or net, taxed by a stream-specific function.
@@ -177,8 +180,11 @@ These two are *locale-independent* and should be preserved verbatim in any publi
   export/import and frozen snapshots.
 - **Current:** `type (base | linked_stress_test | custom)`, `stress.ts` modifiers with
   `allowedFields`, `ModelExport`, `Snapshot`, versioned `persist.migrate`.
-- **Generalization:** all general; the *specific* stress modifiers (noBarma, noPartTime,
-  noFolkepension, …) are presets, several of which are locale-specific.
+- **Generalization:** the scenario/stress *mechanism* is general; the *specific* modifiers are
+  presets. Some are Simon- or Denmark-specific — e.g. `noBarma` is a Simon-specific **internal**
+  modifier that removes a particular named income stream, and `noFolkepension` removes the
+  Danish state pension. The public-facing concept should be generic (e.g. *"remove a named
+  income stream"* / *"remove business income"*) rather than personally-named keys.
 
 ### 4.15 Outputs
 - **General:** a per-year audit row, aggregated KPIs, a CSV/JSON export, and frozen snapshots.
@@ -200,7 +206,7 @@ These two are *locale-independent* and should be preserved verbatim in any publi
 | ASK 17% lager tax + carry-forward | **Account tax treatment** (annual mark-to-market) | tax rate + carry-forward as parameters |
 | Folkepension / familyFund | **IncomeStream** presets | amount + fromAge + tax rule |
 | `capitalWithdrawal.fillLowShareIncomeBracket` | **Tax-aware withdrawal policy** | gate behind locale tax pack |
-| Stress modifiers (noBarma, noFolkepension…) | **Scenario modifier** presets | some are locale-specific presets |
+| Stress modifiers (e.g. `noBarma`, `noFolkepension`) | **Scenario modifier** presets | `noBarma` is a Simon-specific internal example; expose generic concepts ("remove a named income stream" / "remove business income") instead of personally-named keys |
 | `desiredMonthlyNet`, buffer, life events, debts, savings/withdrawal policies | **Already general primitives** | keep as-is |
 
 **Rule of thumb:** *mechanisms* generalize; *numbers, brackets, and named local programs* are
@@ -220,7 +226,10 @@ These must become configurable for a public model (today they are baked into `de
 - Default real returns and inflation.
 - Currency, number formatting (`kr`, Danish grouping), and Danish UI copy.
 
-Everything in §4 that is *not* in this list is already audience-general.
+Most mechanisms in §4 are *structurally* generalizable, but some current labels and presets
+remain Simon- or Denmark-specific (e.g. bucket/field names like `free`/`holding`, stress-modifier
+keys like `noBarma`, and the default persona) and should be renamed or moved behind presets
+before public exposure. **Structurally general is not the same as public-ready.**
 
 ---
 
@@ -240,12 +249,46 @@ A possible future shape, kept deliberately high-level:
 
 ---
 
-## 8. Invariants any public model must keep (already test-enforced)
+## 8. Public MVP vs Advanced Mode
+
+A pragmatic productization split of the primitives above. The MVP and Advanced tiers are the
+*same engine and primitives* with different surfaces — "Advanced" simply exposes more of §4.
+
+**Simple public MVP** — the smallest model a general user needs:
+- Age & horizon (current age, life expectancy, stop age).
+- Income (a salary / primary income stream).
+- Spending (base monthly/annual, in real terms).
+- Savings & investments (one or a few investment accounts + an expected real return).
+- Pension (a tax-advantaged account with an access age).
+- Targets & basic outputs (stop age / FI target, net-worth path, simple shortfall/status).
+
+**Advanced public mode** — opt-in depth for power users:
+- Multiple accounts with distinct tax treatments (incl. ASK-style annual mark-to-market).
+- Holding / business capital and distribution policy.
+- Debt with amortization and cashflow impact.
+- Life events (children, home purchase, sabbatical, inheritance).
+- Custom withdrawal order and tax-aware withdrawal strategies.
+- Snapshots, export/import, and scenario comparison.
+
+**Internal / reference-only for now** — not for public exposure yet:
+- Simon-specific named stress modifiers (e.g. `noBarma`).
+- Exact personal/business configurations and named local programs.
+- Experimental or unvalidated assumptions.
+
+The internal/reference tier should be renamed or hidden behind presets before going public.
+
+---
+
+## 9. Invariants any public model must keep (already test-enforced)
 
 - **No money creation** — `closing NW = opening NW + cashflow` for tax-free flows; deficits
   reduce capital or surface as `shortfallAmount` (multi-year + conservation suites).
 - **No negative asset buckets**; debt/net worth may be negative.
-- **Bracket used once per period** for shared tax allowances.
+- **Danish 27/42 share-income pool consumed once per year** — the low-rate share-income
+  bracket is filled at most once per year, shared across holding distributions and realized
+  depot gains (share-income / matrix / multi-year suites). This invariant is locale-specific
+  today; it can later inspire a more general "shared allowance consumed once per period"
+  primitive, but the test-enforced contract is currently the Danish pool specifically.
 - **Deterministic persistence** — export/import + migration reproduce the projection exactly.
 - **Rehydration safety** — corrupted/partial/legacy localStorage never blank-screens; no
   NaN/Infinity/unexpected-null in critical numeric fields.
@@ -254,7 +297,7 @@ These are the contracts a generalization effort must not regress.
 
 ---
 
-## 9. Out of scope / open questions (for a later phase)
+## 10. Out of scope / open questions (for a later phase)
 
 - Multi-currency and FX over time.
 - Joint households (two earners, shared accounts) — today is single-person.
