@@ -65,8 +65,8 @@ All amounts are **real terms / today's money (nutidskroner)**.
 | 1 | **Intro / framing** | Set expectation: this is an estimate, not advice; all amounts are in today's money. | One calm screen: headline question *"Hvornår kan du blive økonomisk fri?"*, one-line framing, a single primary CTA to start. A persistent, unobtrusive "ikke rådgivning" note. |
 | 2 | **Simple inputs** | Collect the minimal input set (§4) with defaults pre-filled so a result is always reachable. | One short form/card fitting one screen: age, horizon, income, spending, current investments, monthly saving, pension balance + access age, expected return, desired stop age. Defaults from `DEFAULT_SIMPLE_INPUTS`. |
 | 3 | **Answer-first result** | Give the headline answer immediately. | A result hero: status badge (on track / tight / not yet) + the headline number **earliest sustainable stop age**, plus a one-line plain-language takeaway. |
-| 4 | **Projection over time** | Make the path tangible. | A simple net-worth-over-time chart with the planned stop age marked and a one-line takeaway ("Dine penge rækker til ca. alder X" / "slipper op ved alder Y"). Anchor points at stop age and key ages. |
-| 5 | **First bottleneck** | Surface the single most important constraint. | A card naming the **first shortfall age** and the **monthly gap** there, in plain language ("Fra alder 86 mangler du ca. 3.200 kr/md"). If no shortfall: a reassuring "ingen flaskehals fundet". |
+| 4 | **Projection over time** | Make the path tangible. | A simple net-worth-over-time chart with the planned stop age marked and a one-line takeaway ("Dine penge rækker til ca. alder X" / "slipper op ved alder Y"). Anchor points are **horizon-relative** (stop/FI age, pension access age, end of horizon) — never a hardcoded age that may fall outside the projection (see §4.2). |
+| 5 | **First bottleneck** | Surface the single most important constraint. | A card naming the **first shortfall age** and the **monthly gap in that year** (sourced from the first shortfall year itself, not an after-stop average — see §4.2), in plain language ("Fra alder 86 mangler du ca. 18.300 kr/md"). If no shortfall: a reassuring "ingen flaskehals fundet". |
 | 6 | **Adjust a few levers** | Let the user *feel* the trade-offs. | 2–3 live controls (monthly spending, monthly saving, stop age). Result + chart + bottleneck update live. Advanced depth stays behind the Advanced door. |
 | 7 | **Save / export (optional)** | Let the user keep or share a result. No account required for the basic path. | Local save + JSON export; optional "save to cloud" (login) as a clearly secondary action. |
 
@@ -103,15 +103,21 @@ is hidden/deferred. This is what a designer builds from. Copy shown is indicativ
 ### Screen C — Result (answer-first dashboard)
 - **Status hero card:** status badge (valid / tight / not yet) + headline **earliest
   sustainable stop age** + one-line takeaway. Maps from `modelStatus` + `earliestSustainableStopAge`.
-- **Key numbers card:** capital at planned stop age; capital at a key age (e.g. 65); each a
-  *number + one sentence*.
+- **Key numbers card:** capital at **horizon-relative anchors** — planned stop/FI age,
+  pension access age, and end of horizon — each a *number + one sentence*. Do **not** use a
+  hardcoded calendar age (e.g. 65) that may not exist in the projection (see §4.2 for why
+  `capitalAt65` is unsafe).
 - **Projection chart card:** net worth over time, planned stop age marked, plain takeaway line.
-- **First bottleneck card:** first shortfall age + monthly gap, or "ingen flaskehals".
+- **First bottleneck card:** first shortfall age + the **monthly gap in that year**
+  (`shortfallAmount / 12` from the first shortfall `YearRow`, **not** the after-stop average),
+  or "ingen flaskehals".
 - **Robustness card:** "Hvor solid er planen?" — a 0–100 robustness score + the top 3
   drivers (helps/hurts), in plain language. Maps from `financialRobustness` +
   `robustnessBreakdown`.
-- **Warnings card (conditional):** plain-language cautions from `sanityChecks()` /
-  `modelStatusReason`, shown only when relevant. Never raw check IDs.
+- **Warnings card (conditional):** plain-language cautions produced by a **public-safe
+  warnings adapter** over `sanityChecks()` + a status→copy mapping over `modelStatus` —
+  never raw `sanityChecks()` output, raw check IDs, or `modelStatusReason` verbatim. Only
+  allowlisted checks surface (see §4.4); advanced/DK/internal checks are filtered out.
 - **"How is this calculated?" affordance:** each headline number links to a one-paragraph
   explainer (real terms, what FI age means, what robustness means).
 - *Hidden/deferred:* full year-by-year `YearRow[]` table, per-bucket balances, tax
@@ -182,20 +188,24 @@ The MVP shows a clear subset of `KPIs` (from `src/lib/finance/types.ts`) plus
 |---|---|---|---|
 | Earliest sustainable stop age | `earliestSustainableStopAge` | integer years or `null` | "Du kan tidligst stoppe omkring alder X" (or "ikke på sporet endnu" when `null`) |
 | Planned stop age (echo of input) | `plannedStopAge` | integer years | The stop age the user chose, for comparison with the earliest sustainable one |
-| Capital at planned stop age | `capitalAtStopAge` | DKK | "Ca. N ved din planlagte stop-alder" |
-| Capital at key age (65) | `capitalAt65` | DKK | An anchor point on the chart |
-| Capital at age 95 (end anchor) | `capitalAt95` | DKK | **Note:** falls back to the **last horizon year** when there is no age 95 (e.g. horizon 90 ⇒ this is capital at 90). Frame as "ved planperiodens slutning". |
+| Capital at planned stop/FI age | `capitalAtStopAge` | DKK | "Ca. N ved din planlagte stop-alder" — always in horizon (`stopAge ∈ [currentAge, lifeExpectancy]`) |
+| Capital at pension access age | net worth of the `YearRow` at `pensionAccessAge` (read from the projection series; **not** a precomputed KPI) | DKK | "Ca. N når din pension bliver tilgængelig (alder {pensionAccessAge})" — in horizon whenever `pensionAccessAge ≤ lifeExpectancy` |
+| Capital at end of horizon | `capitalAt95` | DKK | "Ca. N ved planperiodens slutning". **Note:** despite the name, this field is `years.find(age===95) ?? years[last]` — it **falls back to the last horizon year**, so with horizon 90 it is capital at 90. Treat it as the end-of-horizon anchor; never label it literally "ved 95". |
 | First shortfall age | `firstShortfallAge` | integer years or `null` | "Første år pengene ikke rækker: alder Y" (or none) |
-| Monthly gap after stop | `monthlyGapAfterStop` | DKK / month | "Ca. G kr/md for lidt efter du stopper" (0 when the plan holds) |
-| Status | `modelStatus` (+ `modelStatusReason`) | `valid` / `target_missed` / `invalid` | One clear badge + one-line reason, in plain Danish (not raw reason strings verbatim) |
+| **Monthly gap at the first bottleneck** | `shortfallAmount / 12` of the **first shortfall `YearRow`** (`years.find(y => y.shortfall)`; equivalently that row's `monthlyGap`) | DKK / month | "Fra alder Y mangler du ca. G kr/md" — the gap **in that year**, the number the bottleneck card shows |
+| After-stop average monthly gap (optional) | `monthlyGapAfterStop` | DKK / month | The **average** monthly gap across all years from stop age onward — a different, smaller number. If shown at all, label it explicitly as an average ("gns. efter stop"); never use it as the bottleneck gap. |
+| Status | `modelStatus` | `valid` / `target_missed` / `invalid` | One clear badge + one-line reason via a **status→public-copy mapping** (§4.4). Never show `modelStatusReason` verbatim — it is raw Danish engine text. |
 | Robustness score | `financialRobustness` | 0–100 | "Hvor solid er planen?" with a short explainer |
 | Assumption confidence | `assumptionConfidence` | 0–100 | "Hvor meget hviler planen på optimistiske antagelser?" |
 | Top drivers (help/hurt) | `robustnessBreakdown` (`ScoreFactor[]`) | label + impact + magnitude + detail | "Hvad hjælper / hvad trækker ned" — show top 3–5 |
-| Warnings | `sanityChecks()` → `SanityCheck[]` | severity + title (+ detail) | Plain-language cautions, only when relevant |
+| Warnings | a **public-safe adapter** over `sanityChecks()` (§4.4) | allowlisted, plain Danish copy | Plain-language cautions, only when relevant — never raw `sanityChecks()` output |
 
 Optional, if shown: `minNetWorthAtEnd`, `endShortfallVsTarget` (only meaningful when the
 user set `fiTargetMinNetWorth`). **Never public-facing:** `firstFinancingIssueKind/Amount`,
-`unfinancedHoldingDebt/Years`, full `YearRow[]`, raw audit JSON, `runModelValidation()`.
+`unfinancedHoldingDebt/Years`, full `YearRow[]`, raw audit JSON, `runModelValidation()`,
+`modelStatusReason` (raw text), and `capitalAt65` (see below).
+
+**Why not `capitalAt65`?** `deriveKPIs` computes `capitalAt65 = years.find(y => y.age === 65)?.netWorth ?? 0`. When age 65 is not in the projection (e.g. `currentAge > 65`, or a short horizon), it silently returns **0** — a real-looking but false number. The public surface must use the horizon-relative anchors above instead. If a fixed-age card is ever kept, it must be **conditional**: render only when the age is within `[currentAge, lifeExpectancy]`, and otherwise fall back to an in-horizon anchor (stop/FI age, pension access age, or end of horizon). The supported `currentAge` range may stay broad; the anchors must not assume any fixed age is in the projection.
 
 ### 4.3 Example projected results (design fixtures)
 
@@ -212,15 +222,16 @@ saving 8,000/md, pension 300,000 @ access 67, return 4%, desired stop 60.
 | `modelStatus` | `invalid` | Badge: "Ikke på sporet endnu" |
 | `plannedStopAge` | 60 | "Du vil gerne stoppe ved 60" |
 | `earliestSustainableStopAge` | 62 | "Tidligst holdbare stop: ca. 62" |
-| `capitalAtStopAge` | ≈ 4.240.000 kr | "Ca. 4,2 mio. kr ved stop" |
-| `capitalAt65` | ≈ 3.810.000 kr | anchor point |
-| `capitalAt95` (= age 90 here) | 0 kr | "Formuen er brugt op inden planperiodens slutning" |
+| Capital at stop age (`capitalAtStopAge`) | ≈ 4.240.000 kr | "Ca. 4,2 mio. kr ved stop" |
+| Capital at pension access age (67) | ≈ 3.580.000 kr | "Ca. 3,6 mio. kr når pensionen åbner" |
+| Capital at end of horizon (90) (`capitalAt95` fallback) | 0 kr | "Formuen er brugt op inden planperiodens slutning" |
 | `firstShortfallAge` | 86 | "Første flaskehals: alder 86" |
-| `monthlyGapAfterStop` | ≈ 3.170 kr/md | "Ca. 3.200 kr/md for lidt" |
+| **Monthly gap at first bottleneck** (year-86 `shortfallAmount / 12`) | ≈ 18.255 kr/md | "Fra alder 86 mangler du ca. 18.300 kr/md" — this is the bottleneck-card number |
+| After-stop average gap (`monthlyGapAfterStop`) | ≈ 3.170 kr/md | A different, smaller average across all years from stop; only show if explicitly labelled "gns. efter stop" |
 | `financialRobustness` | 25 / 100 | "Lav robusthed" |
 | `assumptionConfidence` | 75 / 100 | "Rimelig antagelsessikkerhed" |
 | Top driver | "Cashflow-shortfall ved alder 86" (negative, critical) | "Trækkes mest ned af: pengene slipper op ved 86" |
-| Warning | "Planlagt opsparing overstiger cashflow i 25 år" (warn) | shown in warnings card |
+| Warning (allowlisted) | `planned-over-cashflow` ("Planlagt opsparing overstiger cashflow i 25 år") | Surfaced via the §4.4 adapter as plain copy: "Du forsøger at spare mere op, end din økonomi tillader i 25 år." |
 
 > Useful for design: this default persona is **deliberately not on track** — it exercises
 > the "not yet" badge, a real bottleneck, and a low robustness score on first load. A lever
@@ -235,17 +246,65 @@ saving 15,000/md, pension 500,000 @ access 67, return 4%, desired stop 55.
 | `modelStatus` | `valid` | Badge: "På sporet" |
 | `plannedStopAge` | 55 | "Du vil gerne stoppe ved 55" |
 | `earliestSustainableStopAge` | 48 | "Du kunne stoppe allerede ved ca. 48" |
-| `capitalAtStopAge` | ≈ 8.070.000 kr | "Ca. 8,1 mio. kr ved stop" |
-| `capitalAt65` | ≈ 9.250.000 kr | anchor point |
-| `capitalAt95` (= age 90 here) | ≈ 13.520.000 kr | "Formuen vokser planperioden ud" |
+| Capital at stop age (`capitalAtStopAge`) | ≈ 8.070.000 kr | "Ca. 8,1 mio. kr ved stop" |
+| Capital at pension access age (67) | ≈ 9.500.000 kr | "Ca. 9,5 mio. kr når pensionen åbner" |
+| Capital at end of horizon (90) (`capitalAt95` fallback) | ≈ 13.520.000 kr | "Formuen vokser planperioden ud" |
 | `firstShortfallAge` | `null` | "Ingen flaskehals fundet" |
-| `monthlyGapAfterStop` | 0 kr/md | "Ingen mangel efter stop" |
+| Monthly gap at first bottleneck | — (no shortfall) | Bottleneck card hidden; show "ingen flaskehals" |
+| After-stop average gap (`monthlyGapAfterStop`) | 0 kr/md | "Ingen mangel efter stop" |
 | `financialRobustness` | 90 / 100 | "Høj robusthed" |
 | `assumptionConfidence` | 76 / 100 | "Rimelig antagelsessikkerhed" |
 | Top positive driver | "Ingen cashflow-shortfall" (positive, high) | "Forbruget er dækket hele perioden" |
 
 > These two fixtures bracket the common cases: a plan that needs work and a comfortable
 > plan. Design the result screen so both read clearly without redesign.
+
+### 4.4 Public-safe warnings & status adapter
+
+`sanityChecks()` and `modelStatusReason` are **internal, advanced, and DK-specific** by
+design — they reference holding companies, ASK, folkepension, ratepension/livrente, part-time
+income, family fund, debt double-counting, the stress-test "No Barma", and the internal
+audit panel. **None of this raw output may reach the public path.** The public surface must
+go through two small adapters that the onboarding/result PR will implement (UI-side, no
+engine change):
+
+**(a) Status → public copy** — map `modelStatus` (`valid` / `target_missed` / `invalid`)
+to plain Danish (see §5). Never render `modelStatusReason` (raw engine text) verbatim.
+
+**(b) Warnings allowlist** — a **default-deny** adapter: only checks whose `id` is on the
+allowlist may surface, each rewritten to plain, jargon-free Danish. Everything else is
+dropped. Match on the stable `id`, not the title text.
+
+**Allowlist (may surface on the public path):**
+
+| `sanityChecks()` id | Why it's public-safe | Public Danish copy (indicative) |
+|---|---|---|
+| `planned-over-cashflow` | Generic: the user is trying to save more than their cashflow allows. Drop the internal "Hybrid/Planlagt" wording. | "Du forsøger at spare mere op, end din økonomi tillader i {n} år. Resultatet bruger det, der reelt er plads til." |
+
+> The allowlist is intentionally tiny for v1 — under the simple input mapping
+> (`toScenarioInputs`), most checks are unreachable (holding, debt, life events, part-time,
+> state pension, annuity are all zeroed/off). `planned-over-cashflow` is the one check that
+> is both reachable and publicly meaningful. New entries are added deliberately, each with
+> reviewed plain-Danish copy — never by surfacing checks wholesale.
+
+**Explicitly filtered out (must never surface publicly), with the reason:**
+
+| id(s) | Category to filter |
+|---|---|
+| `sp-manual-high` | Folkepension / DK state pension |
+| `private-pension-note` | Pension jargon (ratepension / livsvarig / tax rates) |
+| `exit-far`, `holding-overlap`, `holding-dependency`, `holding-financing-short`, `holding-debt-external` | Holding / business capital (incl. text referencing the "No Barma" stress test) |
+| `parttime-low-gross`, `parttime-late-start` | Deltid / part-time + familiefond income |
+| `liab-double-*` | Debt / personal-liability double-counting (advanced) |
+| `unallocated-cashflow` | References the internal **audit panel** |
+| `savings-logic-explain` | Internal savings-logic explainer (jargon, not a warning) |
+| `le-*` (all life-event checks) | Life events — not in the simple surface |
+
+**Filter rule (robust to new checks):** default-deny — drop anything not on the allowlist —
+**and** additionally hard-block any check whose `id`, `title`, or `detail` references the
+advanced/DK/internal vocabulary: *Folkepension, Holding, "No Barma", Barma, ASK, ratepension,
+livrente, livsvarig, deltid, familiefond, exit, audit-panel(et), stress-test*. This keeps a
+newly-added engine check from leaking onto the public path before it has reviewed public copy.
 
 ---
 
@@ -297,7 +356,10 @@ exists. The natural **next PR** is the first piece of public UI:
 - **Goal:** build Screens B and C (§3) over the existing `simpleInputs` mapping: the
   one-screen simple form (pre-filled from `DEFAULT_SIMPLE_INPUTS`) and the answer-first
   result hero (status badge + earliest sustainable stop age + headline takeaway + projection
-  chart), reading `KPIs` via the existing `project`/`deriveKPIs` pipeline.
+  chart), reading `KPIs` via the existing `project`/`deriveKPIs` pipeline. Includes the two
+  UI-side adapters from §4.4 (status→public-copy mapping; default-deny warnings allowlist),
+  horizon-relative capital anchors (§4.2), and the first-bottleneck gap sourced from the
+  first shortfall `YearRow` (`shortfallAmount / 12`), not `monthlyGapAfterStop`.
 - **Scope guardrails:** UI only. No engine, persistence, or data-format changes. Reuse the
   store and mapping; do not fork engine logic. Keep advanced/DK concepts off the path
   (CLAUDE.md §3). Use Danish copy per §5.
@@ -324,9 +386,12 @@ UI PR has a visual target.
   (Phase 7 item.)
 - **"Tight" status:** scope mentions a "tight / lige på vippen" state; the engine exposes
   `valid | target_missed | invalid`. Confirm the mapping (likely `target_missed` → "tight").
-- **`capitalAt95` framing:** with a default horizon of 90, this field is capital at the end
-  of the horizon, not literally age 95. Confirm whether the public copy says "ved
-  planperiodens slutning" or whether the horizon default should change.
+- **Capital anchors (resolved in this revision):** the public surface uses horizon-relative
+  anchors (stop/FI age, pension access age, end of horizon) and treats `capitalAt95` as the
+  end-of-horizon anchor; `capitalAt65` is not used (silently returns 0 when 65 is out of
+  horizon). Remaining engine-side nicety (later, optional): rename `capitalAt95`/`capitalAt65`
+  in the engine to horizon-relative names so the field names stop implying fixed ages — an
+  engine change with tests, out of scope for this docs PR.
 - **Net vs. gross income input:** the engine takes gross salary; a public user may think in
   net. Do we add a net→gross presentation step now or defer to a locale/tax layer? (Noted in
   scope §3.)
