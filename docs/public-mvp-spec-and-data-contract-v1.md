@@ -162,6 +162,16 @@ those behaviours. Every row in §4.2 has been audited against both rules.
   `years.find(y => y.age === A)?.netWorth ?? 0`, which returns a real-looking **`0`** when
   age `A` is out of horizon (e.g. `capitalAt65`, and `capitalAtStopAge` if `stopAge` is out
   of range). The public UI must guard the age, not trust the `?? 0`.
+  - **Inverse (just as important): a fixed-age KPI must never be repurposed as a
+    horizon-relative anchor.** Horizon-relative anchors — **start** (`currentAge`), **end**
+    (`lifeExpectancy`), **FI/stop age**, **pension access age** — are derived from the **actual
+    `YearRow` in the projection series** (e.g. the **last** `YearRow` for the end of the plan).
+    Fixed-age KPIs (`capitalAt65`, `capitalAt95`) are only valid **when that specific age lies
+    within `[currentAge, lifeExpectancy]`**, and even then they mean "capital at that calendar
+    age", never "start/end/FI/pension of the plan". In particular `capitalAt95 =
+    years.find(y => y.age === 95) ?? years[last]` is the **age-95** figure whenever
+    `lifeExpectancy ≥ 95` (the input range allows up to 110), and only coincidentally equals the
+    plan's end when `lifeExpectancy ≤ 95` — so it must **not** back the end-of-horizon card.
 - **R2 — Public-safe-adapter rule.** **No raw engine list or text** is exposed on the public
   path — not warnings (`sanityChecks()`), not robustness drivers (`robustnessBreakdown`), not
   assumption-confidence drivers (`confidenceBreakdown`), not status reasons
@@ -211,7 +221,7 @@ The MVP shows a clear subset of `KPIs` (from `src/lib/finance/types.ts`) plus
 | Planned stop age (echo of input) | `plannedStopAge` | integer years | The stop age the user chose, for comparison with the earliest sustainable one |
 | Capital at planned stop/FI age | `capitalAtStopAge` | DKK | "Ca. N ved din planlagte stop-alder". **R1:** `capitalAtStopAge = yAtStop?.netWorth ?? 0`, so it silently returns 0 if `stopAge` is out of horizon. Show only when `currentAge ≤ stopAge ≤ lifeExpectancy` (which §4.1 input validation must enforce); never trust the `?? 0`. |
 | Capital at pension access age | net worth of the `YearRow` at `pensionAccessAge` (read from the projection series; **not** a precomputed KPI) | DKK | "Ca. N når din pension bliver tilgængelig (alder {pensionAccessAge})". **R1:** the projection only spans `[currentAge, lifeExpectancy]`, so there is **no** `YearRow` when `pensionAccessAge < currentAge`. Render the card only when `currentAge ≤ pensionAccessAge ≤ lifeExpectancy`. **Fallbacks:** if `pensionAccessAge < currentAge` (pension already accessible) → show capital at `currentAge` with copy "Din pension er allerede tilgængelig", **or** omit the card; if `pensionAccessAge > lifeExpectancy` (never opens in horizon) → omit the card. |
-| Capital at end of horizon | `capitalAt95` | DKK | "Ca. N ved planperiodens slutning". **Note:** despite the name, this field is `years.find(age===95) ?? years[last]` — it **falls back to the last horizon year**, so with horizon 90 it is capital at 90. Treat it as the end-of-horizon anchor; never label it literally "ved 95". |
+| Capital at end of horizon | net worth of the **last projected `YearRow`** (net worth at `lifeExpectancy`), read directly from the projection series — **not** `capitalAt95` | DKK | "Ca. N ved planperiodens slutning". **R1 (inverse):** do **not** use `capitalAt95` here — it is `years.find(age===95) ?? years[last]`, i.e. the **age-95** figure whenever `lifeExpectancy ≥ 95` (the input range allows up to 110), and only coincides with the plan's end when `lifeExpectancy ≤ 95`. Always source the end-of-horizon anchor from the last `YearRow` (same pattern as the pension-access anchor). |
 | First shortfall age | `firstShortfallAge` | integer years or `null` | "Første år pengene ikke rækker: alder Y" (or none) |
 | **Monthly gap at the first bottleneck** | `shortfallAmount / 12` of the **first shortfall `YearRow`** (`years.find(y => y.shortfall)`; equivalently that row's `monthlyGap`) | DKK / month | "Fra alder Y mangler du ca. G kr/md" — the gap **in that year**, the number the bottleneck card shows |
 | After-stop average monthly gap (optional) | `monthlyGapAfterStop` | DKK / month | The **average** monthly gap across all years from stop age onward — a different, smaller number. If shown at all, label it explicitly as an average ("gns. efter stop"); never use it as the bottleneck gap. |
@@ -225,11 +235,13 @@ Optional, if shown: `minNetWorthAtEnd`, `endShortfallVsTarget` (only meaningful 
 user set `fiTargetMinNetWorth`). **Never public-facing:** `firstFinancingIssueKind/Amount`,
 `unfinancedHoldingDebt/Years`, full `YearRow[]`, raw audit JSON, `runModelValidation()`,
 `modelStatusReason` (raw text), `robustnessBreakdown`/`confidenceBreakdown` as raw lists
-(use the §4.5 adapter), and `capitalAt65` (see below).
+(use the §4.5 adapter), and the fixed-age KPIs `capitalAt65` and `capitalAt95` as anchors
+(see below).
 
 **Per-row audit against R1 / R2.** Age-anchored rows (R1): *capital at stop/FI age* (guard
 `stopAge` in horizon — see row), *capital at pension access age* (guard + fallbacks — see
-row), *capital at end of horizon* (safe — `capitalAt95` falls back to the last horizon year).
+row), *capital at end of horizon* (derived from the **last `YearRow`**, not `capitalAt95` —
+see row; `capitalAt95` is a fixed-age KPI and is wrong for `lifeExpectancy > 95`).
 Scalar age values that only need null/﻿out-of-range display handling, not a `YearRow` lookup:
 *earliest sustainable stop age* (`null` → "ikke på sporet endnu"), *planned stop age* (echo
 of a validated input), *first shortfall age* (`null` → no bottleneck). List/text rows (R2):
@@ -238,7 +250,18 @@ scalars with no boundary/adapter risk: *robustness score*, *assumption confidenc
 *after-stop average gap*, *monthly gap at first bottleneck* (guarded by `firstShortfallAge`
 being non-null).
 
-**Why not `capitalAt65`?** `deriveKPIs` computes `capitalAt65 = years.find(y => y.age === 65)?.netWorth ?? 0`. When age 65 is not in the projection (e.g. `currentAge > 65`, or a short horizon), it silently returns **0** — a real-looking but false number. The public surface must use the horizon-relative anchors above instead. If a fixed-age card is ever kept, it must be **conditional**: render only when the age is within `[currentAge, lifeExpectancy]`, and otherwise fall back to an in-horizon anchor (stop/FI age, pension access age, or end of horizon). The supported `currentAge` range may stay broad; the anchors must not assume any fixed age is in the projection.
+**Why not the fixed-age KPIs (`capitalAt65`, `capitalAt95`)?** Two distinct failure modes, both
+covered by R1: (1) `capitalAt65 = years.find(y => y.age === 65)?.netWorth ?? 0` silently returns
+**0** when age 65 is out of horizon (e.g. `currentAge > 65`, or a short horizon) — a real-looking
+but false number. (2) `capitalAt95 = years.find(y => y.age === 95) ?? years[last]` is the **age-95**
+figure when `lifeExpectancy ≥ 95`, so using it for the end-of-horizon card **mislabels** the age-95
+value as "planperiodens slutning" for any plan running past 95. The public surface uses
+horizon-relative anchors instead, each derived from the actual `YearRow` (start, end = last
+`YearRow`, FI/stop age, pension access age). If a fixed-age card is ever kept, it must be
+**conditional**: render only when that age is within `[currentAge, lifeExpectancy]`, label it by
+the calendar age (not as start/end/FI), and otherwise fall back to a horizon-relative anchor. The
+supported `currentAge`/`lifeExpectancy` range may stay broad; anchors must not assume any fixed age
+is in the projection.
 
 ### 4.3 Example projected results (design fixtures)
 
@@ -257,7 +280,7 @@ saving 8,000/md, pension 300,000 @ access 67, return 4%, desired stop 60.
 | `earliestSustainableStopAge` | 62 | "Tidligst holdbare stop: ca. 62" |
 | Capital at stop age (`capitalAtStopAge`) | ≈ 4.240.000 kr | "Ca. 4,2 mio. kr ved stop" |
 | Capital at pension access age (67) | ≈ 3.580.000 kr | "Ca. 3,6 mio. kr når pensionen åbner" |
-| Capital at end of horizon (90) (`capitalAt95` fallback) | 0 kr | "Formuen er brugt op inden planperiodens slutning" |
+| Capital at end of horizon (last `YearRow`, age 90) | 0 kr | "Formuen er brugt op inden planperiodens slutning". (Here `lifeExpectancy` 90 < 95, so this equals `capitalAt95` — but the card must source the last `YearRow`, not `capitalAt95`.) |
 | `firstShortfallAge` | 86 | "Første flaskehals: alder 86" |
 | **Monthly gap at first bottleneck** (year-86 `shortfallAmount / 12`) | ≈ 18.255 kr/md | "Fra alder 86 mangler du ca. 18.300 kr/md" — this is the bottleneck-card number |
 | After-stop average gap (`monthlyGapAfterStop`) | ≈ 3.170 kr/md | A different, smaller average across all years from stop; only show if explicitly labelled "gns. efter stop" |
@@ -281,7 +304,7 @@ saving 15,000/md, pension 500,000 @ access 67, return 4%, desired stop 55.
 | `earliestSustainableStopAge` | 48 | "Du kunne stoppe allerede ved ca. 48" |
 | Capital at stop age (`capitalAtStopAge`) | ≈ 8.070.000 kr | "Ca. 8,1 mio. kr ved stop" |
 | Capital at pension access age (67) | ≈ 9.500.000 kr | "Ca. 9,5 mio. kr når pensionen åbner" |
-| Capital at end of horizon (90) (`capitalAt95` fallback) | ≈ 13.520.000 kr | "Formuen vokser planperioden ud" |
+| Capital at end of horizon (last `YearRow`, age 90) | ≈ 13.520.000 kr | "Formuen vokser planperioden ud". (Here `lifeExpectancy` 90 < 95, so this equals `capitalAt95`; the card must still source the last `YearRow`.) |
 | `firstShortfallAge` | `null` | "Ingen flaskehals fundet" |
 | Monthly gap at first bottleneck | — (no shortfall) | Bottleneck card hidden; show "ingen flaskehals" |
 | After-stop average gap (`monthlyGapAfterStop`) | 0 kr/md | "Ingen mangel efter stop" |
@@ -478,8 +501,11 @@ UI PR has a visual target.
 - **Anchors & adapters (resolved in this revision):** the public surface uses horizon-relative
   anchors (stop/FI age, pension access age, end of horizon) bounded to `[currentAge,
   lifeExpectancy]` per §4.0 R1 — including the pension-access-age guard + fallbacks and the
-  `capitalAtStopAge` in-horizon guard; `capitalAt65` is not used (silently returns 0 when 65
-  is out of horizon). All raw engine lists/text go through public-safe adapters per §4.0 R2:
+  `capitalAtStopAge` in-horizon guard. The end-of-horizon card is sourced from the **last
+  `YearRow`** (net worth at `lifeExpectancy`), not `capitalAt95`; the fixed-age KPIs
+  `capitalAt65` (silent 0 out of horizon) and `capitalAt95` (the age-95 figure when
+  `lifeExpectancy ≥ 95`) are never used as anchors. All raw engine lists/text go through
+  public-safe adapters per §4.0 R2:
   warnings + status (§4.4) and robustness drivers (§4.5), with `confidenceBreakdown` reserved
   for the same treatment if ever surfaced. Remaining engine-side nicety (later, optional):
   rename `capitalAt95`/`capitalAt65` in the engine to horizon-relative names so the field
