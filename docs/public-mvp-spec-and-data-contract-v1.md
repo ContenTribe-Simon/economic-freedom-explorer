@@ -111,9 +111,9 @@ is hidden/deferred. This is what a designer builds from. Copy shown is indicativ
 - **First bottleneck card:** first shortfall age + the **monthly gap in that year**
   (`shortfallAmount / 12` from the first shortfall `YearRow`, **not** the after-stop average),
   or "ingen flaskehals".
-- **Robustness card:** "Hvor solid er planen?" — a 0–100 robustness score + the top 3
-  drivers (helps/hurts), in plain language. Maps from `financialRobustness` +
-  `robustnessBreakdown`.
+- **Robustness card:** "Hvor solid er planen?" — a 0–100 robustness score (`financialRobustness`)
+  + the top 3 drivers (helps/hurts) via the **public-safe drivers adapter** (§4.5) — never raw
+  `robustnessBreakdown`, which always includes advanced/internal factors (holding, buffer).
 - **Warnings card (conditional):** plain-language cautions produced by a **public-safe
   warnings adapter** over `sanityChecks()` + a status→copy mapping over `modelStatus` —
   never raw `sanityChecks()` output, raw check IDs, or `modelStatusReason` verbatim. Only
@@ -147,6 +147,27 @@ is hidden/deferred. This is what a designer builds from. Copy shown is indicativ
 The explicit handoff for Claude Design. Two halves: the **input surface** (what the UI
 collects) and the **output surface** (what the result UI must show), plus **example
 fixtures** to design against.
+
+### 4.0 Two cross-cutting rules (apply to every output)
+
+These two rules govern **every** row of the output surface. They exist because the engine's
+KPIs are built for the advanced/internal surface, where out-of-horizon ages silently return
+`0` and lists/text contain advanced/DK/internal items. The public path must never inherit
+those behaviours. Every row in §4.2 has been audited against both rules.
+
+- **R1 — Horizon-boundary rule.** The projection runs **exactly `[currentAge, lifeExpectancy]`**
+  (`projection.ts`: `age = currentAge + i` for `i` in `0 .. lifeExpectancy − currentAge`).
+  Every **age-anchored** output must be explicitly bounded to that range, with a **defined
+  conditional/fallback** when the age falls outside it. Several KPIs use the pattern
+  `years.find(y => y.age === A)?.netWorth ?? 0`, which returns a real-looking **`0`** when
+  age `A` is out of horizon (e.g. `capitalAt65`, and `capitalAtStopAge` if `stopAge` is out
+  of range). The public UI must guard the age, not trust the `?? 0`.
+- **R2 — Public-safe-adapter rule.** **No raw engine list or text** is exposed on the public
+  path — not warnings (`sanityChecks()`), not robustness drivers (`robustnessBreakdown`), not
+  assumption-confidence drivers (`confidenceBreakdown`), not status reasons
+  (`modelStatusReason`). Each passes a **default-deny adapter** that (a) filters out
+  advanced/DK/internal items and (b) translates survivors to public-facing Danish copy.
+  Adapters are specified in §4.4 (warnings + status) and §4.5 (drivers).
 
 ### 4.1 Input surface — `SimplePublicInputs`
 
@@ -188,8 +209,8 @@ The MVP shows a clear subset of `KPIs` (from `src/lib/finance/types.ts`) plus
 |---|---|---|---|
 | Earliest sustainable stop age | `earliestSustainableStopAge` | integer years or `null` | "Du kan tidligst stoppe omkring alder X" (or "ikke på sporet endnu" when `null`) |
 | Planned stop age (echo of input) | `plannedStopAge` | integer years | The stop age the user chose, for comparison with the earliest sustainable one |
-| Capital at planned stop/FI age | `capitalAtStopAge` | DKK | "Ca. N ved din planlagte stop-alder" — always in horizon (`stopAge ∈ [currentAge, lifeExpectancy]`) |
-| Capital at pension access age | net worth of the `YearRow` at `pensionAccessAge` (read from the projection series; **not** a precomputed KPI) | DKK | "Ca. N når din pension bliver tilgængelig (alder {pensionAccessAge})" — in horizon whenever `pensionAccessAge ≤ lifeExpectancy` |
+| Capital at planned stop/FI age | `capitalAtStopAge` | DKK | "Ca. N ved din planlagte stop-alder". **R1:** `capitalAtStopAge = yAtStop?.netWorth ?? 0`, so it silently returns 0 if `stopAge` is out of horizon. Show only when `currentAge ≤ stopAge ≤ lifeExpectancy` (which §4.1 input validation must enforce); never trust the `?? 0`. |
+| Capital at pension access age | net worth of the `YearRow` at `pensionAccessAge` (read from the projection series; **not** a precomputed KPI) | DKK | "Ca. N når din pension bliver tilgængelig (alder {pensionAccessAge})". **R1:** the projection only spans `[currentAge, lifeExpectancy]`, so there is **no** `YearRow` when `pensionAccessAge < currentAge`. Render the card only when `currentAge ≤ pensionAccessAge ≤ lifeExpectancy`. **Fallbacks:** if `pensionAccessAge < currentAge` (pension already accessible) → show capital at `currentAge` with copy "Din pension er allerede tilgængelig", **or** omit the card; if `pensionAccessAge > lifeExpectancy` (never opens in horizon) → omit the card. |
 | Capital at end of horizon | `capitalAt95` | DKK | "Ca. N ved planperiodens slutning". **Note:** despite the name, this field is `years.find(age===95) ?? years[last]` — it **falls back to the last horizon year**, so with horizon 90 it is capital at 90. Treat it as the end-of-horizon anchor; never label it literally "ved 95". |
 | First shortfall age | `firstShortfallAge` | integer years or `null` | "Første år pengene ikke rækker: alder Y" (or none) |
 | **Monthly gap at the first bottleneck** | `shortfallAmount / 12` of the **first shortfall `YearRow`** (`years.find(y => y.shortfall)`; equivalently that row's `monthlyGap`) | DKK / month | "Fra alder Y mangler du ca. G kr/md" — the gap **in that year**, the number the bottleneck card shows |
@@ -197,13 +218,25 @@ The MVP shows a clear subset of `KPIs` (from `src/lib/finance/types.ts`) plus
 | Status | `modelStatus` | `valid` / `target_missed` / `invalid` | One clear badge + one-line reason via a **status→public-copy mapping** (§4.4). Never show `modelStatusReason` verbatim — it is raw Danish engine text. |
 | Robustness score | `financialRobustness` | 0–100 | "Hvor solid er planen?" with a short explainer |
 | Assumption confidence | `assumptionConfidence` | 0–100 | "Hvor meget hviler planen på optimistiske antagelser?" |
-| Top drivers (help/hurt) | `robustnessBreakdown` (`ScoreFactor[]`) | label + impact + magnitude + detail | "Hvad hjælper / hvad trækker ned" — show top 3–5 |
+| Top drivers (help/hurt) | a **public-safe adapter** over `robustnessBreakdown` (§4.5) | allowlisted, plain Danish copy | "Hvad hjælper / hvad trækker ned" — show top 3–5. **R2:** never point the UI at raw `robustnessBreakdown`; it always contains advanced/internal factors (e.g. the holding-dependency factor, present even when holding = 0). |
 | Warnings | a **public-safe adapter** over `sanityChecks()` (§4.4) | allowlisted, plain Danish copy | Plain-language cautions, only when relevant — never raw `sanityChecks()` output |
 
 Optional, if shown: `minNetWorthAtEnd`, `endShortfallVsTarget` (only meaningful when the
 user set `fiTargetMinNetWorth`). **Never public-facing:** `firstFinancingIssueKind/Amount`,
 `unfinancedHoldingDebt/Years`, full `YearRow[]`, raw audit JSON, `runModelValidation()`,
-`modelStatusReason` (raw text), and `capitalAt65` (see below).
+`modelStatusReason` (raw text), `robustnessBreakdown`/`confidenceBreakdown` as raw lists
+(use the §4.5 adapter), and `capitalAt65` (see below).
+
+**Per-row audit against R1 / R2.** Age-anchored rows (R1): *capital at stop/FI age* (guard
+`stopAge` in horizon — see row), *capital at pension access age* (guard + fallbacks — see
+row), *capital at end of horizon* (safe — `capitalAt95` falls back to the last horizon year).
+Scalar age values that only need null/﻿out-of-range display handling, not a `YearRow` lookup:
+*earliest sustainable stop age* (`null` → "ikke på sporet endnu"), *planned stop age* (echo
+of a validated input), *first shortfall age* (`null` → no bottleneck). List/text rows (R2):
+*status* → §4.4 mapping, *warnings* → §4.4 adapter, *top drivers* → §4.5 adapter. Plain
+scalars with no boundary/adapter risk: *robustness score*, *assumption confidence*,
+*after-stop average gap*, *monthly gap at first bottleneck* (guarded by `firstShortfallAge`
+being non-null).
 
 **Why not `capitalAt65`?** `deriveKPIs` computes `capitalAt65 = years.find(y => y.age === 65)?.netWorth ?? 0`. When age 65 is not in the projection (e.g. `currentAge > 65`, or a short horizon), it silently returns **0** — a real-looking but false number. The public surface must use the horizon-relative anchors above instead. If a fixed-age card is ever kept, it must be **conditional**: render only when the age is within `[currentAge, lifeExpectancy]`, and otherwise fall back to an in-horizon anchor (stop/FI age, pension access age, or end of horizon). The supported `currentAge` range may stay broad; the anchors must not assume any fixed age is in the projection.
 
@@ -230,7 +263,7 @@ saving 8,000/md, pension 300,000 @ access 67, return 4%, desired stop 60.
 | After-stop average gap (`monthlyGapAfterStop`) | ≈ 3.170 kr/md | A different, smaller average across all years from stop; only show if explicitly labelled "gns. efter stop" |
 | `financialRobustness` | 25 / 100 | "Lav robusthed" |
 | `assumptionConfidence` | 75 / 100 | "Rimelig antagelsessikkerhed" |
-| Top driver | "Cashflow-shortfall ved alder 86" (negative, critical) | "Trækkes mest ned af: pengene slipper op ved 86" |
+| Top driver (via §4.5 adapter) | raw `robustnessBreakdown[0]` = "Cashflow-shortfall ved alder 86" (negative, critical) | Public copy: "Trækkes mest ned af: pengene slipper op ved 86." The raw list **also** contains "Lav margin til minimumsmål", "Lav kontant buffer" and "Lav afhængighed af holding" — all filtered out by the drivers adapter. |
 | Warning (allowlisted) | `planned-over-cashflow` ("Planlagt opsparing overstiger cashflow i 25 år") | Surfaced via the §4.4 adapter as plain copy: "Du forsøger at spare mere op, end din økonomi tillader i 25 år." |
 
 > Useful for design: this default persona is **deliberately not on track** — it exercises
@@ -254,7 +287,7 @@ saving 15,000/md, pension 500,000 @ access 67, return 4%, desired stop 55.
 | After-stop average gap (`monthlyGapAfterStop`) | 0 kr/md | "Ingen mangel efter stop" |
 | `financialRobustness` | 90 / 100 | "Høj robusthed" |
 | `assumptionConfidence` | 76 / 100 | "Rimelig antagelsessikkerhed" |
-| Top positive driver | "Ingen cashflow-shortfall" (positive, high) | "Forbruget er dækket hele perioden" |
+| Top positive driver (via §4.5 adapter) | raw `robustnessBreakdown` includes "Ingen cashflow-shortfall" (positive) + "Komfortabel slutmargin" (positive); also "Lav kontant buffer" and "Lav afhængighed af holding" — the latter two filtered out | Public copy: "Forbruget er dækket hele perioden." / "God margin ved planperiodens slutning." |
 
 > These two fixtures bracket the common cases: a plan that needs work and a comfortable
 > plan. Design the result screen so both read clearly without redesign.
@@ -306,6 +339,59 @@ advanced/DK/internal vocabulary: *Folkepension, Holding, "No Barma", Barma, ASK,
 livrente, livsvarig, deltid, familiefond, exit, audit-panel(et), stress-test*. This keeps a
 newly-added engine check from leaking onto the public path before it has reviewed public copy.
 
+### 4.5 Public-safe robustness-drivers adapter
+
+The robustness card's "what helps / what hurts" must **not** point at raw `robustnessBreakdown`.
+`deriveKPIs` always pushes advanced/internal factors into that list regardless of the simple
+inputs — in particular:
+
+- a **holding-dependency** factor ("Lav/Moderat/Høj afhængighed af holding", detail "Holding
+  udgør X % af slutaktiverne") — pushed unconditionally, so it shows even when holding = 0;
+- a **cash-buffer** factor ("Lav/OK/Solid kontant buffer") — pushed unconditionally, and since
+  the simple surface has no buffer input (`cashBuffer = 0`) it always reads "Lav kontant
+  buffer / 0,0 måneders forbrug", nagging about something the public user can't set;
+- end-margin factors whose copy references "minimumsmål" even when the user set no FI target.
+
+**Important structural caveat:** unlike `SanityCheck`, a `ScoreFactor` has **no stable `id`** —
+only `label` / `detail` / `impact` / `magnitude`, and the labels embed dynamic numbers. So the
+adapter must **not** match on label text. Two robust options (the implementation PR picks one):
+
+1. **Preferred — compose public drivers from already-public KPI fields**, not from
+   `robustnessBreakdown` at all: derive "what helps/hurts" from `firstShortfallAge` /
+   monthly bottleneck gap (cashflow coverage), end-of-horizon capital vs. `fiTargetMinNetWorth`
+   (end margin), and the headline `financialRobustness`. This sidesteps the no-`id` problem
+   entirely.
+2. **Or — classify factors into a small set of public "families"** by their known origin in
+   `kpis.ts` and apply a **default-deny allowlist** of families, each with reviewed Danish copy.
+
+**Allowlist of public driver families** (default-deny — anything not listed is dropped):
+
+| Driver family (origin in `kpis.ts`) | Public Danish copy (indicative) |
+|---|---|
+| Cashflow coverage — positive ("Ingen cashflow-shortfall") | "Dit forbrug er dækket hele perioden." |
+| Cashflow coverage — negative ("Cashflow-shortfall ved alder X" / "Månedligt hul efter stop") | "Pengene slipper op ved alder {X}." / "Du mangler i gennemsnit ca. {G} kr/md efter stop." |
+| End-of-horizon margin ("Komfortabel slutmargin" / "Lav margin …") | "Du har god margin ved planperiodens slutning." / "Der er kun lille margin ved planperiodens slutning." Mention a target only when `fiTargetMinNetWorth` is set. |
+
+**Explicitly filtered out (never public):**
+
+| Driver family | Reason |
+|---|---|
+| Holding-dependency ("… afhængighed af holding", "Holding udgør X %") | Advanced / business capital — present even when holding = 0 |
+| Cash-buffer ("… kontant buffer") | Buffer is not in the simple input surface; always reads "lav" and can't be acted on |
+| Concentration / part-time source factors | Advanced / deltid |
+| Minimumsmål-not-met critical factor | Only meaningful with an FI target; rephrase via the end-margin family, never raw |
+
+**Filter rule (mirrors §4.4):** default-deny on family, **and** hard-block any factor whose
+`label`/`detail` references *holding, buffer, kontant buffer, deltid, ASK, koncentration,
+minimumsmål* (unless an FI target is set) — so a newly-added engine factor can't leak before
+it has reviewed public copy.
+
+> **Same treatment applies to `confidenceBreakdown`.** It is not shown in the MVP (only the
+> `assumptionConfidence` score is). If a future PR surfaces assumption drivers, they must pass
+> an equivalent adapter: allow `returns`, `spending`, `salary`; filter `familyFund`,
+> `statePension`, `ratePension`, `lifeAnnuity`, `holdingExit` (advanced/DK), and drop factors
+> flagged "Bruges ikke i scenariet".
+
 ---
 
 ## 5. Copy direction (Danish)
@@ -356,10 +442,13 @@ exists. The natural **next PR** is the first piece of public UI:
 - **Goal:** build Screens B and C (§3) over the existing `simpleInputs` mapping: the
   one-screen simple form (pre-filled from `DEFAULT_SIMPLE_INPUTS`) and the answer-first
   result hero (status badge + earliest sustainable stop age + headline takeaway + projection
-  chart), reading `KPIs` via the existing `project`/`deriveKPIs` pipeline. Includes the two
-  UI-side adapters from §4.4 (status→public-copy mapping; default-deny warnings allowlist),
-  horizon-relative capital anchors (§4.2), and the first-bottleneck gap sourced from the
-  first shortfall `YearRow` (`shortfallAmount / 12`), not `monthlyGapAfterStop`.
+  chart), reading `KPIs` via the existing `project`/`deriveKPIs` pipeline. Includes the
+  UI-side adapters from §4.4 (status→public-copy mapping; default-deny warnings allowlist)
+  **and §4.5 (drivers adapter)**, horizon-relative capital anchors with the §4.0 **R1**
+  boundary guards (incl. the pension-access-age guard + fallbacks and the `capitalAtStopAge`
+  in-horizon guard from §4.2), and the first-bottleneck gap sourced from the first shortfall
+  `YearRow` (`shortfallAmount / 12`), not `monthlyGapAfterStop`. Every age-anchored and
+  list/text output must satisfy the two cross-cutting rules in §4.0.
 - **Scope guardrails:** UI only. No engine, persistence, or data-format changes. Reuse the
   store and mapping; do not fork engine logic. Keep advanced/DK concepts off the path
   (CLAUDE.md §3). Use Danish copy per §5.
@@ -386,12 +475,15 @@ UI PR has a visual target.
   (Phase 7 item.)
 - **"Tight" status:** scope mentions a "tight / lige på vippen" state; the engine exposes
   `valid | target_missed | invalid`. Confirm the mapping (likely `target_missed` → "tight").
-- **Capital anchors (resolved in this revision):** the public surface uses horizon-relative
-  anchors (stop/FI age, pension access age, end of horizon) and treats `capitalAt95` as the
-  end-of-horizon anchor; `capitalAt65` is not used (silently returns 0 when 65 is out of
-  horizon). Remaining engine-side nicety (later, optional): rename `capitalAt95`/`capitalAt65`
-  in the engine to horizon-relative names so the field names stop implying fixed ages — an
-  engine change with tests, out of scope for this docs PR.
+- **Anchors & adapters (resolved in this revision):** the public surface uses horizon-relative
+  anchors (stop/FI age, pension access age, end of horizon) bounded to `[currentAge,
+  lifeExpectancy]` per §4.0 R1 — including the pension-access-age guard + fallbacks and the
+  `capitalAtStopAge` in-horizon guard; `capitalAt65` is not used (silently returns 0 when 65
+  is out of horizon). All raw engine lists/text go through public-safe adapters per §4.0 R2:
+  warnings + status (§4.4) and robustness drivers (§4.5), with `confidenceBreakdown` reserved
+  for the same treatment if ever surfaced. Remaining engine-side nicety (later, optional):
+  rename `capitalAt95`/`capitalAt65` in the engine to horizon-relative names so the field
+  names stop implying fixed ages — an engine change with tests, out of scope for this docs PR.
 - **Net vs. gross income input:** the engine takes gross salary; a public user may think in
   net. Do we add a net→gross presentation step now or defer to a locale/tax layer? (Noted in
   scope §3.)
