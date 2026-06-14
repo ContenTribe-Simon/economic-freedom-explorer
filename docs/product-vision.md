@@ -102,14 +102,45 @@ The next phase is *not* more abstract test work unless a concrete bug or risk ap
 | 4 | Claude Design / UI concept (visual direction, after the flow is defined) | Planned |
 | 5 | Public onboarding UI v1 (simple input flow over the mapping layer) | Planned |
 | 6 | Public result dashboard v1 (the must-have outputs, plainly shown) | Planned |
-| 7 | Explanation & trust layer (estimates not advice, assumptions, real terms, robustness) | Planned |
-| 8 | Hide/defer advanced complexity (keep advanced features in the engine, off the public path) | Planned |
-| 9 | Sensitivity & top drivers ("what moves your FI age most?") | After dashboard v1 |
-| 10 | Save, share, export (local save, summary export; share link / accounts later) | Planned |
+| 7 | **Stress test & security — mid-build gate** (model edge cases & invariants, input validation, persistence/migration, performance, security/RLS) | Planned |
+| 8 | Explanation & trust layer (estimates not advice, assumptions, real terms, robustness) | Planned |
+| 9 | Hide/defer advanced complexity (keep advanced features in the engine, off the public path) | Planned |
+| 10 | Sensitivity & top drivers ("what moves your FI age most?") | After dashboard v1 |
+| 11 | Save, share, export (local save, summary export; share link / accounts later) | Planned |
+| 12 | **Stress test, security & go-live readiness — pre-launch gate** (full regression, RLS pen-check, dependencies, privacy/GDPR, data backup, load/uptime, go/no-go) | Planned |
+
+Phases 7 and 12 are deliberate **gates**: the mid-build gate runs a thorough stress test
+and security review once a working public surface exists (onboarding + dashboard), before
+the trust/advanced/export layers are stacked on top; the pre-launch gate is the final
+go/no-go review before launch. Neither is skipped — we don't build past a failing mid-gate
+or launch on a failing pre-launch gate.
+
+### Phase 7 — mid-build stress & security gate (checklist)
+
+- Model: run golden scenarios + edge cases (0 savings, extreme spending, very early stop age, extreme returns).
+- Confirm model invariants: conservation (money never vanishes), no negative asset buckets, no NaN/Infinity in output.
+- Input validation: boundary and unreasonable inputs — public inputs must not bypass important validation.
+- Persistence: localStorage rehydration, corrupt data, and legacy migration without crashing (e2e already exists).
+- Performance: large horizons + rapid slider changes (live recompute) without jank.
+- Security: confirm Supabase Row Level Security on every table; only browser-facing keys exposed (no `service_role`); `npm audit`; no secrets in the bundle or repo.
+- Robustness / a11y: keyboard, visible focus, no blank-screen crashes on any route.
+
+### Phase 12 — pre-launch stress, security & go-live gate (checklist)
+
+- Full regression: whole suite green (unit + e2e + build) and CI green on the release branch.
+- End-to-end stress test of the whole public journey under realistic *and* hostile conditions.
+- Security: RLS penetration check (can a user read/write another's data?), auth flows, rate limiting, CORS, security headers / CSP.
+- Dependencies: `npm audit` / Dependabot — no known vulnerabilities in production dependencies.
+- Privacy & legal: visible "not financial advice" disclaimer, privacy policy, cookie/consent if relevant; GDPR (data minimization, consent, deletion).
+- Data: cloud backup/restore, export/import round-trip, migration safety.
+- Robustness / load: app works during Supabase downtime (offline-first), error handling, test under concurrent users.
+- Content: every number explained, no false precision, no DK/personal assumptions leaked, copy proofread.
+- Go-live: monitoring / error logging, rollback plan, prod env vars, domain + SEO/robots in place.
 
 Implementation order after the flow is clear: UI audit → public MVP flow → Claude Design
-concept → onboarding UI → result dashboard → explanation/trust layer → sensitivity/top
-drivers → save/share/export.
+concept → onboarding UI → result dashboard → **mid-build stress/security gate** →
+explanation/trust layer → hide advanced → sensitivity/top drivers → save/share/export →
+**pre-launch stress/security/go-live gate**.
 
 ---
 
@@ -142,7 +173,7 @@ disclosure; avoid exposing every underlying model field.
 
 The user should always know: what they entered, what the model assumes, what the result
 means, and what they can change next. Because financial projections create false
-precision easily, the explanation/trust layer (Phase 7) is a hard requirement, not a
+precision easily, the explanation/trust layer (Phase 8) is a hard requirement, not a
 nice-to-have.
 
 ---
