@@ -64,6 +64,20 @@ The finance engine is `src/lib/finance/` (notably `projection.ts`, `types.ts`,
 7. **Don't leak advanced / DK-personal concepts into the public surface.** Holding/
    business capital, ASK, `depotTax`, custom withdrawal order, `folkepension`-style
    labels, country analysis and detailed tax buckets stay behind the Advanced door.
+8. **Public copy voice.** All Danish user-facing copy follows this voice (the public
+   data contract, `docs/public-mvp-spec-and-data-contract-v1.md` §5, is the canonical
+   reference):
+   - Plain, human Danish. Sentence case, short, active voice. Name things by what the
+     person controls, not by how the system works.
+   - No em dashes. Use commas or full stops.
+   - Avoid classic AI phrasings and filler.
+   - Show the actual computed figures, formatted in Danish convention (period as
+     thousands separator, whole kroner, e.g. 3.486.500 kr). Do not hedge figures with
+     "ca." and do not round them into vagueness.
+   - Handle model uncertainty once, globally, with a single calm disclaimer (not per
+     number): "En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene
+     som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning."
+   - Honest and reassuring, never salesy or alarmist.
 
 ---
 

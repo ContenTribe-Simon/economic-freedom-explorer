@@ -96,51 +96,50 @@ The next phase is *not* more abstract test work unless a concrete bug or risk ap
 
 | Phase | Focus | Status |
 |---|---|---|
-| 1 | Foundation: stabilize engine, tests/CI, model primitives, public MVP scope, simple input mapping | Mostly complete |
-| 2 | UI audit + public flow spec (review the live app, decide reuse vs. hide, define the public journey) | **Next** |
-| 3 | Public MVP UX specification (screens, cards, inputs/outputs, copy direction) | Planned |
-| 4 | Claude Design / UI concept (visual direction, after the flow is defined) | Planned |
-| 5 | Public onboarding UI v1 (simple input flow over the mapping layer) | Planned |
+| 1 | Foundation: engine, tests/CI, model primitives, public MVP scope, simple input mapping | Complete |
+| 2 | Public flow & MVP spec (decide reuse vs. hide, define the public answer-first journey) | Complete |
+| 3 | Public MVP data contract (screens, cards, inputs/outputs, public-safe adapters, copy direction) | Complete |
+| 4 | Brand & UI concept (Claude Design: visual direction, design system, key screens) | In progress |
+| 5 | Public onboarding & input UI v1 (simple input flow over the mapping layer) | Planned |
 | 6 | Public result dashboard v1 (the must-have outputs, plainly shown) | Planned |
-| 7 | **Stress test & security — mid-build gate** (model edge cases & invariants, input validation, persistence/migration, performance, security/RLS) | Planned |
-| 8 | Explanation & trust layer (estimates not advice, assumptions, real terms, robustness) | Planned |
-| 9 | Hide/defer advanced complexity (keep advanced features in the engine, off the public path) | Planned |
-| 10 | Sensitivity & top drivers ("what moves your FI age most?") | After dashboard v1 |
+| 7 | Stress test & security (mid-build gate) | Planned |
+| 8 | Explanation & trust layer (a simplified model taken with a grain of salt; assumptions, real terms, robustness) | Planned |
+| 9 | Hide/defer advanced complexity (advanced features stay in the engine, off the public path) | Planned |
+| 10 | Sensitivity & top drivers ("what moves your FI age most?") | Planned |
 | 11 | Save, share, export (local save, summary export; share link / accounts later) | Planned |
-| 12 | **Stress test, security & go-live readiness — pre-launch gate** (full regression, RLS pen-check, dependencies, privacy/GDPR, data backup, load/uptime, go/no-go) | Planned |
+| 12 | Stress test, security & go-live readiness (pre-launch gate) | Planned |
 
-Phases 7 and 12 are deliberate **gates**: the mid-build gate runs a thorough stress test
-and security review once a working public surface exists (onboarding + dashboard), before
-the trust/advanced/export layers are stacked on top; the pre-launch gate is the final
-go/no-go review before launch. Neither is skipped — we don't build past a failing mid-gate
-or launch on a failing pre-launch gate.
+Phases 7 and 12 are deliberate **gates**: nothing proceeds past a failing gate. The
+mid-build gate runs a thorough stress test and security review once a working public surface
+exists (onboarding + dashboard), before the trust/advanced/export layers are stacked on top;
+the pre-launch gate is the final go/no-go review before launch.
 
 ### Phase 7 — mid-build stress & security gate (checklist)
 
-- Model: run golden scenarios + edge cases (0 savings, extreme spending, very early stop age, extreme returns).
-- Confirm model invariants: conservation (money never vanishes), no negative asset buckets, no NaN/Infinity in output.
-- Input validation: boundary and unreasonable inputs — public inputs must not bypass important validation.
-- Persistence: localStorage rehydration, corrupt data, and legacy migration without crashing (e2e already exists).
-- Performance: large horizons + rapid slider changes (live recompute) without jank.
-- Security: confirm Supabase Row Level Security on every table; only browser-facing keys exposed (no `service_role`); `npm audit`; no secrets in the bundle or repo.
-- Robustness / a11y: keyboard, visible focus, no blank-screen crashes on any route.
+- Model: golden scenarios + edge cases; invariants hold (conservation, no negative asset buckets); no NaN/Infinity.
+- Public input validation on boundary and unreasonable inputs.
+- Persistence: localStorage rehydration, corrupt data, legacy migration without crashing.
+- Performance: large horizons and rapid recompute without jank.
+- Security: Supabase Row Level Security on every table; only browser-facing keys; npm audit; no secrets in the bundle or repo.
+- Robustness / a11y: keyboard, visible focus, no blank-screen crashes.
 
 ### Phase 12 — pre-launch stress, security & go-live gate (checklist)
 
 - Full regression: whole suite green (unit + e2e + build) and CI green on the release branch.
-- End-to-end stress test of the whole public journey under realistic *and* hostile conditions.
-- Security: RLS penetration check (can a user read/write another's data?), auth flows, rate limiting, CORS, security headers / CSP.
-- Dependencies: `npm audit` / Dependabot — no known vulnerabilities in production dependencies.
-- Privacy & legal: visible "not financial advice" disclaimer, privacy policy, cookie/consent if relevant; GDPR (data minimization, consent, deletion).
+- End-to-end stress of the public journey under realistic and hostile conditions.
+- Security: RLS penetration check, auth flows, rate limiting, CORS, security headers / CSP, plus a dynamic pen test of the running app (the cheap AI pen test first).
+- Dependencies: npm audit / Dependabot, no known vulnerabilities.
+- Privacy & legal: visible disclaimer, privacy policy, consent if relevant; GDPR (data minimization, consent, deletion); self-hosted fonts so nothing loads from a third party.
 - Data: cloud backup/restore, export/import round-trip, migration safety.
-- Robustness / load: app works during Supabase downtime (offline-first), error handling, test under concurrent users.
-- Content: every number explained, no false precision, no DK/personal assumptions leaked, copy proofread.
-- Go-live: monitoring / error logging, rollback plan, prod env vars, domain + SEO/robots in place.
+- Robustness / load: offline-first works during backend downtime, error handling, concurrent users.
+- Content: figures shown as actual numbers with the single global disclaimer, no false certainty, no advanced/DK/personal concepts leaked, copy proofread (plain Danish, no em dashes), feedback/bug-reporting channel live.
+- Go-live: monitoring / error logging, rollback plan, prod env vars, domain + SEO/robots.
 
-Implementation order after the flow is clear: UI audit → public MVP flow → Claude Design
-concept → onboarding UI → result dashboard → **mid-build stress/security gate** →
-explanation/trust layer → hide advanced → sensitivity/top drivers → save/share/export →
-**pre-launch stress/security/go-live gate**.
+Implementation order follows the phases above: foundation → public flow & MVP spec → public
+MVP data contract → brand & UI concept → onboarding & input UI → result dashboard →
+**mid-build stress/security gate** → explanation/trust layer → hide advanced →
+sensitivity/top drivers → save/share/export → **pre-launch stress/security/go-live gate**.
+Phases 1–3 are complete; Phase 4 (brand & UI concept) is in progress.
 
 ---
 
@@ -209,7 +208,8 @@ agent. Full detail in `CLAUDE.md`.
 
 ## 11. Current next step
 
-With the repository foundation in place, the next phase is **Phase 2 — UI audit + public
-flow spec**: audit the current app from source, decide what is reused vs. hidden for the
-public MVP, and define the public journey (and a public data contract) *before* any UI is
-built. That spec becomes the input to Claude Design.
+The foundation (Phase 1), the public flow & MVP spec (Phase 2), and the public MVP data
+contract (Phase 3) are complete. The current phase is **Phase 4 — brand & UI concept**
+(Claude Design): turn the spec's screens, cards, and data contract into a visual direction, a
+design system, and the key public screens. That concept becomes the target for the first
+public onboarding & input UI (Phase 5).
