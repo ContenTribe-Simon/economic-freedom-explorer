@@ -218,7 +218,7 @@ The MVP shows a clear subset of `KPIs` (from `src/lib/finance/types.ts`) plus
 
 | Output | Source field (`KPIs.*`) | Type / unit | Plain-language meaning |
 |---|---|---|---|
-| Earliest sustainable stop age | `earliestSustainableStopAge` | integer years or `null` | "Du kan tidligst stoppe omkring alder X" (or "ikke på sporet endnu" when `null`) |
+| Earliest sustainable stop age | `earliestSustainableStopAge` | integer years or `null` | "Du kan tidligst stoppe ved alder X" (or "ikke på sporet endnu" when `null`) |
 | Planned stop age (echo of input) | `plannedStopAge` | integer years | The stop age the user chose, for comparison with the earliest sustainable one |
 | Capital at planned stop/FI age | `capitalAtStopAge` | DKK | "N ved din planlagte stop-alder". **R1:** `capitalAtStopAge = yAtStop?.netWorth ?? 0`, so it silently returns 0 if `stopAge` is out of horizon. Show only when `currentAge ≤ stopAge ≤ lifeExpectancy` (which §4.1 input validation must enforce); never trust the `?? 0`. |
 | Capital at pension access age | net worth of the `YearRow` at `pensionAccessAge` (read from the projection series; **not** a precomputed KPI) | DKK | "N når din pension bliver tilgængelig (alder {pensionAccessAge})". **R1:** the projection only spans `[currentAge, lifeExpectancy]`, so there is **no** `YearRow` when `pensionAccessAge < currentAge`. Render the card only when `currentAge ≤ pensionAccessAge ≤ lifeExpectancy`. **Fallbacks:** if `pensionAccessAge < currentAge` (pension already accessible) → show capital at `currentAge` with copy "Din pension er allerede tilgængelig", **or** omit the card; if `pensionAccessAge > lifeExpectancy` (never opens in horizon) → omit the card. |
@@ -285,7 +285,7 @@ saving 8,000/md, pension 300,000 @ access 67, return 4%, desired stop 60.
 
 | Output | Value | Designed-for framing |
 |---|---|---|
-| `modelStatus` | `invalid` | Badge: "Ikke på sporet endnu" |
+| `modelStatus` | `invalid` | Badge: "Ikke på sporet" |
 | `plannedStopAge` | 60 | "Du vil gerne stoppe ved 60" |
 | `earliestSustainableStopAge` | 62 | "Tidligst holdbare stop: 62" |
 | Capital at stop age (`capitalAtStopAge`) | ≈ 4.240.000 kr | "{beløb} kr ved stop" |
@@ -468,9 +468,9 @@ Example labels / microcopy (indicative — final copy is a later pass):
 | Start CTA | "Kom i gang" |
 | Result CTA | "Se mit resultat" |
 | Status: valid | "På sporet" |
-| Status: tight / target_missed | "Lige på vippen" |
-| Status: invalid | "Ikke på sporet endnu" |
-| Headline answer | "Du kan tidligst stoppe omkring alder {X}." |
+| Status: tight / target_missed | "Stramt" |
+| Status: invalid | "Ikke på sporet" |
+| Headline answer | "Du kan tidligst stoppe ved alder {X}." |
 | No FI age yet | "Med de nuværende tal er du ikke på sporet endnu." |
 | Capital at stop | "{N} kr ved din planlagte stop-alder." |
 | Bottleneck | "Fra alder {Y} mangler du {G} kr/md." |
