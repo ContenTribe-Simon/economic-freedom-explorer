@@ -19,6 +19,18 @@ rules, and the run/test commands. This file exists so tools that look for `AGENT
 - One engine — "simple" is a reduced input/output surface, never a second model.
 - Keep advanced / DK-personal concepts (holding, ASK, `depotTax`, `folkepension`,
   country analysis) out of the public surface.
+- Public copy voice — all Danish user-facing copy follows this voice (CLAUDE.md §3 rule 8):
+  - Plain, human Danish. Sentence case, short, active voice. Name things by what the
+    person controls, not by how the system works.
+  - No em dashes. Use commas or full stops.
+  - Avoid classic AI phrasings and filler.
+  - Show the actual computed figures, formatted in Danish convention (period as
+    thousands separator, whole kroner, e.g. 3.486.500 kr). Do not hedge figures with
+    "ca." and do not round them into vagueness.
+  - Handle model uncertainty once, globally, with a single calm disclaimer (not per
+    number): "En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene
+    som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning."
+  - Honest and reassuring, never salesy or alarmist.
 
 ## For reviewers (Codex / `@claude`)
 
