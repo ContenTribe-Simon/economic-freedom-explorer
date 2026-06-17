@@ -6,8 +6,16 @@
 > **Audience:** product + engineering.
 >
 > **Companion docs:** `docs/model-primitives-v1.md` (the merged model-primitives / conceptual
-> model map) and `src/lib/finance/MODEL.md` (internal implementation note). This document
-> turns those primitives into a concrete public-product scope.
+> model map), `src/lib/finance/MODEL.md` (internal implementation note), and
+> `docs/public-mvp-spec-and-data-contract-v1.md` (the Phase 3 spec & data contract). This
+> document turns those primitives into a concrete public-product scope.
+>
+> **Copy & figure presentation:** the canonical rule now lives in
+> `docs/public-mvp-spec-and-data-contract-v1.md` §5 (mirrored in CLAUDE.md §3 rule 8) — show the
+> actual computed figure in Danish format with no "ca." and no rounding into vagueness, and
+> handle uncertainty once with a single global disclaimer. Where this scope doc earlier implied
+> rounding/ranging headline numbers, that rule **supersedes** it; the wording below has been
+> reconciled.
 
 ---
 
@@ -184,8 +192,10 @@ explicit (short, plain, always available):
 
 - **Real terms.** State once and clearly that all amounts are in **today's money / nutidskroner**
   (the chosen convention), so figures are comparable to today's prices.
-- **Not financial advice.** A persistent, unobtrusive disclaimer: estimates for planning, not
-  personalized advice.
+- **Not financial advice.** A persistent, unobtrusive **single global disclaimer** (one calm
+  statement, not per number) — the exact Danish wording is the canonical one in
+  `docs/public-mvp-spec-and-data-contract-v1.md` §5 (CLAUDE.md §3 rule 8): a simplified estimate
+  from the user's own numbers, a qualified picture, not a guarantee, and not financial advice.
 - **Assumptions drive the result.** Make the key assumptions (return, inflation/real terms,
   pension access age) visible and editable, with a note that changing them changes everything.
 - **Why valid / invalid.** Translate `modelStatus` + `modelStatusReason` into plain language:
@@ -212,7 +222,7 @@ explainer. If we can't explain it simply, we don't show it in the MVP.
 | Risk | Description | Mitigation |
 |---|---|---|
 | Too much complexity too early | The advanced model overwhelms first-time users and they bounce. | Strict progressive disclosure; one-screen form; answer-first. |
-| False precision | Showing kr-exact figures implies certainty the model doesn't have. | Round/range headline numbers; pair with robustness/confidence; "estimate" framing. |
+| False precision | Showing kr-exact figures implies certainty the model doesn't have. | Per the canonical copy rule (`docs/public-mvp-spec-and-data-contract-v1.md` §5): show the actual computed figure in Danish format, **not** rounded into vagueness; handle uncertainty **once** with the single global disclaimer, and pair the numbers with the robustness/confidence framing ("a qualified picture, not a guarantee"). |
 | Misread as advice | Users treat projections as a recommendation to act. | Persistent disclaimer; "planning estimate" language; no buy/sell guidance. |
 | DK assumptions leaking into public UI | Danish tax/pension terms or `kr` appear for non-DK users. | Locale packs; generic copy on the main path; DK as one pack, not the default everywhere. |
 | Hiding too much → feels generic | Over-simplification makes the tool feel like every other calculator. | Keep the *differentiators* (real bottleneck, robustness, top drivers) on the simple path. |
