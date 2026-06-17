@@ -39,13 +39,17 @@
     --accent: 31 57% 53%;              /* dawn */
     --accent-foreground: 168 35% 14%;  /* ink */
 
-    --destructive: 10 50% 47%;         /* clay (risk) */
+    /* Status TEXT tokens: darkened from the raw brand hues to clear WCAG AA
+       (>=4.5:1) against --background (paper) for normal-size text. The vivid
+       brand hues for fills/dots/chips/borders/chart marks stay in the raw vars
+       --sage / --dawn / --clay above (3:1 graphical threshold). */
+    --destructive: 10 52% 44%;         /* deeper clay (risk) — AA text on paper 5.20:1 */
     --destructive-foreground: 90 18% 96%;
 
-    --success: 143 19% 45%;            /* sage (ok) */
-    --success-foreground: 90 18% 96%;
+    --success: 143 23% 37%;            /* deeper sage (ok) — AA text on paper 4.95:1 */
+    --success-foreground: 90 18% 96%;  /* paper on --success fill: 4.95:1 */
 
-    --warning: 31 57% 53%;             /* dawn (tight) */
+    --warning: 31 60% 37%;             /* deeper amber/dawn (tight) — AA text on paper 4.83:1 */
 
     --border: 142 13% 88%;             /* #DCE4DF */
     --input: 142 13% 88%;
@@ -79,11 +83,11 @@
     --muted-foreground: 142 10% 65%;
     --accent: 31 57% 56%;              /* dawn */
     --accent-foreground: 168 35% 12%;
-    --destructive: 10 55% 52%;         /* clay */
-    --destructive-foreground: 90 18% 96%;
-    --success: 143 25% 52%;            /* sage */
+    --destructive: 10 60% 60%;         /* clay — AA text on dark 5.19:1 */
+    --destructive-foreground: 168 35% 12%; /* ink on fill: 4.61:1 */
+    --success: 143 25% 52%;            /* sage — AA text on dark 5.82:1 */
     --success-foreground: 168 35% 12%;
-    --warning: 31 57% 56%;             /* dawn */
+    --warning: 31 57% 56%;             /* dawn — AA text on dark 6.39:1 */
     --border: 168 18% 20%;
     --input: 168 18% 20%;
     --ring: 187 40% 55%;
