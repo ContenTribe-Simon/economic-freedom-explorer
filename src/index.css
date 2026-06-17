@@ -2,86 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Fonts are self-hosted via @fontsource and imported in src/main.tsx.
+   No external font requests (no Google Fonts / CDN). */
 
 @layer base {
   :root {
-    --background: 38 38% 96%;
-    --foreground: 220 40% 12%;
+    /* Frihedsmodel brand reference tokens (raw hex). Light mode is the default. */
+    --paper: #F4F6F2;
+    --ink: #17302B;
+    --fjord: #1C4A50;
+    --dawn: #CC8A43;
+    --sage: #5E8A6F;
+    --clay: #B5503C;
+    --brand-border: #DCE4DF;
+
+    /* shadcn/Tailwind tokens (HSL triplets) mapped onto the brand palette,
+       so existing components inherit the new look without changing names. */
+    --background: 90 18% 96%;          /* paper */
+    --foreground: 168 35% 14%;         /* ink */
 
     --card: 0 0% 100%;
-    --card-foreground: 220 40% 12%;
+    --card-foreground: 168 35% 14%;    /* ink */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 40% 12%;
+    --popover-foreground: 168 35% 14%; /* ink */
 
-    --primary: 220 50% 14%;
-    --primary-foreground: 38 38% 96%;
+    --primary: 187 48% 21%;            /* fjord */
+    --primary-foreground: 90 18% 96%;  /* paper */
 
-    --secondary: 38 30% 92%;
-    --secondary-foreground: 220 40% 12%;
+    --secondary: 120 12% 92%;
+    --secondary-foreground: 168 35% 14%;
 
-    --muted: 38 25% 90%;
-    --muted-foreground: 220 12% 38%;
+    --muted: 100 14% 91%;
+    --muted-foreground: 153 10% 37%;
 
-    --accent: 28 85% 52%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 31 57% 53%;              /* dawn */
+    --accent-foreground: 168 35% 14%;  /* ink */
 
-    --destructive: 0 70% 45%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 10 50% 47%;         /* clay (risk) */
+    --destructive-foreground: 90 18% 96%;
 
-    --success: 152 50% 32%;
-    --success-foreground: 0 0% 100%;
+    --success: 143 19% 45%;            /* sage (ok) */
+    --success-foreground: 90 18% 96%;
 
-    --warning: 38 90% 48%;
+    --warning: 31 57% 53%;             /* dawn (tight) */
 
-    --border: 38 20% 85%;
-    --input: 38 20% 85%;
-    --ring: 28 85% 52%;
+    --border: 142 13% 88%;             /* #DCE4DF */
+    --input: 142 13% 88%;
+    --ring: 187 48% 21%;               /* fjord */
 
     --radius: 0.5rem;
 
-    --sidebar-background: 220 50% 14%;
-    --sidebar-foreground: 38 30% 88%;
-    --sidebar-primary: 28 85% 52%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 40% 20%;
-    --sidebar-accent-foreground: 38 38% 96%;
-    --sidebar-border: 220 40% 22%;
-    --sidebar-ring: 28 85% 52%;
+    --sidebar-background: 187 48% 21%; /* fjord */
+    --sidebar-foreground: 90 18% 96%;  /* paper */
+    --sidebar-primary: 31 57% 53%;     /* dawn */
+    --sidebar-primary-foreground: 168 35% 14%;
+    --sidebar-accent: 187 40% 27%;
+    --sidebar-accent-foreground: 90 18% 96%;
+    --sidebar-border: 187 38% 28%;
+    --sidebar-ring: 31 57% 53%;
   }
 
   .dark {
-    --background: 220 40% 8%;
-    --foreground: 38 30% 92%;
-    --card: 220 38% 11%;
-    --card-foreground: 38 30% 92%;
-    --popover: 220 38% 11%;
-    --popover-foreground: 38 30% 92%;
-    --primary: 38 30% 92%;
-    --primary-foreground: 220 40% 8%;
-    --secondary: 220 30% 16%;
-    --secondary-foreground: 38 30% 92%;
-    --muted: 220 30% 16%;
-    --muted-foreground: 220 10% 65%;
-    --accent: 28 85% 55%;
-    --accent-foreground: 220 40% 8%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 152 50% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 90% 55%;
-    --border: 220 30% 18%;
-    --input: 220 30% 18%;
-    --ring: 28 85% 55%;
-    --sidebar-background: 220 45% 6%;
-    --sidebar-foreground: 38 30% 88%;
-    --sidebar-primary: 28 85% 55%;
-    --sidebar-primary-foreground: 220 40% 8%;
-    --sidebar-accent: 220 35% 12%;
-    --sidebar-accent-foreground: 38 30% 92%;
-    --sidebar-border: 220 30% 14%;
-    --sidebar-ring: 28 85% 55%;
+    /* Brand-aligned dark variant (ink ground, paper text). Light is default. */
+    --background: 168 30% 9%;
+    --foreground: 90 18% 96%;
+    --card: 168 26% 12%;
+    --card-foreground: 90 18% 96%;
+    --popover: 168 26% 12%;
+    --popover-foreground: 90 18% 96%;
+    --primary: 187 40% 55%;            /* brightened fjord for contrast */
+    --primary-foreground: 168 35% 12%;
+    --secondary: 168 18% 18%;
+    --secondary-foreground: 90 18% 96%;
+    --muted: 168 16% 18%;
+    --muted-foreground: 142 10% 65%;
+    --accent: 31 57% 56%;              /* dawn */
+    --accent-foreground: 168 35% 12%;
+    --destructive: 10 55% 52%;         /* clay */
+    --destructive-foreground: 90 18% 96%;
+    --success: 143 25% 52%;            /* sage */
+    --success-foreground: 168 35% 12%;
+    --warning: 31 57% 56%;             /* dawn */
+    --border: 168 18% 20%;
+    --input: 168 18% 20%;
+    --ring: 187 40% 55%;
+    --sidebar-background: 168 30% 7%;
+    --sidebar-foreground: 90 18% 96%;
+    --sidebar-primary: 31 57% 56%;
+    --sidebar-primary-foreground: 168 35% 12%;
+    --sidebar-accent: 168 20% 16%;
+    --sidebar-accent-foreground: 90 18% 96%;
+    --sidebar-border: 168 18% 18%;
+    --sidebar-ring: 31 57% 56%;
   }
 }
 
@@ -92,18 +105,16 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, sans-serif;
-    font-feature-settings: 'cv11', 'ss01';
+    font-family: 'Public Sans', system-ui, sans-serif;
   }
 
   h1, h2, h3, .font-display {
-    font-family: 'Fraunces', Georgia, serif;
-    font-feature-settings: 'ss01';
+    font-family: 'Spectral', Georgia, serif;
     letter-spacing: -0.01em;
   }
 
   .font-mono, .tabular {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
     font-variant-numeric: tabular-nums;
   }
 
