@@ -455,7 +455,7 @@ Example labels / microcopy (indicative — final copy is a later pass):
 |---|---|
 | App brand | **Frihedsmodel** |
 | Intro headline | "Hvornår kan du blive økonomisk fri?" |
-| Intro sub | "Få et estimat på få minutter — og se, hvad der betyder mest." |
+| Intro sub | "Få et estimat på få minutter. Se, hvad der betyder mest." |
 | Start CTA | "Kom i gang" |
 | Result CTA | "Se mit resultat" |
 | Status: valid | "På sporet" |
