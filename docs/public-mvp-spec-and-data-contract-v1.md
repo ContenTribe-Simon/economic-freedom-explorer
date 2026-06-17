@@ -62,11 +62,11 @@ All amounts are **real terms / today's money (nutidskroner)**.
 
 | # | Step | Purpose | What the user sees |
 |---|---|---|---|
-| 1 | **Intro / framing** | Set expectation: this is an estimate, not advice; all amounts are in today's money. | One calm screen: headline question *"Hvornår kan du blive økonomisk fri?"*, one-line framing, a single primary CTA to start. A persistent, unobtrusive "ikke rådgivning" note. |
+| 1 | **Intro / framing** | Set expectation: this is an estimate, not advice; all amounts are in today's money. | One calm screen: headline question *"Hvornår kan du blive økonomisk fri?"*, one-line framing, a single primary CTA to start. A persistent, unobtrusive single global disclaimer (see §5). |
 | 2 | **Simple inputs** | Collect the minimal input set (§4) with defaults pre-filled so a result is always reachable. | One short form/card fitting one screen: age, horizon, income, spending, current investments, monthly saving, pension balance + access age, expected return, desired stop age. Defaults from `DEFAULT_SIMPLE_INPUTS`. |
 | 3 | **Answer-first result** | Give the headline answer immediately. | A result hero: status badge (on track / tight / not yet) + the headline number **earliest sustainable stop age**, plus a one-line plain-language takeaway. |
-| 4 | **Projection over time** | Make the path tangible. | A simple net-worth-over-time chart with the planned stop age marked and a one-line takeaway ("Dine penge rækker til ca. alder X" / "slipper op ved alder Y"). Anchor points are **horizon-relative** (stop/FI age, pension access age, end of horizon) — never a hardcoded age that may fall outside the projection (see §4.2). |
-| 5 | **First bottleneck** | Surface the single most important constraint. | A card naming the **first shortfall age** and the **monthly gap in that year** (sourced from the first shortfall year itself, not an after-stop average — see §4.2), in plain language ("Fra alder 86 mangler du ca. 18.300 kr/md"). If no shortfall: a reassuring "ingen flaskehals fundet". |
+| 4 | **Projection over time** | Make the path tangible. | A simple net-worth-over-time chart with the planned stop age marked and a one-line takeaway ("Dine penge rækker til alder X" / "slipper op ved alder Y"). Anchor points are **horizon-relative** (stop/FI age, pension access age, end of horizon) — never a hardcoded age that may fall outside the projection (see §4.2). |
+| 5 | **First bottleneck** | Surface the single most important constraint. | A card naming the **first shortfall age** and the **monthly gap in that year** (sourced from the first shortfall year itself, not an after-stop average — see §4.2), in plain language ("Fra alder 86 mangler du 18.255 kr/md"). If no shortfall: a reassuring "ingen flaskehals fundet". |
 | 6 | **Adjust a few levers** | Let the user *feel* the trade-offs. | 2–3 live controls (monthly spending, monthly saving, stop age). Result + chart + bottleneck update live. Advanced depth stays behind the Advanced door. |
 | 7 | **Save / export (optional)** | Let the user keep or share a result. No account required for the basic path. | Local save + JSON export; optional "save to cloud" (login) as a clearly secondary action. |
 
@@ -84,8 +84,9 @@ is hidden/deferred. This is what a designer builds from. Copy shown is indicativ
 ### Screen A — Intro / framing
 - **Hero card:** product brand "Frihedsmodel", headline question, one-line framing, primary
   CTA (*"Kom i gang"*).
-- **Trust strip (persistent):** "Et estimat til planlægning — ikke økonomisk rådgivning."
-  + "Alle beløb er i nutidskroner."
+- **Trust strip (persistent):** the single global disclaimer "En forenklet beregning ud fra
+  dine egne tal og antagelser. Tag tallene som et kvalificeret billede, ikke en garanti, og
+  ikke som økonomisk rådgivning." + "Alle beløb er i nutidskroner."
 - *Hidden/deferred:* sign-in, advanced mode entry (a small, low-emphasis link only).
 
 ### Screen B — Simple inputs
@@ -217,13 +218,13 @@ The MVP shows a clear subset of `KPIs` (from `src/lib/finance/types.ts`) plus
 
 | Output | Source field (`KPIs.*`) | Type / unit | Plain-language meaning |
 |---|---|---|---|
-| Earliest sustainable stop age | `earliestSustainableStopAge` | integer years or `null` | "Du kan tidligst stoppe omkring alder X" (or "ikke på sporet endnu" when `null`) |
+| Earliest sustainable stop age | `earliestSustainableStopAge` | integer years or `null` | "Du kan tidligst stoppe ved alder X" (or "ikke på sporet endnu" when `null`) |
 | Planned stop age (echo of input) | `plannedStopAge` | integer years | The stop age the user chose, for comparison with the earliest sustainable one |
-| Capital at planned stop/FI age | `capitalAtStopAge` | DKK | "Ca. N ved din planlagte stop-alder". **R1:** `capitalAtStopAge = yAtStop?.netWorth ?? 0`, so it silently returns 0 if `stopAge` is out of horizon. Show only when `currentAge ≤ stopAge ≤ lifeExpectancy` (which §4.1 input validation must enforce); never trust the `?? 0`. |
-| Capital at pension access age | net worth of the `YearRow` at `pensionAccessAge` (read from the projection series; **not** a precomputed KPI) | DKK | "Ca. N når din pension bliver tilgængelig (alder {pensionAccessAge})". **R1:** the projection only spans `[currentAge, lifeExpectancy]`, so there is **no** `YearRow` when `pensionAccessAge < currentAge`. Render the card only when `currentAge ≤ pensionAccessAge ≤ lifeExpectancy`. **Fallbacks:** if `pensionAccessAge < currentAge` (pension already accessible) → show capital at `currentAge` with copy "Din pension er allerede tilgængelig", **or** omit the card; if `pensionAccessAge > lifeExpectancy` (never opens in horizon) → omit the card. |
-| Capital at end of horizon | net worth of the **last projected `YearRow`** (net worth at `lifeExpectancy`), read directly from the projection series — **not** `capitalAt95` | DKK | "Ca. N ved planperiodens slutning". **R1 (inverse):** do **not** use `capitalAt95` here — it is `years.find(age===95) ?? years[last]`, i.e. the **age-95** figure whenever `lifeExpectancy ≥ 95` (the input range allows up to 110), and only coincides with the plan's end when `lifeExpectancy ≤ 95`. Always source the end-of-horizon anchor from the last `YearRow` (same pattern as the pension-access anchor). |
+| Capital at planned stop/FI age | `capitalAtStopAge` | DKK | "N ved din planlagte stop-alder". **R1:** `capitalAtStopAge = yAtStop?.netWorth ?? 0`, so it silently returns 0 if `stopAge` is out of horizon. Show only when `currentAge ≤ stopAge ≤ lifeExpectancy` (which §4.1 input validation must enforce); never trust the `?? 0`. |
+| Capital at pension access age | net worth of the `YearRow` at `pensionAccessAge` (read from the projection series; **not** a precomputed KPI) | DKK | "N når din pension bliver tilgængelig (alder {pensionAccessAge})". **R1:** the projection only spans `[currentAge, lifeExpectancy]`, so there is **no** `YearRow` when `pensionAccessAge < currentAge`. Render the card only when `currentAge ≤ pensionAccessAge ≤ lifeExpectancy`. **Fallbacks:** if `pensionAccessAge < currentAge` (pension already accessible) → show capital at `currentAge` with copy "Din pension er allerede tilgængelig", **or** omit the card; if `pensionAccessAge > lifeExpectancy` (never opens in horizon) → omit the card. |
+| Capital at end of horizon | net worth of the **last projected `YearRow`** (net worth at `lifeExpectancy`), read directly from the projection series — **not** `capitalAt95` | DKK | "N ved planperiodens slutning". **R1 (inverse):** do **not** use `capitalAt95` here — it is `years.find(age===95) ?? years[last]`, i.e. the **age-95** figure whenever `lifeExpectancy ≥ 95` (the input range allows up to 110), and only coincides with the plan's end when `lifeExpectancy ≤ 95`. Always source the end-of-horizon anchor from the last `YearRow` (same pattern as the pension-access anchor). |
 | First shortfall age | `firstShortfallAge` | integer years or `null` | "Første år pengene ikke rækker: alder Y" (or none) |
-| **Monthly gap at the first bottleneck** | `shortfallAmount / 12` of the **first shortfall `YearRow`** (`years.find(y => y.shortfall)`; equivalently that row's `monthlyGap`) | DKK / month | "Fra alder Y mangler du ca. G kr/md" — the gap **in that year**, the number the bottleneck card shows |
+| **Monthly gap at the first bottleneck** | `shortfallAmount / 12` of the **first shortfall `YearRow`** (`years.find(y => y.shortfall)`; equivalently that row's `monthlyGap`) | DKK / month | "Fra alder Y mangler du G kr/md" — the gap **in that year**, the number the bottleneck card shows |
 | After-stop average monthly gap (optional) | `monthlyGapAfterStop` | DKK / month | The **average** monthly gap across all years from stop age onward — a different, smaller number. If shown at all, label it explicitly as an average ("gns. efter stop"); never use it as the bottleneck gap. |
 | Status | `modelStatus` | `valid` / `target_missed` / `invalid` | One clear badge + one-line reason via a **status→public-copy mapping** (§4.4). Never show `modelStatusReason` verbatim — it is raw Danish engine text. |
 | Robustness score | `financialRobustness` | 0–100 | "Hvor solid er planen?" with a short explainer |
@@ -269,20 +270,29 @@ Computed by tracing the engine (`toScenario`/`toAssumptions` → `project` → `
 `sanityChecks`) — via a temporary, uncommitted script; **no code was committed**. Numbers are
 real-terms DKK. Use these as realistic design fixtures (one "not yet on track", one "on track").
 
+> **The Value column holds illustrative, rounded example figures** (monetary ones marked with
+> `≈`), for design only. The live UI — and any test — must render the **actual runtime-computed
+> value** formatted in Danish convention (period as thousands separator, whole kroner), **never
+> these rounded examples**. So the "Designed-for framing" copy uses a `{beløb}` placeholder for
+> the runtime value rather than a hardcoded number; do not hardcode the example figures as
+> rendered copy. (Per the copy rule in §5, the rendered figure carries no "ca." and uncertainty
+> is handled once by the single global disclaimer, not per number.) Exact integer values — ages,
+> scores, status — are shown directly.
+
 **Fixture 1 — `DEFAULT_SIMPLE_INPUTS` persona (the default form state).**
 Inputs: age 35, horizon 90, income 500,000, spending 20,000/md, investments 200,000,
 saving 8,000/md, pension 300,000 @ access 67, return 4%, desired stop 60.
 
 | Output | Value | Designed-for framing |
 |---|---|---|
-| `modelStatus` | `invalid` | Badge: "Ikke på sporet endnu" |
+| `modelStatus` | `invalid` | Badge: "Ikke på sporet" |
 | `plannedStopAge` | 60 | "Du vil gerne stoppe ved 60" |
-| `earliestSustainableStopAge` | 62 | "Tidligst holdbare stop: ca. 62" |
-| Capital at stop age (`capitalAtStopAge`) | ≈ 4.240.000 kr | "Ca. 4,2 mio. kr ved stop" |
-| Capital at pension access age (67) | ≈ 3.580.000 kr | "Ca. 3,6 mio. kr når pensionen åbner" |
+| `earliestSustainableStopAge` | 62 | "Tidligst holdbare stop: 62" |
+| Capital at stop age (`capitalAtStopAge`) | ≈ 4.240.000 kr | "{beløb} kr ved stop" |
+| Capital at pension access age (67) | ≈ 3.580.000 kr | "{beløb} kr når pensionen åbner" |
 | Capital at end of horizon (last `YearRow`, age 90) | 0 kr | "Formuen er brugt op inden planperiodens slutning". (Here `lifeExpectancy` 90 < 95, so this equals `capitalAt95` — but the card must source the last `YearRow`, not `capitalAt95`.) |
 | `firstShortfallAge` | 86 | "Første flaskehals: alder 86" |
-| **Monthly gap at first bottleneck** (year-86 `shortfallAmount / 12`) | ≈ 18.255 kr/md | "Fra alder 86 mangler du ca. 18.300 kr/md" — this is the bottleneck-card number |
+| **Monthly gap at first bottleneck** (year-86 `shortfallAmount / 12`) | ≈ 18.255 kr/md | "Fra alder 86 mangler du {beløb} kr/md" — this is the bottleneck-card number |
 | After-stop average gap (`monthlyGapAfterStop`) | ≈ 3.170 kr/md | A different, smaller average across all years from stop; only show if explicitly labelled "gns. efter stop" |
 | `financialRobustness` | 25 / 100 | "Lav robusthed" |
 | `assumptionConfidence` | 75 / 100 | "Rimelig antagelsessikkerhed" |
@@ -301,9 +311,9 @@ saving 15,000/md, pension 500,000 @ access 67, return 4%, desired stop 55.
 |---|---|---|
 | `modelStatus` | `valid` | Badge: "På sporet" |
 | `plannedStopAge` | 55 | "Du vil gerne stoppe ved 55" |
-| `earliestSustainableStopAge` | 48 | "Du kunne stoppe allerede ved ca. 48" |
-| Capital at stop age (`capitalAtStopAge`) | ≈ 8.070.000 kr | "Ca. 8,1 mio. kr ved stop" |
-| Capital at pension access age (67) | ≈ 9.500.000 kr | "Ca. 9,5 mio. kr når pensionen åbner" |
+| `earliestSustainableStopAge` | 48 | "Du kunne stoppe allerede ved 48" |
+| Capital at stop age (`capitalAtStopAge`) | ≈ 8.070.000 kr | "{beløb} kr ved stop" |
+| Capital at pension access age (67) | ≈ 9.500.000 kr | "{beløb} kr når pensionen åbner" |
 | Capital at end of horizon (last `YearRow`, age 90) | ≈ 13.520.000 kr | "Formuen vokser planperioden ud". (Here `lifeExpectancy` 90 < 95, so this equals `capitalAt95`; the card must still source the last `YearRow`.) |
 | `firstShortfallAge` | `null` | "Ingen flaskehals fundet" |
 | Monthly gap at first bottleneck | — (no shortfall) | Bottleneck card hidden; show "ingen flaskehals" |
@@ -392,7 +402,7 @@ adapter must **not** match on label text. Two robust options (the implementation
 | Driver family (origin in `kpis.ts`) | Public Danish copy (indicative) |
 |---|---|
 | Cashflow coverage — positive ("Ingen cashflow-shortfall") | "Dit forbrug er dækket hele perioden." |
-| Cashflow coverage — negative ("Cashflow-shortfall ved alder X" / "Månedligt hul efter stop") | "Pengene slipper op ved alder {X}." / "Du mangler i gennemsnit ca. {G} kr/md efter stop." |
+| Cashflow coverage — negative ("Cashflow-shortfall ved alder X" / "Månedligt hul efter stop") | "Pengene slipper op ved alder {X}." / "Du mangler i gennemsnit {G} kr/md efter stop." |
 | End-of-horizon margin ("Komfortabel slutmargin" / "Lav margin …") | "Du har god margin ved planperiodens slutning." / "Der er kun lille margin ved planperiodens slutning." Mention a target only when `fiTargetMinNetWorth` is set. |
 
 **Explicitly filtered out (never public):**
@@ -420,14 +430,31 @@ it has reviewed public copy.
 ## 5. Copy direction (Danish)
 
 Tone: **calm, plain, trustworthy, practical.** Not advice, not jargon, not salesy, no false
-precision. Short sentences. Numbers are rounded/approximate in headlines ("ca."). Never show
-personal names (Barma) or unexplained Danish acronyms (ASK, AM-bidrag, 27/42) on the public
-path. Currency is `kr`; amounts are nutidskroner.
+precision. Short sentences. Never show personal names (Barma) or unexplained Danish acronyms
+(ASK, AM-bidrag, 27/42) on the public path. Currency is `kr`; amounts are nutidskroner.
+
+**Public copy voice (the rule).** This is the canonical voice for every Danish user-facing
+string. It is mirrored in `CLAUDE.md` §3 rule 8.
+
+- Plain, human Danish. Sentence case, short, active voice. Name things by what the person
+  controls, not by how the system works.
+- No em dashes. Use commas or full stops.
+- Avoid classic AI phrasings and filler.
+- Show the actual computed figures, formatted in Danish convention (period as thousands
+  separator, whole kroner, e.g. 3.486.500 kr). Do not hedge figures with "ca." and do not
+  round them into vagueness.
+- Handle model uncertainty once, globally, with a single calm disclaimer (not per number):
+  *"En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret
+  billede, ikke en garanti, og ikke som økonomisk rådgivning."*
+- Honest and reassuring, never salesy or alarmist.
 
 Principles:
 - **Every headline number gets one explaining sentence.** A number with no sentence is not ready.
-- **Estimate, not advice.** Persistent, unobtrusive: *"Et estimat til planlægning — ikke
-  økonomisk rådgivning."*
+- **Actual figures, not vague ones.** Show the real computed number in Danish convention
+  (e.g. 3.486.500 kr); never prefix it with "ca." and never round it into vagueness.
+- **One global disclaimer, not per number.** Handle model uncertainty once: *"En forenklet
+  beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret billede, ikke
+  en garanti, og ikke som økonomisk rådgivning."*
 - **Real terms, stated once, clearly:** *"Alle beløb er i nutidskroner (dagens købekraft)."*
 - **Plain bottleneck language**, not engine terms: *"flaskehals"* not *"cashflow-shortfall"*.
 
@@ -437,21 +464,21 @@ Example labels / microcopy (indicative — final copy is a later pass):
 |---|---|
 | App brand | **Frihedsmodel** |
 | Intro headline | "Hvornår kan du blive økonomisk fri?" |
-| Intro sub | "Få et estimat på få minutter — og se, hvad der betyder mest." |
+| Intro sub | "Få et estimat på få minutter. Se, hvad der betyder mest." |
 | Start CTA | "Kom i gang" |
 | Result CTA | "Se mit resultat" |
 | Status: valid | "På sporet" |
-| Status: tight / target_missed | "Lige på vippen" |
-| Status: invalid | "Ikke på sporet endnu" |
-| Headline answer | "Du kan tidligst stoppe omkring alder {X}." |
+| Status: tight / target_missed | "Stramt" |
+| Status: invalid | "Ikke på sporet" |
+| Headline answer | "Du kan tidligst stoppe ved alder {X}." |
 | No FI age yet | "Med de nuværende tal er du ikke på sporet endnu." |
-| Capital at stop | "Ca. {N} kr ved din planlagte stop-alder." |
-| Bottleneck | "Fra alder {Y} mangler du ca. {G} kr/md." |
-| No bottleneck | "Ingen flaskehals fundet — planen holder hele vejen." |
+| Capital at stop | "{N} kr ved din planlagte stop-alder." |
+| Bottleneck | "Fra alder {Y} mangler du {G} kr/md." |
+| No bottleneck | "Ingen flaskehals fundet, planen holder hele vejen." |
 | Robustness | "Hvor solid er planen?" |
 | Confidence | "Hvor meget afhænger resultatet af optimistiske antagelser?" |
 | Levers nudge | "Prøv at justere forbrug, opsparing eller stop-alder og se effekten." |
-| Disclaimer | "Et estimat til planlægning — ikke økonomisk rådgivning." |
+| Disclaimer (single, global) | "En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning." |
 | Real terms note | "Alle beløb er i nutidskroner." |
 
 ---

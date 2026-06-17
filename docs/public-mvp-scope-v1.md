@@ -6,8 +6,16 @@
 > **Audience:** product + engineering.
 >
 > **Companion docs:** `docs/model-primitives-v1.md` (the merged model-primitives / conceptual
-> model map) and `src/lib/finance/MODEL.md` (internal implementation note). This document
-> turns those primitives into a concrete public-product scope.
+> model map), `src/lib/finance/MODEL.md` (internal implementation note), and
+> `docs/public-mvp-spec-and-data-contract-v1.md` (the Phase 3 spec & data contract). This
+> document turns those primitives into a concrete public-product scope.
+>
+> **Copy & figure presentation:** the canonical rule now lives in
+> `docs/public-mvp-spec-and-data-contract-v1.md` §5 (mirrored in CLAUDE.md §3 rule 8) — show the
+> actual computed figure in Danish format with no "ca." and no rounding into vagueness, and
+> handle uncertainty once with a single global disclaimer. Where this scope doc earlier implied
+> rounding/ranging headline numbers, that rule **supersedes** it; the wording below has been
+> reconciled.
 
 ---
 
@@ -104,18 +112,27 @@ to fill in correctly belongs in Advanced.
 The engine already computes everything below (see `KPIs` in `types.ts`); the MVP just *shows a
 subset clearly*.
 
-### Must-have (public dashboard)
-| Output | Source field | Plain-language framing |
+> **The data contract is the binding mapping; this table is orientation only.** The exact public
+> output surface — which KPI fields are public-safe, which are forbidden, the horizon-relative
+> anchors, and the public-safe adapters — is specified in
+> `docs/public-mvp-spec-and-data-contract-v1.md` §4.2 (outputs), §4.4 (warnings + status adapter)
+> and §4.5 (drivers adapter). **That contract supersedes the table below; do not implement from
+> this table alone.** The rows here have been corrected to match it: the fixed-age KPIs
+> `capitalAt65`/`capitalAt95` are never used as anchors, `monthlyGapAfterStop` is never the
+> bottleneck gap, and `modelStatusReason` / `robustnessBreakdown` are never surfaced raw.
+
+### Must-have (public dashboard) — binding mapping in data contract §4.2
+| Output | Public-safe source (per data contract) | Plain-language framing |
 |---|---|---|
-| Earliest sustainable stop age | `kpis.earliestSustainableStopAge` | "You could stop around age X" (or "not yet on track") |
-| Capital at stop age | `kpis.capitalAtStopAge` | "About N at your planned stop age" |
-| Capital at key ages | `kpis.capitalAt65`, `kpis.capitalAt95` | two anchor points on the chart |
-| First financing problem / shortfall age | `kpis.firstShortfallAge` / `firstFinancingIssueAge` | "First shortfall around age Y" |
-| Monthly gap or surplus | `kpis.monthlyGapAfterStop` | "About G kr/month short/over after you stop" |
-| Status (valid / tight / not yet) | `kpis.modelStatus` + `modelStatusReason` | a single clear badge + one-line reason |
-| Robustness / confidence score | `kpis.financialRobustness`, `assumptionConfidence` | "How solid is this plan?" with a short explainer |
-| Top 3–5 drivers | `kpis.robustnessBreakdown` (ScoreFactor[]) | "What's helping / hurting most" |
-| Warnings (fragile/invalid) | `sanityChecks()` + `modelStatusReason` | plain-language cautions, not raw check IDs |
+| Earliest sustainable stop age | `kpis.earliestSustainableStopAge` (`null` → "not yet on track") | the earliest age you could sustainably stop (or "not yet on track") |
+| Capital at planned stop age | `kpis.capitalAtStopAge`, shown only when `currentAge ≤ stopAge ≤ lifeExpectancy` (§4.2 R1 guard) | capital at your planned stop age |
+| Capital at horizon-relative anchors | net worth of the **`YearRow`** at pension-access age and at the **last** projected year — **not** `capitalAt65`/`capitalAt95` (fixed-age KPIs are never anchors; end-of-horizon is the last `YearRow`) | pension-access and end-of-horizon points on the chart |
+| First financing problem / shortfall age | `kpis.firstShortfallAge` (`null` → no bottleneck) | the first age the plan can't fund spending |
+| Monthly gap at the first bottleneck | `shortfallAmount / 12` of the **first shortfall `YearRow`** — **not** `monthlyGapAfterStop` (that is an after-stop *average*: a different, smaller number, never the bottleneck gap) | "from age Y you're G kr/month short" |
+| Status (valid / tight / not yet) | `kpis.modelStatus` via the **status→public-copy mapping** (§4.4) — never raw `modelStatusReason` | a single clear badge + one-line reason |
+| Robustness / confidence score | `kpis.financialRobustness`, `kpis.assumptionConfidence` | "How solid is this plan?" with a short explainer |
+| Top 3–5 drivers | the **public-safe drivers adapter** over `robustnessBreakdown` (§4.5) — never raw (e.g. the holding-dependency factor is filtered out) | "What's helping / hurting most" |
+| Warnings (fragile/invalid) | the **public-safe warnings adapter** over `sanityChecks()` (§4.4) — never raw output, raw check IDs, or raw `modelStatusReason` | plain-language cautions |
 
 ### Advanced outputs (Advanced mode only)
 - Full year-by-year table (`YearRow[]`), per-bucket balances, tax breakdowns, withdrawal audit.
@@ -184,13 +201,15 @@ explicit (short, plain, always available):
 
 - **Real terms.** State once and clearly that all amounts are in **today's money / nutidskroner**
   (the chosen convention), so figures are comparable to today's prices.
-- **Not financial advice.** A persistent, unobtrusive disclaimer: estimates for planning, not
-  personalized advice.
+- **Not financial advice.** A persistent, unobtrusive **single global disclaimer** (one calm
+  statement, not per number) — the exact Danish wording is the canonical one in
+  `docs/public-mvp-spec-and-data-contract-v1.md` §5 (CLAUDE.md §3 rule 8): a simplified estimate
+  from the user's own numbers, a qualified picture, not a guarantee, and not financial advice.
 - **Assumptions drive the result.** Make the key assumptions (return, inflation/real terms,
   pension access age) visible and editable, with a note that changing them changes everything.
-- **Why valid / invalid.** Translate `modelStatus` + `modelStatusReason` into plain language:
-  *valid* (plan holds), *target missed* (works but ends below your minimum), *invalid* (you run
-  short — here's where).
+- **Why valid / invalid.** Translate `modelStatus` into plain language via the status→public-copy
+  mapping (data contract §4.4) — never render raw `modelStatusReason`: *valid* (plan holds),
+  *target missed* (works but ends below your minimum), *invalid* (you run short — here's where).
 - **What "first financing problem" means.** Explain it as *"the first year your income +
   available capital can't cover your spending"* — the first real bottleneck, not a styling glitch.
 - **Why FI / stop age may not be reached.** When `earliestSustainableStopAge` is null/late,
@@ -212,7 +231,7 @@ explainer. If we can't explain it simply, we don't show it in the MVP.
 | Risk | Description | Mitigation |
 |---|---|---|
 | Too much complexity too early | The advanced model overwhelms first-time users and they bounce. | Strict progressive disclosure; one-screen form; answer-first. |
-| False precision | Showing kr-exact figures implies certainty the model doesn't have. | Round/range headline numbers; pair with robustness/confidence; "estimate" framing. |
+| False precision | Showing kr-exact figures implies certainty the model doesn't have. | Per the canonical copy rule (`docs/public-mvp-spec-and-data-contract-v1.md` §5): show the actual computed figure in Danish format, **not** rounded into vagueness; handle uncertainty **once** with the single global disclaimer, and pair the numbers with the robustness/confidence framing ("a qualified picture, not a guarantee"). |
 | Misread as advice | Users treat projections as a recommendation to act. | Persistent disclaimer; "planning estimate" language; no buy/sell guidance. |
 | DK assumptions leaking into public UI | Danish tax/pension terms or `kr` appear for non-DK users. | Locale packs; generic copy on the main path; DK as one pack, not the default everywhere. |
 | Hiding too much → feels generic | Over-simplification makes the tool feel like every other calculator. | Keep the *differentiators* (real bottleneck, robustness, top drivers) on the simple path. |
@@ -260,13 +279,16 @@ own PR candidate.
    - *Tests:* Playwright: advanced routes reachable in advanced mode, not on the public path.
 
 6. **Public scenario validity explanations**
-   - *Goal:* translate `modelStatus`/`sanityChecks()` into public-friendly messages.
+   - *Goal:* translate `modelStatus`/`sanityChecks()` into public-friendly messages via the
+     public-safe status + warnings adapters (data contract §4.4) — never raw output or raw
+     `modelStatusReason`.
    - *Areas:* a presentation mapping (status → copy), dashboard.
    - *Risk:* low.
    - *Tests:* unit tests mapping each status/check to a message; Playwright presence checks.
 
 7. **Top drivers / sensitivity explanation**
-   - *Goal:* surface `robustnessBreakdown` as "what helps/hurts most", optionally a small
+   - *Goal:* surface the top drivers as "what helps/hurts most" via the public-safe drivers
+     adapter (data contract §4.5) — never raw `robustnessBreakdown` — optionally a small
      1-lever sensitivity ("+1,000 kr/month saving → stop ~1 yr earlier").
    - *Areas:* dashboard component; possibly a thin read-only sensitivity helper (no engine change).
    - *Risk:* medium (sensitivity must reuse the engine, not approximate it).
