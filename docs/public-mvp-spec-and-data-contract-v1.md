@@ -270,6 +270,15 @@ Computed by tracing the engine (`toScenario`/`toAssumptions` → `project` → `
 `sanityChecks`) — via a temporary, uncommitted script; **no code was committed**. Numbers are
 real-terms DKK. Use these as realistic design fixtures (one "not yet on track", one "on track").
 
+> **The Value column holds illustrative, rounded example figures** (monetary ones marked with
+> `≈`), for design only. The live UI — and any test — must render the **actual runtime-computed
+> value** formatted in Danish convention (period as thousands separator, whole kroner), **never
+> these rounded examples**. So the "Designed-for framing" copy uses a `{beløb}` placeholder for
+> the runtime value rather than a hardcoded number; do not hardcode the example figures as
+> rendered copy. (Per the copy rule in §5, the rendered figure carries no "ca." and uncertainty
+> is handled once by the single global disclaimer, not per number.) Exact integer values — ages,
+> scores, status — are shown directly.
+
 **Fixture 1 — `DEFAULT_SIMPLE_INPUTS` persona (the default form state).**
 Inputs: age 35, horizon 90, income 500,000, spending 20,000/md, investments 200,000,
 saving 8,000/md, pension 300,000 @ access 67, return 4%, desired stop 60.
@@ -279,11 +288,11 @@ saving 8,000/md, pension 300,000 @ access 67, return 4%, desired stop 60.
 | `modelStatus` | `invalid` | Badge: "Ikke på sporet endnu" |
 | `plannedStopAge` | 60 | "Du vil gerne stoppe ved 60" |
 | `earliestSustainableStopAge` | 62 | "Tidligst holdbare stop: 62" |
-| Capital at stop age (`capitalAtStopAge`) | ≈ 4.240.000 kr | "4.240.000 kr ved stop" |
-| Capital at pension access age (67) | ≈ 3.580.000 kr | "3.580.000 kr når pensionen åbner" |
+| Capital at stop age (`capitalAtStopAge`) | ≈ 4.240.000 kr | "{beløb} kr ved stop" |
+| Capital at pension access age (67) | ≈ 3.580.000 kr | "{beløb} kr når pensionen åbner" |
 | Capital at end of horizon (last `YearRow`, age 90) | 0 kr | "Formuen er brugt op inden planperiodens slutning". (Here `lifeExpectancy` 90 < 95, so this equals `capitalAt95` — but the card must source the last `YearRow`, not `capitalAt95`.) |
 | `firstShortfallAge` | 86 | "Første flaskehals: alder 86" |
-| **Monthly gap at first bottleneck** (year-86 `shortfallAmount / 12`) | ≈ 18.255 kr/md | "Fra alder 86 mangler du 18.255 kr/md" — this is the bottleneck-card number |
+| **Monthly gap at first bottleneck** (year-86 `shortfallAmount / 12`) | ≈ 18.255 kr/md | "Fra alder 86 mangler du {beløb} kr/md" — this is the bottleneck-card number |
 | After-stop average gap (`monthlyGapAfterStop`) | ≈ 3.170 kr/md | A different, smaller average across all years from stop; only show if explicitly labelled "gns. efter stop" |
 | `financialRobustness` | 25 / 100 | "Lav robusthed" |
 | `assumptionConfidence` | 75 / 100 | "Rimelig antagelsessikkerhed" |
@@ -303,8 +312,8 @@ saving 15,000/md, pension 500,000 @ access 67, return 4%, desired stop 55.
 | `modelStatus` | `valid` | Badge: "På sporet" |
 | `plannedStopAge` | 55 | "Du vil gerne stoppe ved 55" |
 | `earliestSustainableStopAge` | 48 | "Du kunne stoppe allerede ved 48" |
-| Capital at stop age (`capitalAtStopAge`) | ≈ 8.070.000 kr | "8.070.000 kr ved stop" |
-| Capital at pension access age (67) | ≈ 9.500.000 kr | "9.500.000 kr når pensionen åbner" |
+| Capital at stop age (`capitalAtStopAge`) | ≈ 8.070.000 kr | "{beløb} kr ved stop" |
+| Capital at pension access age (67) | ≈ 9.500.000 kr | "{beløb} kr når pensionen åbner" |
 | Capital at end of horizon (last `YearRow`, age 90) | ≈ 13.520.000 kr | "Formuen vokser planperioden ud". (Here `lifeExpectancy` 90 < 95, so this equals `capitalAt95`; the card must still source the last `YearRow`.) |
 | `firstShortfallAge` | `null` | "Ingen flaskehals fundet" |
 | Monthly gap at first bottleneck | — (no shortfall) | Bottleneck card hidden; show "ingen flaskehals" |
