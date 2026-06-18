@@ -1,19 +1,19 @@
 /**
  * Public-safe status adapter (data contract §4.4(a)).
  *
- * The public status is derived from the engine's existing `modelStatus` verdict — NO new
- * thresholds. The reason is synthesised from the verdict plus already-public facts; the raw
- * `modelStatusReason` (which may name holding / folkepension / ratepension / "No Barma") is
- * never read into the output. Default-deny by construction.
+ * The public status has two components, both horizon-correct:
+ *  - off_track is the engine's shortfall-based verdict (`modelStatus === "invalid"`, which reads
+ *    YearRow.shortfall across the whole horizon). Kept exactly as-is.
+ *  - the target-met component (on_track vs tight) is derived from the SAME end-of-horizon margin
+ *    verdict the end-margin driver uses (last YearRow vs fiTargetMinNetWorth), NOT from the engine's
+ *    age-95 `target_missed`. This keeps status and driver from ever disagreeing for lifeExpectancy > 95.
+ *
+ * No new thresholds — the target verdict reuses `classifyEndMargin`. The reason is synthesised from
+ * the verdict plus already-public facts; the raw `modelStatusReason` is never read into the output.
  */
 import type { KPIs, ModelStatus } from "../types";
+import type { EndMarginVerdict } from "./endMargin";
 import type { PublicStatus, PublicStatusKind, StatusColorToken } from "./types";
-
-const KIND_BY_STATUS: Record<ModelStatus, PublicStatusKind> = {
-  valid: "on_track",
-  target_missed: "tight",
-  invalid: "off_track",
-};
 
 const LABEL: Record<PublicStatusKind, string> = {
   on_track: "På sporet",
@@ -32,6 +32,17 @@ export interface StatusContext {
   firstShortfallAge: number | null;
   /** Whether the user set an FI target (so "mål" wording is meaningful). */
   hasFiTarget: boolean;
+  /** Shared end-of-horizon margin verdict — the SAME one the end-margin driver consumes. */
+  endMarginVerdict: EndMarginVerdict;
+}
+
+/**
+ * Off_track from the shortfall-based engine verdict; otherwise the target component from the shared
+ * end-of-horizon margin verdict (missed → tight, thin/comfortable → on_track).
+ */
+function deriveKind(modelStatus: ModelStatus, endMarginVerdict: EndMarginVerdict): PublicStatusKind {
+  if (modelStatus === "invalid") return "off_track"; // shortfall / financing failure — horizon-correct
+  return endMarginVerdict === "missed" ? "tight" : "on_track";
 }
 
 /** Public Danish reason, generated fresh from the verdict — never the raw engine text. */
@@ -50,8 +61,8 @@ export function adaptStatusReason(kind: PublicStatusKind, ctx: StatusContext): s
   }
 }
 
-/** Map the engine verdict to a public status badge (kind + Danish label + colour + safe reason). */
+/** Map the engine verdict + shared end-margin verdict to a public status badge. */
 export function toPublicStatus(kpis: Pick<KPIs, "modelStatus">, ctx: StatusContext): PublicStatus {
-  const kind = KIND_BY_STATUS[kpis.modelStatus];
+  const kind = deriveKind(kpis.modelStatus, ctx.endMarginVerdict);
   return { kind, label: LABEL[kind], colorToken: COLOR[kind], reason: adaptStatusReason(kind, ctx) };
 }

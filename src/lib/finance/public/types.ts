@@ -73,8 +73,9 @@ export interface PublicResult {
    */
   capitalAtStopAge: number;
   /**
-   * First age within the horizon where total net worth reaches <= 0. If it never does, the money
-   * lasts the whole plan and this equals `lifeExpectancy` (from the LAST YearRow, never capitalAt95).
+   * The age the money lasts to: the FIRST shortfall age (`YearRow.shortfall`, the engine's failure
+   * signal — the same first-shortfall row the bottleneck uses). When the plan never falls short, the
+   * money lasts the whole plan and this equals `lifeExpectancy` (the LAST YearRow, never capitalAt95).
    */
   moneyLastsToAge: number;
   /** "none" when the money lasts; otherwise the first-shortfall bottleneck. */

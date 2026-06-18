@@ -12,6 +12,7 @@ import { toAssumptions, toScenario, type SimplePublicInputs } from "../simpleInp
 import type { PublicBottleneck, PublicResult } from "./types";
 import { toPublicStatus } from "./status";
 import { adaptRobustnessDrivers } from "./drivers";
+import { classifyEndMargin } from "./endMargin";
 import { toRobustnessScore, toAssumptionConfidenceScore } from "./scores";
 import { capitalAtPlannedStopAge, firstShortfall, moneyLastsToAge, netWorthSeries } from "./selectors";
 
@@ -31,18 +32,25 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
     ? { kind: "shortfall", firstShortfallAge: short.age, monthlyGap: short.monthlyGap }
     : { kind: "none" };
 
-  // Status: derived from the engine verdict only (no new thresholds), reason synthesised safely.
-  const status = toPublicStatus(kpis, { firstShortfallAge, hasFiTarget });
+  // End of horizon = the LAST projected YearRow (never the fixed-age-95 KPI). One shared
+  // end-of-horizon margin verdict feeds BOTH the status's target component and the end-margin
+  // driver, so they can never disagree.
+  const endOfHorizonNetWorth = years.length ? years[years.length - 1].netWorth : 0;
+  const endMarginVerdict = classifyEndMargin({
+    endOfHorizonNetWorth,
+    fiTargetMinNetWorth: inputs.fiTargetMinNetWorth ?? 0,
+    annualSpending: Math.max(1, inputs.monthlySpending * 12),
+  });
+
+  // Status: off_track from the shortfall-based engine verdict; target component from the shared
+  // end-margin verdict. Reason synthesised safely (never the raw modelStatusReason).
+  const status = toPublicStatus(kpis, { firstShortfallAge, hasFiTarget, endMarginVerdict });
 
   // Frihedspunkt: bounded to the horizon.
   const earliest =
     kpis.earliestSustainableStopAge == null
       ? null
       : Math.max(currentAge, Math.min(lifeExpectancy, kpis.earliestSustainableStopAge));
-
-  // End of horizon = the LAST projected YearRow (never the fixed-age-95 KPI). Used by the
-  // horizon-correct end-of-horizon-margin driver.
-  const endOfHorizonNetWorth = years.length ? years[years.length - 1].netWorth : 0;
 
   return {
     status,
@@ -54,12 +62,7 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
     netWorthByAge: netWorthSeries(years),
     desiredStopAge: Math.max(currentAge, Math.min(lifeExpectancy, inputs.desiredStopAge)),
     lifeExpectancy,
-    drivers: adaptRobustnessDrivers(kpis.robustnessBreakdown, {
-      hasFiTarget,
-      endOfHorizonNetWorth,
-      fiTargetMinNetWorth: inputs.fiTargetMinNetWorth ?? 0,
-      annualSpending: Math.max(1, inputs.monthlySpending * 12),
-    }),
+    drivers: adaptRobustnessDrivers(kpis.robustnessBreakdown, { hasFiTarget, endMarginVerdict }),
     robustness: toRobustnessScore(kpis.financialRobustness),
     assumptionConfidence: toAssumptionConfidenceScore(kpis.assumptionConfidence),
   };

@@ -15,6 +15,7 @@ import {
   containsForbiddenTerm,
   toRobustnessScore,
   toAssumptionConfidenceScore,
+  classifyEndMargin,
   type PublicResult,
 } from "../index";
 
@@ -105,23 +106,44 @@ function publicStrings(r: PublicResult): string[] {
 // 1. Golden scenarios — all three verdicts
 // ---------------------------------------------------------------------------
 
-describe("status mapping (engine verdict → public status, no new thresholds)", () => {
-  it("valid → on_track / På sporet / sage", () => {
-    const s = toPublicStatus(makeKpis({ modelStatus: "valid" }), { firstShortfallAge: null, hasFiTarget: false });
+describe("status mapping (shortfall verdict + shared end-margin verdict)", () => {
+  it("not-invalid + comfortable margin → on_track / På sporet / sage", () => {
+    const s = toPublicStatus(makeKpis({ modelStatus: "valid" }), {
+      firstShortfallAge: null,
+      hasFiTarget: false,
+      endMarginVerdict: "comfortable",
+    });
     expect(s.kind).toBe("on_track");
     expect(s.label).toBe("På sporet");
     expect(s.colorToken).toBe("sage");
   });
 
-  it("target_missed → tight / Stramt / dawn", () => {
-    const s = toPublicStatus(makeKpis({ modelStatus: "target_missed" }), { firstShortfallAge: null, hasFiTarget: true });
+  it("not-invalid + thin margin → on_track (a thin margin is not 'missed')", () => {
+    const s = toPublicStatus(makeKpis({ modelStatus: "valid" }), {
+      firstShortfallAge: null,
+      hasFiTarget: true,
+      endMarginVerdict: "thin",
+    });
+    expect(s.kind).toBe("on_track");
+  });
+
+  it("not-invalid + missed margin → tight / Stramt / dawn", () => {
+    const s = toPublicStatus(makeKpis({ modelStatus: "valid" }), {
+      firstShortfallAge: null,
+      hasFiTarget: true,
+      endMarginVerdict: "missed",
+    });
     expect(s.kind).toBe("tight");
     expect(s.label).toBe("Stramt");
     expect(s.colorToken).toBe("dawn");
   });
 
-  it("invalid → off_track / Ikke på sporet / clay", () => {
-    const s = toPublicStatus(makeKpis({ modelStatus: "invalid" }), { firstShortfallAge: 86, hasFiTarget: false });
+  it("invalid (shortfall) → off_track regardless of the end margin", () => {
+    const s = toPublicStatus(makeKpis({ modelStatus: "invalid" }), {
+      firstShortfallAge: 86,
+      hasFiTarget: false,
+      endMarginVerdict: "comfortable",
+    });
     expect(s.kind).toBe("off_track");
     expect(s.label).toBe("Ikke på sporet");
     expect(s.colorToken).toBe("clay");
@@ -291,12 +313,7 @@ describe("leak guards", () => {
       { label: "Lav kontant buffer", detail: "0,0 måneders forbrug", impact: "negative", magnitude: "low" },
       { label: "Ingen cashflow-shortfall", detail: "", impact: "positive", magnitude: "high" },
     ];
-    const drivers = adaptRobustnessDrivers(breakdown, {
-      hasFiTarget: false,
-      endOfHorizonNetWorth: 5_000_000,
-      fiTargetMinNetWorth: 0,
-      annualSpending: 240_000,
-    });
+    const drivers = adaptRobustnessDrivers(breakdown, { hasFiTarget: false, endMarginVerdict: "comfortable" });
     // the cashflow-coverage driver survives; holding + buffer are dropped and never named
     expect(drivers).toContainEqual({ direction: "helps", text: "Dit forbrug er dækket hele perioden." });
     for (const d of drivers) {
@@ -395,13 +412,8 @@ describe("end-of-horizon-margin driver (recomputed from the last YearRow, never 
       { label: "Lav kontant buffer", detail: "Buffer svarer til ca. 0,0 måneders forbrug.", impact: "negative", magnitude: "medium" },
       { label: "Lav afhængighed af holding", detail: "Holding udgør 0 % af slutaktiverne.", impact: "neutral", magnitude: "low" },
     ];
-    // ctx: end value 13.5M just over a 13M goal → a thin margin, recomputed from the last row.
-    const drivers = adaptRobustnessDrivers(breakdown, {
-      hasFiTarget: true,
-      endOfHorizonNetWorth: 13_500_000,
-      fiTargetMinNetWorth: 13_000_000,
-      annualSpending: 216_000,
-    });
+    // ctx: a thin end-of-horizon margin (the shared verdict the status also consumes).
+    const drivers = adaptRobustnessDrivers(breakdown, { hasFiTarget: true, endMarginVerdict: "thin" });
     expect(drivers).toContainEqual({ direction: "hurts", text: "Der er kun lille margin til dit mål ved planperiodens slutning." });
     expect(drivers.some((d) => /buffer/i.test(d.text))).toBe(false);
     expect(drivers.some((d) => /holding/i.test(d.text))).toBe(false);
@@ -450,6 +462,59 @@ describe("end-of-horizon-margin driver (recomputed from the last YearRow, never 
     expect(texts).not.toContain("Du har god margin ved planperiodens slutning.");
     // reflects the real end (age 110, below the goal)
     expect(texts).toContain("Du når ikke dit mål ved planperiodens slutning.");
+    // STATUS shares the same end-of-horizon verdict → not "På sporet", agrees with the driver
+    expect(r.status.kind).not.toBe("on_track");
+    expect(r.status.kind).toBe("tight");
+    expect(r.status.label).toBe("Stramt");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Status & end-margin driver share one evaluation and never disagree (Codex P2)
+// ---------------------------------------------------------------------------
+
+describe("status target verdict and the end-margin driver never disagree", () => {
+  it("classifyEndMargin: missed / thin / comfortable banding", () => {
+    expect(classifyEndMargin({ endOfHorizonNetWorth: 4_000_000, fiTargetMinNetWorth: 5_000_000, annualSpending: 240_000 })).toBe("missed");
+    // just over goal but < 5× annual spend margin → thin
+    expect(classifyEndMargin({ endOfHorizonNetWorth: 5_500_000, fiTargetMinNetWorth: 5_000_000, annualSpending: 240_000 })).toBe("thin");
+    // well over goal → comfortable
+    expect(classifyEndMargin({ endOfHorizonNetWorth: 12_000_000, fiTargetMinNetWorth: 5_000_000, annualSpending: 240_000 })).toBe("comfortable");
+    // no goal + healthy end → comfortable
+    expect(classifyEndMargin({ endOfHorizonNetWorth: 10_000_000, fiTargetMinNetWorth: 0, annualSpending: 240_000 })).toBe("comfortable");
+  });
+
+  it("invariant: status is never on_track while the end-margin driver says the target is missed", () => {
+    const scenarios: SimplePublicInputs[] = [
+      DEFAULT_SIMPLE_INPUTS,
+      HIGH_SAVER,
+      { ...HIGH_SAVER, fiTargetMinNetWorth: 50_000_000 },
+      { ...HIGH_SAVER, fiTargetMinNetWorth: 13_000_000 },
+      { ...DEFAULT_SIMPLE_INPUTS, fiTargetMinNetWorth: 10_000_000 },
+    ];
+    for (const inp of scenarios) {
+      const r = computePublicResult(inp);
+      const driverSaysMissed = r.drivers.some((d) => d.text === "Du når ikke dit mål ved planperiodens slutning.");
+      if (driverSaysMissed) expect(r.status.kind).not.toBe("on_track");
+    }
+  });
+
+  it("invariant (lifeExpectancy > 95 fabricated): status tight ⇔ driver says target missed", () => {
+    // last YearRow below goal even though age 95 is comfortable
+    const ys: YearRow[] = [];
+    for (let a = 35; a <= 110; a++) ys.push(y(a, a <= 95 ? 12_000_000 : 12_000_000 - (a - 95) * 750_000));
+    const inputs: SimplePublicInputs = {
+      ...BASE_INPUTS,
+      currentAge: 35,
+      lifeExpectancy: 110,
+      desiredStopAge: 60,
+      monthlySpending: 20_000,
+      fiTargetMinNetWorth: 5_000_000,
+    };
+    const r = buildPublicResult(inputs, ys, makeKpis({ modelStatus: "valid" }));
+    const driverSaysMissed = r.drivers.some((d) => d.text === "Du når ikke dit mål ved planperiodens slutning.");
+    expect(driverSaysMissed).toBe(true);
+    expect(r.status.kind).toBe("tight");
   });
 });
 

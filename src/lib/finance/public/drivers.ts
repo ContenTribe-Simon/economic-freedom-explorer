@@ -11,24 +11,22 @@
  * that factor from `yAt95` (a FIXED age 95), which is an interior point when lifeExpectancy > 95 —
  * so translating it would claim "margin ved planperiodens slutning" on a fixed-age-95 basis, the
  * exact fixed-age anchor the horizon-boundary rule (§4.0 R1) forbids for end-of-horizon outputs.
- * Instead we recompute the end-margin driver from the adapter's own LAST YearRow against the public
- * minimum-goal input (§4.5 option 1: "end-of-horizon capital vs. fiTargetMinNetWorth"), so it is
- * horizon-correct for every lifeExpectancy. We emit our own fresh Danish copy and never pass raw
- * engine label/detail through; the leak guard runs on the copy we EMIT.
+ * Instead the end-margin driver maps the SHARED end-of-horizon verdict (`classifyEndMargin`, the
+ * same one the public status consumes — last YearRow vs fiTargetMinNetWorth), so it is
+ * horizon-correct for every lifeExpectancy AND can never disagree with the status. We emit our own
+ * fresh Danish copy and never pass raw engine label/detail through; the leak guard runs on the
+ * copy we EMIT.
  */
 import type { ScoreFactor } from "../types";
+import type { EndMarginVerdict } from "./endMargin";
 import type { PublicDriver } from "./types";
 import { containsForbiddenTerm } from "./safety";
 
 export interface DriverContext {
   /** Whether the user set an FI target (so a "mål" mention is meaningful). */
   hasFiTarget: boolean;
-  /** End-of-horizon net worth = the LAST projected YearRow's netWorth (never the age-95 value). */
-  endOfHorizonNetWorth: number;
-  /** Public FI minimum-goal input (0 when not set). */
-  fiTargetMinNetWorth: number;
-  /** Annual desired spending (monthlySpending * 12) — for the 5×-spending margin threshold. */
-  annualSpending: number;
+  /** Shared end-of-horizon margin verdict — the SAME one the public status consumes. */
+  endMarginVerdict: EndMarginVerdict;
 }
 
 /** Classify a per-factor LABEL into a cashflow-coverage public driver, or `null` to drop it. */
@@ -52,28 +50,28 @@ function classifyCashflow(label: string): PublicDriver | null {
 }
 
 /**
- * Horizon-correct end-of-horizon-margin driver, recomputed from the LAST YearRow (never age 95).
- * Mirrors the kpis.ts comparison (target-missed → thin margin (< 5× annual spend) → comfortable),
- * but anchored to the real end of horizon.
+ * Horizon-correct end-of-horizon-margin driver, from the SHARED end-margin verdict (last YearRow,
+ * never age 95). Maps the verdict the public status also consumes to fresh Danish copy.
  */
 function endOfHorizonMarginDriver(ctx: DriverContext): PublicDriver | null {
-  const goal = ctx.fiTargetMinNetWorth;
-  const endValue = ctx.endOfHorizonNetWorth;
-  const belowGoal = endValue + 0.5 < goal;
-  const endMargin = (endValue - goal) / Math.max(1, ctx.annualSpending * 5);
-
-  if (belowGoal && ctx.hasFiTarget) {
-    return { direction: "hurts", text: "Du når ikke dit mål ved planperiodens slutning." };
+  switch (ctx.endMarginVerdict) {
+    case "missed":
+      return {
+        direction: "hurts",
+        text: ctx.hasFiTarget
+          ? "Du når ikke dit mål ved planperiodens slutning."
+          : "Der er kun lille margin ved planperiodens slutning.",
+      };
+    case "thin":
+      return {
+        direction: "hurts",
+        text: ctx.hasFiTarget
+          ? "Der er kun lille margin til dit mål ved planperiodens slutning."
+          : "Der er kun lille margin ved planperiodens slutning.",
+      };
+    case "comfortable":
+      return { direction: "helps", text: "Du har god margin ved planperiodens slutning." };
   }
-  if (belowGoal || endMargin < 1) {
-    return {
-      direction: "hurts",
-      text: ctx.hasFiTarget
-        ? "Der er kun lille margin til dit mål ved planperiodens slutning."
-        : "Der er kun lille margin ved planperiodens slutning.",
-    };
-  }
-  return { direction: "helps", text: "Du har god margin ved planperiodens slutning." };
 }
 
 /**
