@@ -168,27 +168,69 @@ describe("horizon-boundary edge cases", () => {
   it("lifeExpectancy below 65: works without any age-65/95 reference", () => {
     const ys = years(40, 60, () => 500_000);
     expect(netWorthAtAge(ys, 65)).toBeNull();
-    expect(moneyLastsToAge(ys, 60)).toBe(60); // never depletes → end of horizon
+    expect(moneyLastsToAge(ys, firstShortfall(ys))).toBe(60); // never falls short → end of horizon
     expect(capitalAtPlannedStopAge(ys, 55, 40, 60)).toBe(500_000);
   });
 
   it("lifeExpectancy above 95: end of horizon is the LAST YearRow (110), not age 95", () => {
-    const ys = years(35, 110, (a) => 100_000 + a); // strictly increasing, never depletes
+    const ys = years(35, 110, (a) => 100_000 + a); // strictly increasing, never falls short
     const series = netWorthSeries(ys);
     expect(series[series.length - 1].age).toBe(110);
-    expect(moneyLastsToAge(ys, 110)).toBe(110); // not 95
+    expect(moneyLastsToAge(ys, firstShortfall(ys))).toBe(110); // not 95
     // the age-95 row exists but must not be the end-of-horizon value
     expect(netWorthAtAge(ys, 95)).not.toBe(series[series.length - 1].netWorth);
   });
+});
 
-  it("money never runs out → moneyLastsToAge is the horizon end", () => {
-    const ys = years(35, 90, () => 250_000);
-    expect(moneyLastsToAge(ys, 90)).toBe(90);
+// ---------------------------------------------------------------------------
+// 2b. moneyLastsToAge uses the engine shortfall signal (not netWorth <= 0)
+// ---------------------------------------------------------------------------
+
+describe("moneyLastsToAge uses the engine shortfall signal", () => {
+  it("bridge: a shortfall year while net worth is still positive (pension locked) is flagged", () => {
+    const ys = [
+      y(50, 800_000),
+      y(51, 500_000),
+      y(52, 200_000),
+      y(53, 150_000, true, 60_000), // shortfall === true, netWorth still > 0
+      y(54, 120_000, true, 60_000),
+    ];
+    expect(ys[3].netWorth).toBeGreaterThan(0); // net worth has NOT reached <= 0
+    // netWorth <= 0 would never trigger here; the shortfall signal must.
+    expect(moneyLastsToAge(ys, firstShortfall(ys))).toBe(53);
   });
 
-  it("money runs short early → moneyLastsToAge is the first <= 0 age", () => {
-    const ys = years(35, 90, (a) => (a < 50 ? 200_000 : 0)); // hits 0 at age 50
-    expect(moneyLastsToAge(ys, 90)).toBe(50);
+  it("no shortfall but low/negative net worth: that year is NOT flagged as depletion", () => {
+    const ys = [y(35, 100_000), y(36, 0), y(37, -50_000)]; // netWorth <= 0, but shortfall === false
+    expect(moneyLastsToAge(ys, firstShortfall(ys))).toBe(37); // lasts to end of horizon
+    expect(moneyLastsToAge(ys, firstShortfall(ys))).not.toBe(36);
+  });
+
+  it("runs short early: first shortfall age is returned", () => {
+    const ys = years(35, 90, () => 500_000);
+    ys.forEach((r) => {
+      if (r.age >= 70) (r as { shortfall: boolean }).shortfall = true;
+    });
+    expect(moneyLastsToAge(ys, firstShortfall(ys))).toBe(70);
+  });
+
+  it("no shortfall → moneyLastsToAge is the horizon end", () => {
+    const ys = years(35, 90, () => 250_000);
+    expect(moneyLastsToAge(ys, firstShortfall(ys))).toBe(90);
+  });
+
+  it("invariant: off_track → moneyLastsToAge === bottleneck age; on_track → === lifeExpectancy", () => {
+    const off = computePublicResult(DEFAULT_SIMPLE_INPUTS);
+    expect(off.status.kind).toBe("off_track");
+    expect(off.bottleneck.kind).toBe("shortfall");
+    if (off.bottleneck.kind === "shortfall") {
+      expect(off.moneyLastsToAge).toBe(off.bottleneck.firstShortfallAge);
+    }
+
+    const on = computePublicResult(HIGH_SAVER);
+    expect(on.status.kind).toBe("on_track");
+    expect(on.bottleneck.kind).toBe("none");
+    expect(on.moneyLastsToAge).toBe(on.lifeExpectancy);
   });
 });
 

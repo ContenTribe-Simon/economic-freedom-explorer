@@ -41,14 +41,21 @@ export function firstShortfall(years: YearRow[]): YearRow | null {
 }
 
 /**
- * First age within the horizon where total net worth reaches <= 0. If it never does, the money
- * lasts the whole plan and this is the LAST projected YearRow's age (== lifeExpectancy) — the
- * end-of-horizon value always comes from the last YearRow, never from capitalAt95.
+ * The age the money lasts to — the engine's failure signal, NOT `netWorth <= 0`.
+ *
+ * It is the FIRST shortfall age (`YearRow.shortfall`), passed in as the SAME first-shortfall row
+ * the bottleneck uses so the two fields can never diverge. When the plan never falls short, the
+ * money lasts the whole plan and this is the LAST projected YearRow's age (== lifeExpectancy) —
+ * the end-of-horizon value always comes from the last YearRow, never from capitalAt95.
+ *
+ * Why not `netWorth <= 0`: net worth can stay positive in a bridge year whose desired spending is
+ * unfunded (pension still locked), and can be <= 0 (e.g. early debt) in a year where income still
+ * covers spending. `YearRow.shortfall` is the engine's real "can't fund spending" signal, so this
+ * stays consistent with `bottleneck` and the engine verdict.
  */
-export function moneyLastsToAge(years: YearRow[], lifeExpectancy: number): number {
-  const depleted = years.find((y) => y.netWorth <= 0);
-  if (depleted) return depleted.age;
-  return years.length ? years[years.length - 1].age : lifeExpectancy;
+export function moneyLastsToAge(years: YearRow[], firstShortfallRow: YearRow | null): number {
+  if (firstShortfallRow) return firstShortfallRow.age;
+  return years.length ? years[years.length - 1].age : 0;
 }
 
 /** Total-net-worth-per-age series for the horizon chart. Total line only — never per-bucket. */
