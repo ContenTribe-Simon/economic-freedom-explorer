@@ -15,6 +15,7 @@ export type {
   StatusColorToken,
   PublicBottleneck,
   PublicDriver,
+  PublicScore,
   NetWorthPoint,
 } from "./types";
 
@@ -24,6 +25,7 @@ export { computePublicResult, buildPublicResult } from "./result";
 // Adapters (exported so they exist before any screen consumes them — nothing raw can leak later).
 export { toPublicStatus, adaptStatusReason, type StatusContext } from "./status";
 export { adaptRobustnessDrivers, type DriverContext } from "./drivers";
+export { toRobustnessScore, toAssumptionConfidenceScore } from "./scores";
 
 // Horizon-correct selectors over the engine YearRows.
 export {

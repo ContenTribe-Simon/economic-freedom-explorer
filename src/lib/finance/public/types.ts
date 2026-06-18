@@ -51,6 +51,14 @@ export interface PublicDriver {
   text: string;
 }
 
+/** A public-safe 0–100 score plus a short Danish band label (never a raw internal object). */
+export interface PublicScore {
+  /** 0–100, clamped and rounded to an integer. */
+  score: number;
+  /** Short Danish band label (e.g. "Lav robusthed", "Rimelig antagelsessikkerhed"). */
+  label: string;
+}
+
 /** The single typed result the public screens consume. */
 export interface PublicResult {
   status: PublicStatus;
@@ -79,4 +87,8 @@ export interface PublicResult {
   lifeExpectancy: number;
   /** Public-safe robustness drivers (filtered + translated). May be empty. */
   drivers: PublicDriver[];
+  /** How solid the plan is: `financialRobustness` (0–100) + a short Danish band label. */
+  robustness: PublicScore;
+  /** How much the plan leans on optimistic assumptions: `assumptionConfidence` (0–100) + band. */
+  assumptionConfidence: PublicScore;
 }

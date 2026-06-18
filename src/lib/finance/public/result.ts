@@ -12,6 +12,7 @@ import { toAssumptions, toScenario, type SimplePublicInputs } from "../simpleInp
 import type { PublicBottleneck, PublicResult } from "./types";
 import { toPublicStatus } from "./status";
 import { adaptRobustnessDrivers } from "./drivers";
+import { toRobustnessScore, toAssumptionConfidenceScore } from "./scores";
 import { capitalAtPlannedStopAge, firstShortfall, moneyLastsToAge, netWorthSeries } from "./selectors";
 
 /**
@@ -50,6 +51,8 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
     desiredStopAge: Math.max(currentAge, Math.min(lifeExpectancy, inputs.desiredStopAge)),
     lifeExpectancy,
     drivers: adaptRobustnessDrivers(kpis.robustnessBreakdown, { hasFiTarget }),
+    robustness: toRobustnessScore(kpis.financialRobustness),
+    assumptionConfidence: toAssumptionConfidenceScore(kpis.assumptionConfidence),
   };
 }
 

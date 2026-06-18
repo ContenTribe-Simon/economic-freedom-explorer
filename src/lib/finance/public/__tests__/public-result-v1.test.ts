@@ -13,6 +13,8 @@ import {
   netWorthSeries,
   firstShortfall,
   containsForbiddenTerm,
+  toRobustnessScore,
+  toAssumptionConfidenceScore,
   type PublicResult,
 } from "../index";
 
@@ -90,7 +92,13 @@ const BASE_INPUTS: SimplePublicInputs = { ...DEFAULT_SIMPLE_INPUTS };
 
 /** Every user-facing string in a PublicResult (for leak guards). */
 function publicStrings(r: PublicResult): string[] {
-  return [r.status.label, r.status.reason, ...r.drivers.map((d) => d.text)];
+  return [
+    r.status.label,
+    r.status.reason,
+    r.robustness.label,
+    r.assumptionConfidence.label,
+    ...r.drivers.map((d) => d.text),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -361,5 +369,101 @@ describe("positive driver presence (real engine — catches silent disappearance
         { direction: "hurts", text: "Pengene slipper op ved alder 86." }, // cashflow coverage (negative)
       ]),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. End-of-horizon margin driver must not be eaten by a "buffer" in its detail (Codex P2.1)
+// ---------------------------------------------------------------------------
+
+describe("end-of-horizon-margin driver survival", () => {
+  it("survives even though kpis.ts gives its detail the word 'buffer'; the real cash-buffer factor is still dropped", () => {
+    const breakdown: ScoreFactor[] = [
+      // Real kpis.ts shape: end-margin family label, with a detail that contains "buffer".
+      {
+        label: "Lav margin til minimumsmål",
+        detail: "Slutformue er kun 48 % over minimumsmålet (mål: 5× årsforbrug i buffer).",
+        impact: "negative",
+        magnitude: "medium",
+      },
+      // Genuine cash-buffer factor — must be dropped by its own family, not by the word "buffer".
+      { label: "Lav kontant buffer", detail: "Buffer svarer til ca. 0,0 måneders forbrug.", impact: "negative", magnitude: "medium" },
+      { label: "Lav afhængighed af holding", detail: "Holding udgør 0 % af slutaktiverne.", impact: "neutral", magnitude: "low" },
+    ];
+    const drivers = adaptRobustnessDrivers(breakdown, { hasFiTarget: true });
+    // the thin-margin driver survives
+    expect(drivers).toContainEqual({ direction: "hurts", text: "Der er kun lille margin til dit mål ved planperiodens slutning." });
+    // genuine cash-buffer + holding-dependency factors are still filtered
+    expect(drivers.some((d) => /buffer/i.test(d.text))).toBe(false);
+    expect(drivers.some((d) => /holding/i.test(d.text))).toBe(false);
+    expect(drivers).toHaveLength(1); // only the end-margin driver survives
+  });
+
+  it("real engine: a valid plan with a low end-of-horizon margin surfaces the thin-margin driver", () => {
+    // target just under the plan's end net worth → valid (on track) but a low margin.
+    const r = computePublicResult({ ...HIGH_SAVER, fiTargetMinNetWorth: 13_000_000 });
+    expect(r.status.kind).toBe("on_track");
+    const texts = r.drivers.map((d) => d.text);
+    expect(texts).toContain("Der er kun lille margin til dit mål ved planperiodens slutning.");
+    for (const d of r.drivers) {
+      expect(/buffer/i.test(d.text)).toBe(false);
+      expect(/holding/i.test(d.text)).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Robustness score & assumption confidence scalars (Codex P2.2 — contract §4.2)
+// ---------------------------------------------------------------------------
+
+describe("robustness & assumption-confidence scalars", () => {
+  it("score banding: clamps to [0,100], rounds, and labels by band", () => {
+    expect(toRobustnessScore(25)).toEqual({ score: 25, label: "Lav robusthed" });
+    expect(toRobustnessScore(55)).toEqual({ score: 55, label: "Middel robusthed" });
+    expect(toRobustnessScore(90)).toEqual({ score: 90, label: "Høj robusthed" });
+    // boundaries
+    expect(toRobustnessScore(40).label).toBe("Middel robusthed");
+    expect(toRobustnessScore(70).label).toBe("Høj robusthed");
+    expect(toAssumptionConfidenceScore(75)).toEqual({ score: 75, label: "Rimelig antagelsessikkerhed" });
+    expect(toAssumptionConfidenceScore(30).label).toBe("Lav antagelsessikkerhed");
+    expect(toAssumptionConfidenceScore(80).label).toBe("Høj antagelsessikkerhed");
+    // clamping / non-finite
+    expect(toRobustnessScore(-10).score).toBe(0);
+    expect(toRobustnessScore(150).score).toBe(100);
+    expect(toRobustnessScore(63.6).score).toBe(64);
+    expect(toAssumptionConfidenceScore(Number.NaN).score).toBe(0);
+  });
+
+  it("PublicResult exposes both scalars with sane bounds and matching Danish bands", () => {
+    for (const inp of [DEFAULT_SIMPLE_INPUTS, HIGH_SAVER]) {
+      const r = computePublicResult(inp);
+      for (const s of [r.robustness, r.assumptionConfidence]) {
+        expect(Number.isInteger(s.score)).toBe(true);
+        expect(s.score).toBeGreaterThanOrEqual(0);
+        expect(s.score).toBeLessThanOrEqual(100);
+        expect(s.label.length).toBeGreaterThan(0);
+      }
+      // label is always consistent with the score band (pure-function parity)
+      expect(r.robustness).toEqual(toRobustnessScore(r.robustness.score));
+      expect(r.assumptionConfidence).toEqual(toAssumptionConfidenceScore(r.assumptionConfidence.score));
+    }
+  });
+
+  it("golden bands: off-track persona is low robustness, high-saver is high robustness", () => {
+    const off = computePublicResult(DEFAULT_SIMPLE_INPUTS);
+    expect(off.robustness.score).toBeLessThan(40);
+    expect(off.robustness.label).toBe("Lav robusthed");
+
+    const on = computePublicResult(HIGH_SAVER);
+    expect(on.robustness.score).toBeGreaterThanOrEqual(70);
+    expect(on.robustness.label).toBe("Høj robusthed");
+  });
+
+  it("the scalar labels carry no advanced/DK term", () => {
+    for (const inp of [DEFAULT_SIMPLE_INPUTS, HIGH_SAVER]) {
+      const r = computePublicResult(inp);
+      expect(containsForbiddenTerm(r.robustness.label)).toBe(false);
+      expect(containsForbiddenTerm(r.assumptionConfidence.label)).toBe(false);
+    }
   });
 });
