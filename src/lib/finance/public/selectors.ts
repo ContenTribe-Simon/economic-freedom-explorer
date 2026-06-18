@@ -35,6 +35,21 @@ export function capitalAtPlannedStopAge(
   return nw ?? years[years.length - 1].netWorth;
 }
 
+/**
+ * Net worth at the pension access age, read from the YearRow at that age. Per §4.2 the card is
+ * shown only when `currentAge <= pensionAccessAge <= lifeExpectancy`; outside that range there is
+ * no YearRow, so this returns `null` (omit the card). Never a precomputed fixed-age KPI.
+ */
+export function capitalAtPensionAccessAge(
+  years: YearRow[],
+  pensionAccessAge: number,
+  currentAge: number,
+  lifeExpectancy: number,
+): number | null {
+  if (pensionAccessAge < currentAge || pensionAccessAge > lifeExpectancy) return null;
+  return netWorthAtAge(years, pensionAccessAge);
+}
+
 /** First YearRow flagged as a desired-spending shortfall, or `null` if the plan never falls short. */
 export function firstShortfall(years: YearRow[]): YearRow | null {
   return years.find((y) => y.shortfall) ?? null;

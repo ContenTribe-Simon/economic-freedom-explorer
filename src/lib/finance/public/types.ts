@@ -59,6 +59,14 @@ export interface PublicScore {
   label: string;
 }
 
+/** A public-safe caution, already filtered (allowlisted by id) and rewritten to plain Danish. */
+export interface PublicWarning {
+  /** Stable id of the source sanity check (allowlisted, public-safe). */
+  id: string;
+  /** Fresh public Danish caution copy. */
+  text: string;
+}
+
 /** The single typed result the public screens consume. */
 export interface PublicResult {
   status: PublicStatus;
@@ -72,6 +80,13 @@ export interface PublicResult {
    * age, horizon-bounded with a defined fallback. Never the fixed-age capitalAt65 / capitalAt95.
    */
   capitalAtStopAge: number;
+  /**
+   * Net worth at the pension access age (YearRow at `pensionAccessAge`). `null` when that age is
+   * outside [currentAge, lifeExpectancy] (omit the card — §4.2). Never a precomputed fixed-age KPI.
+   */
+  capitalAtPensionAccessAge: number | null;
+  /** Net worth at the end of horizon = the LAST projected YearRow (never capitalAt95). */
+  capitalAtEndOfHorizon: number;
   /**
    * The age the money lasts to: the FIRST shortfall age (`YearRow.shortfall`, the engine's failure
    * signal — the same first-shortfall row the bottleneck uses). When the plan never falls short, the
@@ -88,6 +103,8 @@ export interface PublicResult {
   lifeExpectancy: number;
   /** Public-safe robustness drivers (filtered + translated). May be empty. */
   drivers: PublicDriver[];
+  /** Public-safe cautions from `sanityChecks()` (allowlisted by id + translated). May be empty. */
+  warnings: PublicWarning[];
   /** How solid the plan is: `financialRobustness` (0–100) + a short Danish band label. */
   robustness: PublicScore;
   /** How much the plan leans on optimistic assumptions: `assumptionConfidence` (0–100) + band. */

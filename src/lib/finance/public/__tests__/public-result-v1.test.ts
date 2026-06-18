@@ -7,8 +7,10 @@ import {
   buildPublicResult,
   toPublicStatus,
   adaptRobustnessDrivers,
+  adaptWarnings,
   netWorthAtAge,
   capitalAtPlannedStopAge,
+  capitalAtPensionAccessAge,
   moneyLastsToAge,
   netWorthSeries,
   firstShortfall,
@@ -18,6 +20,7 @@ import {
   classifyEndMargin,
   type PublicResult,
 } from "../index";
+import type { SanityCheck } from "../../types";
 
 // ---------------------------------------------------------------------------
 // Fixtures & helpers
@@ -99,6 +102,7 @@ function publicStrings(r: PublicResult): string[] {
     r.robustness.label,
     r.assumptionConfidence.label,
     ...r.drivers.map((d) => d.text),
+    ...r.warnings.map((w) => w.text),
   ];
 }
 
@@ -106,44 +110,28 @@ function publicStrings(r: PublicResult): string[] {
 // 1. Golden scenarios — all three verdicts
 // ---------------------------------------------------------------------------
 
-describe("status mapping (shortfall verdict + shared end-margin verdict)", () => {
-  it("not-invalid + comfortable margin → on_track / På sporet / sage", () => {
-    const s = toPublicStatus(makeKpis({ modelStatus: "valid" }), {
-      firstShortfallAge: null,
-      hasFiTarget: false,
-      endMarginVerdict: "comfortable",
-    });
+describe("status mapping (public shortfall + shared end-margin verdict)", () => {
+  it("no shortfall + comfortable margin → on_track / På sporet / sage", () => {
+    const s = toPublicStatus({ firstShortfallAge: null, hasFiTarget: false, endMarginVerdict: "comfortable" });
     expect(s.kind).toBe("on_track");
     expect(s.label).toBe("På sporet");
     expect(s.colorToken).toBe("sage");
   });
 
-  it("not-invalid + thin margin → on_track (a thin margin is not 'missed')", () => {
-    const s = toPublicStatus(makeKpis({ modelStatus: "valid" }), {
-      firstShortfallAge: null,
-      hasFiTarget: true,
-      endMarginVerdict: "thin",
-    });
+  it("no shortfall + thin margin → on_track (a thin margin is not 'missed')", () => {
+    const s = toPublicStatus({ firstShortfallAge: null, hasFiTarget: true, endMarginVerdict: "thin" });
     expect(s.kind).toBe("on_track");
   });
 
-  it("not-invalid + missed margin → tight / Stramt / dawn", () => {
-    const s = toPublicStatus(makeKpis({ modelStatus: "valid" }), {
-      firstShortfallAge: null,
-      hasFiTarget: true,
-      endMarginVerdict: "missed",
-    });
+  it("no shortfall + missed margin → tight / Stramt / dawn", () => {
+    const s = toPublicStatus({ firstShortfallAge: null, hasFiTarget: true, endMarginVerdict: "missed" });
     expect(s.kind).toBe("tight");
     expect(s.label).toBe("Stramt");
     expect(s.colorToken).toBe("dawn");
   });
 
-  it("invalid (shortfall) → off_track regardless of the end margin", () => {
-    const s = toPublicStatus(makeKpis({ modelStatus: "invalid" }), {
-      firstShortfallAge: 86,
-      hasFiTarget: false,
-      endMarginVerdict: "comfortable",
-    });
+  it("shortfall (firstShortfallAge != null) → off_track regardless of the end margin", () => {
+    const s = toPublicStatus({ firstShortfallAge: 86, hasFiTarget: false, endMarginVerdict: "comfortable" });
     expect(s.kind).toBe("off_track");
     expect(s.label).toBe("Ikke på sporet");
     expect(s.colorToken).toBe("clay");
@@ -515,6 +503,99 @@ describe("status target verdict and the end-margin driver never disagree", () =>
     const driverSaysMissed = r.drivers.some((d) => d.text === "Du når ikke dit mål ved planperiodens slutning.");
     expect(driverSaysMissed).toBe(true);
     expect(r.status.kind).toBe("tight");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. Public-safe warnings adapter (Codex P2 — contract §4.4 / fixture 1)
+// ---------------------------------------------------------------------------
+
+describe("warnings adapter", () => {
+  it("default inputs surface the planned-over-cashflow caution in public Danish (positive presence)", () => {
+    const r = computePublicResult(DEFAULT_SIMPLE_INPUTS);
+    expect(r.warnings).toContainEqual({
+      id: "planned-over-cashflow",
+      text: "Du forsøger at spare mere op, end din økonomi tillader i 25 år. Resultatet bruger det, der reelt er plads til.",
+    });
+  });
+
+  it("allowlists planned-over-cashflow (with year count) and drops everything else (default-deny)", () => {
+    const checks: SanityCheck[] = [
+      { id: "savings-logic-explain", severity: "info", title: "Opsparingslogik", detail: "Hybrid: ..." },
+      { id: "sp-manual-high", severity: "warn", title: "Folkepension netto virker høj", detail: "..." },
+      { id: "holding-dependency", severity: "warn", title: "Slutformue afhænger kraftigt af holding", detail: "..." },
+      { id: "planned-over-cashflow", severity: "warn", title: "Planlagt opsparing overstiger cashflow i 7 år", detail: "Med 'Planlagt' logik investeres kun det cashflow tillader." },
+    ];
+    expect(adaptWarnings(checks)).toEqual([
+      { id: "planned-over-cashflow", text: "Du forsøger at spare mere op, end din økonomi tillader i 7 år. Resultatet bruger det, der reelt er plads til." },
+    ]);
+  });
+
+  it("hard-blocks an allowlisted check whose text references advanced/DK vocabulary", () => {
+    const blocked = adaptWarnings([
+      { id: "planned-over-cashflow", severity: "warn", title: "Planlagt opsparing overstiger cashflow i 3 år", detail: "Reference til holding." },
+    ]);
+    expect(blocked).toEqual([]);
+  });
+
+  it("emitted warning copy carries no forbidden term", () => {
+    for (const inp of [DEFAULT_SIMPLE_INPUTS, HIGH_SAVER]) {
+      for (const w of computePublicResult(inp).warnings) {
+        expect(containsForbiddenTerm(w.text)).toBe(false);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. off_track is single-sourced from the public shortfall (Codex review item 3)
+// ---------------------------------------------------------------------------
+
+describe("off_track single-sourcing", () => {
+  it("off_track is true exactly when firstShortfallAge != null", () => {
+    expect(toPublicStatus({ firstShortfallAge: 70, hasFiTarget: false, endMarginVerdict: "comfortable" }).kind).toBe("off_track");
+    expect(toPublicStatus({ firstShortfallAge: null, hasFiTarget: false, endMarginVerdict: "comfortable" }).kind).not.toBe("off_track");
+    expect(toPublicStatus({ firstShortfallAge: null, hasFiTarget: true, endMarginVerdict: "missed" }).kind).not.toBe("off_track");
+  });
+
+  it("engine scenarios: status off_track ⇔ bottleneck is a shortfall", () => {
+    const scenarios: SimplePublicInputs[] = [
+      DEFAULT_SIMPLE_INPUTS,
+      HIGH_SAVER,
+      { ...HIGH_SAVER, fiTargetMinNetWorth: 50_000_000 },
+    ];
+    for (const inp of scenarios) {
+      const r = computePublicResult(inp);
+      expect(r.status.kind === "off_track").toBe(r.bottleneck.kind === "shortfall");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. Capital anchors: pension access age + end of horizon (contract §4.2)
+// ---------------------------------------------------------------------------
+
+describe("capital anchors (pension access + end of horizon)", () => {
+  it("capitalAtPensionAccessAge reads the YearRow in-horizon, else null (omit)", () => {
+    const ys = years(35, 90, (a) => 100_000 * a);
+    expect(capitalAtPensionAccessAge(ys, 67, 35, 90)).toBe(netWorthAtAge(ys, 67));
+    expect(capitalAtPensionAccessAge(ys, 30, 35, 90)).toBeNull(); // before currentAge
+    expect(capitalAtPensionAccessAge(ys, 95, 35, 90)).toBeNull(); // after lifeExpectancy
+  });
+
+  it("PublicResult exposes both anchors; end-of-horizon is the last series point", () => {
+    const r = computePublicResult(DEFAULT_SIMPLE_INPUTS); // pension access 67 in [35,90]
+    expect(r.capitalAtPensionAccessAge).not.toBeNull();
+    expect(r.capitalAtEndOfHorizon).toBe(r.netWorthByAge[r.netWorthByAge.length - 1].netWorth);
+  });
+
+  it("capitalAtEndOfHorizon uses the LAST YearRow even for lifeExpectancy > 95 (never capitalAt95)", () => {
+    const ys: YearRow[] = [];
+    for (let a = 35; a <= 110; a++) ys.push(y(a, a === 95 ? 9_999_999 : 100_000 + a));
+    const inputs: SimplePublicInputs = { ...BASE_INPUTS, currentAge: 35, lifeExpectancy: 110, desiredStopAge: 60, pensionAccessAge: 67 };
+    const r = buildPublicResult(inputs, ys, makeKpis({ capitalAt95: 9_999_999 }));
+    expect(r.capitalAtEndOfHorizon).toBe(netWorthAtAge(ys, 110)); // age 110, not 95
+    expect(r.capitalAtEndOfHorizon).not.toBe(9_999_999); // not capitalAt95
   });
 });
 

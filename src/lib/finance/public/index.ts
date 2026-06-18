@@ -16,6 +16,7 @@ export type {
   PublicBottleneck,
   PublicDriver,
   PublicScore,
+  PublicWarning,
   NetWorthPoint,
 } from "./types";
 
@@ -25,6 +26,7 @@ export { computePublicResult, buildPublicResult } from "./result";
 // Adapters (exported so they exist before any screen consumes them — nothing raw can leak later).
 export { toPublicStatus, adaptStatusReason, type StatusContext } from "./status";
 export { adaptRobustnessDrivers, type DriverContext } from "./drivers";
+export { adaptWarnings } from "./warnings";
 export { classifyEndMargin, type EndMarginVerdict, type EndMarginInput } from "./endMargin";
 export { toRobustnessScore, toAssumptionConfidenceScore } from "./scores";
 
@@ -32,6 +34,7 @@ export { toRobustnessScore, toAssumptionConfidenceScore } from "./scores";
 export {
   netWorthAtAge,
   capitalAtPlannedStopAge,
+  capitalAtPensionAccessAge,
   firstShortfall,
   moneyLastsToAge,
   netWorthSeries,

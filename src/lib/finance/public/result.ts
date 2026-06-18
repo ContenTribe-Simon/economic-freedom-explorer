@@ -5,22 +5,36 @@
  * `simpleInputs` layer, runs the real `project` + `deriveKPIs` pipeline, then turns the raw
  * outputs into horizon-correct, public-safe values. No projection logic is duplicated here.
  */
-import type { Assumptions, KPIs, YearRow } from "../types";
+import type { Assumptions, KPIs, SanityCheck, YearRow } from "../types";
 import { project } from "../projection";
 import { deriveKPIs } from "../kpis";
+import { sanityChecks } from "../sanity";
 import { toAssumptions, toScenario, type SimplePublicInputs } from "../simpleInputs";
 import type { PublicBottleneck, PublicResult } from "./types";
 import { toPublicStatus } from "./status";
 import { adaptRobustnessDrivers } from "./drivers";
+import { adaptWarnings } from "./warnings";
 import { classifyEndMargin } from "./endMargin";
 import { toRobustnessScore, toAssumptionConfidenceScore } from "./scores";
-import { capitalAtPlannedStopAge, firstShortfall, moneyLastsToAge, netWorthSeries } from "./selectors";
+import {
+  capitalAtPensionAccessAge,
+  capitalAtPlannedStopAge,
+  firstShortfall,
+  moneyLastsToAge,
+  netWorthSeries,
+} from "./selectors";
 
 /**
  * Build a `PublicResult` from already-computed engine outputs. Kept separate from
- * `computePublicResult` so it can be unit-tested against hand-built `YearRow[]` / `KPIs`.
+ * `computePublicResult` so it can be unit-tested against hand-built `YearRow[]` / `KPIs`. `checks`
+ * is the raw `sanityChecks()` output (defaults to none); it passes through the §4.4 warnings adapter.
  */
-export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], kpis: KPIs): PublicResult {
+export function buildPublicResult(
+  inputs: SimplePublicInputs,
+  years: YearRow[],
+  kpis: KPIs,
+  checks: SanityCheck[] = [],
+): PublicResult {
   const currentAge = inputs.currentAge;
   const lifeExpectancy = Math.max(currentAge, inputs.lifeExpectancy);
   const hasFiTarget = (inputs.fiTargetMinNetWorth ?? 0) > 0;
@@ -42,9 +56,9 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
     annualSpending: Math.max(1, inputs.monthlySpending * 12),
   });
 
-  // Status: off_track from the shortfall-based engine verdict; target component from the shared
-  // end-margin verdict. Reason synthesised safely (never the raw modelStatusReason).
-  const status = toPublicStatus(kpis, { firstShortfallAge, hasFiTarget, endMarginVerdict });
+  // Status: off_track from the public shortfall (firstShortfallAge); target component from the
+  // shared end-margin verdict. Reason synthesised safely (never the raw modelStatusReason).
+  const status = toPublicStatus({ firstShortfallAge, hasFiTarget, endMarginVerdict });
 
   // Frihedspunkt: bounded to the horizon.
   const earliest =
@@ -56,6 +70,8 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
     status,
     earliestSustainableStopAge: earliest,
     capitalAtStopAge: capitalAtPlannedStopAge(years, inputs.desiredStopAge, currentAge, lifeExpectancy),
+    capitalAtPensionAccessAge: capitalAtPensionAccessAge(years, inputs.pensionAccessAge, currentAge, lifeExpectancy),
+    capitalAtEndOfHorizon: endOfHorizonNetWorth,
     // Same `short` row as the bottleneck → moneyLastsToAge and bottleneck can never diverge.
     moneyLastsToAge: moneyLastsToAge(years, short),
     bottleneck,
@@ -63,6 +79,7 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
     desiredStopAge: Math.max(currentAge, Math.min(lifeExpectancy, inputs.desiredStopAge)),
     lifeExpectancy,
     drivers: adaptRobustnessDrivers(kpis.robustnessBreakdown, { hasFiTarget, endMarginVerdict }),
+    warnings: adaptWarnings(checks),
     robustness: toRobustnessScore(kpis.financialRobustness),
     assumptionConfidence: toAssumptionConfidenceScore(kpis.assumptionConfidence),
   };
@@ -78,5 +95,6 @@ export function computePublicResult(inputs: SimplePublicInputs): PublicResult {
   const assumptions: Assumptions = toAssumptions(inputs);
   const years = project(scenario, assumptions);
   const kpis = deriveKPIs(scenario, years, assumptions);
-  return buildPublicResult(inputs, years, kpis);
+  const checks = sanityChecks(scenario, years);
+  return buildPublicResult(inputs, years, kpis, checks);
 }
