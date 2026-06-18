@@ -504,6 +504,25 @@ describe("status target verdict and the end-margin driver never disagree", () =>
     expect(driverSaysMissed).toBe(true);
     expect(r.status.kind).toBe("tight");
   });
+
+  it("lifeExpectancy > 95: robustness score is capped to the horizon — no high-robustness-next-to-tight", () => {
+    // comfortable at age 95, but the last YearRow (110) is below the goal → missed at the real horizon
+    const ys: YearRow[] = [];
+    for (let a = 35; a <= 110; a++) ys.push(y(a, a <= 95 ? 12_000_000 : 12_000_000 - (a - 95) * 750_000));
+    const inputs: SimplePublicInputs = {
+      ...BASE_INPUTS,
+      currentAge: 35,
+      lifeExpectancy: 110,
+      desiredStopAge: 60,
+      monthlySpending: 20_000,
+      fiTargetMinNetWorth: 5_000_000,
+    };
+    // the engine over-reads robustness from the comfortable age-95 value
+    const r = buildPublicResult(inputs, ys, makeKpis({ modelStatus: "valid", financialRobustness: 90 }));
+    expect(r.status.kind).toBe("tight");
+    expect(r.robustness.score).toBeLessThan(70); // not the top/"strong" band
+    expect(r.robustness.label).not.toBe("Høj robusthed"); // consistent with the tight status
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -619,6 +638,12 @@ describe("robustness & assumption-confidence scalars", () => {
     expect(toRobustnessScore(150).score).toBe(100);
     expect(toRobustnessScore(63.6).score).toBe(64);
     expect(toAssumptionConfidenceScore(Number.NaN).score).toBe(0);
+    // public-horizon cap: a strong engine score cannot read in the top band when the end margin is thin/missed
+    expect(toRobustnessScore(90, "comfortable")).toEqual({ score: 90, label: "Høj robusthed" });
+    expect(toRobustnessScore(90, "thin").score).toBeLessThan(70);
+    expect(toRobustnessScore(90, "thin").label).not.toBe("Høj robusthed");
+    expect(toRobustnessScore(90, "missed").score).toBeLessThan(70);
+    expect(toRobustnessScore(20, "missed")).toEqual({ score: 20, label: "Lav robusthed" }); // cap only lowers
   });
 
   it("PublicResult exposes both scalars with sane bounds and matching Danish bands", () => {

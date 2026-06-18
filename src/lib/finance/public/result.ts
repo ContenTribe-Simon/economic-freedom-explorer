@@ -80,7 +80,9 @@ export function buildPublicResult(
     lifeExpectancy,
     drivers: adaptRobustnessDrivers(kpis.robustnessBreakdown, { hasFiTarget, endMarginVerdict }),
     warnings: adaptWarnings(checks),
-    robustness: toRobustnessScore(kpis.financialRobustness),
+    // Public score capped to the public horizon: it cannot read in the top band when the shared
+    // end-margin verdict (last YearRow) is thin/missed, so it can't contradict a tight status.
+    robustness: toRobustnessScore(kpis.financialRobustness, endMarginVerdict),
     assumptionConfidence: toAssumptionConfidenceScore(kpis.assumptionConfidence),
   };
 }
