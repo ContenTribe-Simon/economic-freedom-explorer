@@ -27,7 +27,7 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
   const short = firstShortfall(years);
   const firstShortfallAge = short ? short.age : null;
   const bottleneck: PublicBottleneck = short
-    ? { kind: "shortfall", firstShortfallAge: short.age, monthlyGap: short.shortfallAmount / 12 }
+    ? { kind: "shortfall", firstShortfallAge: short.age, monthlyGap: short.monthlyGap }
     : { kind: "none" };
 
   // Status: derived from the engine verdict only (no new thresholds), reason synthesised safely.

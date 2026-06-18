@@ -41,7 +41,7 @@ export type PublicBottleneck =
       kind: "shortfall";
       /** First age the plan can't fund desired spending. */
       firstShortfallAge: number;
-      /** Monthly gap in that year (shortfallAmount / 12) — not the after-stop average. */
+      /** Monthly gap in that year — the engine's `YearRow.monthlyGap` (= shortfallAmount / 12), not the after-stop average. */
       monthlyGap: number;
     };
 

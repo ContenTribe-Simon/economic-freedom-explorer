@@ -33,9 +33,19 @@ const HIGH_SAVER: SimplePublicInputs = {
   desiredStopAge: 55,
 };
 
-/** Minimal YearRow — only the fields the public layer reads (age, netWorth, shortfall, shortfallAmount). */
-function y(age: number, netWorth: number, shortfall = false, shortfallAmount = 0): YearRow {
-  return { age, netWorth, shortfall, shortfallAmount } as unknown as YearRow;
+/**
+ * Minimal YearRow — only the fields the public layer reads (age, netWorth, shortfall,
+ * shortfallAmount, monthlyGap). `monthlyGap` defaults to the engine invariant shortfallAmount / 12
+ * (projection.ts: `monthlyGap: stillShort / 12`); pass it explicitly to exercise field-read.
+ */
+function y(
+  age: number,
+  netWorth: number,
+  shortfall = false,
+  shortfallAmount = 0,
+  monthlyGap = shortfallAmount / 12,
+): YearRow {
+  return { age, netWorth, shortfall, shortfallAmount, monthlyGap } as unknown as YearRow;
 }
 
 /** Build a range of YearRows from `from`..`to` with a constant or per-age net worth. */
@@ -299,8 +309,15 @@ describe("leak guards", () => {
     expect(allNumbers).not.toContain(888_888);
   });
 
-  it("the bottleneck uses the FIRST-shortfall gap, not the average monthlyGapAfterStop", () => {
-    const ys = [y(60, 500_000), y(61, 300_000), y(62, 0, true, 24_000), y(63, 0, true, 30_000)];
+  it("the bottleneck reads the FIRST-shortfall row's monthlyGap, not the average and not a re-derived shortfallAmount/12", () => {
+    // monthlyGap on the shortfall rows is set explicitly, and deliberately != shortfallAmount/12,
+    // to prove the bottleneck reads the engine's YearRow.monthlyGap field rather than re-dividing.
+    const ys = [
+      y(60, 500_000),
+      y(61, 300_000),
+      y(62, 0, true, /* shortfallAmount */ 99_999, /* monthlyGap */ 2_000),
+      y(63, 0, true, 120_000, 2_500),
+    ];
     const inputs: SimplePublicInputs = { ...BASE_INPUTS, currentAge: 60, lifeExpectancy: 63, desiredStopAge: 60 };
     // average gap (a smaller, different number) is set to a sentinel that must NOT be used
     const kpis = makeKpis({ modelStatus: "invalid", monthlyGapAfterStop: 777, firstShortfallAge: 62 });
@@ -309,10 +326,40 @@ describe("leak guards", () => {
     expect(r.bottleneck.kind).toBe("shortfall");
     if (r.bottleneck.kind === "shortfall") {
       expect(r.bottleneck.firstShortfallAge).toBe(62); // first shortfall row
-      expect(r.bottleneck.monthlyGap).toBe(2_000); // 24_000 / 12 — that year's gap
+      expect(r.bottleneck.monthlyGap).toBe(2_000); // reads YearRow.monthlyGap (not 99_999 / 12)
+      expect(r.bottleneck.monthlyGap).not.toBe(99_999 / 12); // not a re-derived shortfallAmount / 12
       expect(r.bottleneck.monthlyGap).not.toBe(777); // never the after-stop average
     }
     // sanity: the helper picks the first shortfall row
     expect(firstShortfall(ys)?.age).toBe(62);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Positive driver presence
+//    The drivers adapter is default-deny and matches Danish substrings of ScoreFactor.label.
+//    The leak tests only assert forbidden factors are ABSENT, so a reword of a label in kpis.ts
+//    would make an expected driver silently disappear with no failure. These positive tests run
+//    the REAL engine and assert the expected public drivers ARE present.
+// ---------------------------------------------------------------------------
+
+describe("positive driver presence (real engine — catches silent disappearance on kpis.ts label rewords)", () => {
+  it("on-track plan surfaces the cashflow-coverage and end-of-horizon-margin families (positive)", () => {
+    const drivers = computePublicResult(HIGH_SAVER).drivers;
+    expect(drivers).toEqual(
+      expect.arrayContaining([
+        { direction: "helps", text: "Dit forbrug er dækket hele perioden." }, // cashflow coverage
+        { direction: "helps", text: "Du har god margin ved planperiodens slutning." }, // end-of-horizon margin
+      ]),
+    );
+  });
+
+  it("off-track plan surfaces the cashflow-coverage family (negative)", () => {
+    const drivers = computePublicResult(DEFAULT_SIMPLE_INPUTS).drivers;
+    expect(drivers).toEqual(
+      expect.arrayContaining([
+        { direction: "hurts", text: "Pengene slipper op ved alder 86." }, // cashflow coverage (negative)
+      ]),
+    );
   });
 });
