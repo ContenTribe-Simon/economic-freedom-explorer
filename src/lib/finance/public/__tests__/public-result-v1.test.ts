@@ -285,15 +285,20 @@ describe("leak guards", () => {
     assertNoLeak(publicStrings(computePublicResult(HIGH_SAVER)));
   });
 
-  it("the holding-dependency (and buffer) robustness factors are filtered out", () => {
+  it("the holding-dependency and cash-buffer robustness factors are filtered out", () => {
     const breakdown: ScoreFactor[] = [
       { label: "Lav afhængighed af holding", detail: "Holding udgør 0 % af slutaktiverne", impact: "neutral", magnitude: "low" },
       { label: "Lav kontant buffer", detail: "0,0 måneders forbrug", impact: "negative", magnitude: "low" },
       { label: "Ingen cashflow-shortfall", detail: "", impact: "positive", magnitude: "high" },
     ];
-    const drivers = adaptRobustnessDrivers(breakdown, { hasFiTarget: false });
-    // only the cashflow-coverage factor survives
-    expect(drivers).toEqual([{ direction: "helps", text: "Dit forbrug er dækket hele perioden." }]);
+    const drivers = adaptRobustnessDrivers(breakdown, {
+      hasFiTarget: false,
+      endOfHorizonNetWorth: 5_000_000,
+      fiTargetMinNetWorth: 0,
+      annualSpending: 240_000,
+    });
+    // the cashflow-coverage driver survives; holding + buffer are dropped and never named
+    expect(drivers).toContainEqual({ direction: "helps", text: "Dit forbrug er dækket hele perioden." });
     for (const d of drivers) {
       expect(/holding/i.test(d.text)).toBe(false);
       expect(/buffer/i.test(d.text)).toBe(false);
@@ -376,30 +381,34 @@ describe("positive driver presence (real engine — catches silent disappearance
 // 5. End-of-horizon margin driver must not be eaten by a "buffer" in its detail (Codex P2.1)
 // ---------------------------------------------------------------------------
 
-describe("end-of-horizon-margin driver survival", () => {
-  it("survives even though kpis.ts gives its detail the word 'buffer'; the real cash-buffer factor is still dropped", () => {
+describe("end-of-horizon-margin driver (recomputed from the last YearRow, never age 95)", () => {
+  it("is recomputed from ctx, so the engine factor's 'buffer' detail is never read; cash-buffer + holding still filtered", () => {
     const breakdown: ScoreFactor[] = [
-      // Real kpis.ts shape: end-margin family label, with a detail that contains "buffer".
+      // engine's age-95 end-margin factor — IGNORED by the adapter (its detail mentions "buffer").
       {
         label: "Lav margin til minimumsmål",
         detail: "Slutformue er kun 48 % over minimumsmålet (mål: 5× årsforbrug i buffer).",
         impact: "negative",
         magnitude: "medium",
       },
-      // Genuine cash-buffer factor — must be dropped by its own family, not by the word "buffer".
+      // Genuine cash-buffer factor — dropped by its own family, not by the word "buffer".
       { label: "Lav kontant buffer", detail: "Buffer svarer til ca. 0,0 måneders forbrug.", impact: "negative", magnitude: "medium" },
       { label: "Lav afhængighed af holding", detail: "Holding udgør 0 % af slutaktiverne.", impact: "neutral", magnitude: "low" },
     ];
-    const drivers = adaptRobustnessDrivers(breakdown, { hasFiTarget: true });
-    // the thin-margin driver survives
+    // ctx: end value 13.5M just over a 13M goal → a thin margin, recomputed from the last row.
+    const drivers = adaptRobustnessDrivers(breakdown, {
+      hasFiTarget: true,
+      endOfHorizonNetWorth: 13_500_000,
+      fiTargetMinNetWorth: 13_000_000,
+      annualSpending: 216_000,
+    });
     expect(drivers).toContainEqual({ direction: "hurts", text: "Der er kun lille margin til dit mål ved planperiodens slutning." });
-    // genuine cash-buffer + holding-dependency factors are still filtered
     expect(drivers.some((d) => /buffer/i.test(d.text))).toBe(false);
     expect(drivers.some((d) => /holding/i.test(d.text))).toBe(false);
-    expect(drivers).toHaveLength(1); // only the end-margin driver survives
+    expect(drivers).toHaveLength(1); // only the recomputed end-margin driver
   });
 
-  it("real engine: a valid plan with a low end-of-horizon margin surfaces the thin-margin driver", () => {
+  it("real engine (lifeExpectancy <= 95): a valid plan with a low end-of-horizon margin surfaces the thin-margin driver", () => {
     // target just under the plan's end net worth → valid (on track) but a low margin.
     const r = computePublicResult({ ...HIGH_SAVER, fiTargetMinNetWorth: 13_000_000 });
     expect(r.status.kind).toBe("on_track");
@@ -409,6 +418,38 @@ describe("end-of-horizon-margin driver survival", () => {
       expect(/buffer/i.test(d.text)).toBe(false);
       expect(/holding/i.test(d.text)).toBe(false);
     }
+  });
+
+  it("lifeExpectancy > 95: end-margin reflects the LAST YearRow (age 110), not the comfortable age-95 value", () => {
+    // Comfortable at age 95 (12M, well above the 5M goal), but the real end (age 110) is below it.
+    const ys: YearRow[] = [];
+    for (let a = 35; a <= 110; a++) {
+      const nw = a <= 95 ? 12_000_000 : 12_000_000 - (a - 95) * 750_000; // declines after 95 → ~750k at 110
+      ys.push(y(a, nw)); // no shortfall anywhere
+    }
+    const inputs: SimplePublicInputs = {
+      ...BASE_INPUTS,
+      currentAge: 35,
+      lifeExpectancy: 110,
+      desiredStopAge: 60,
+      monthlySpending: 20_000,
+      fiTargetMinNetWorth: 5_000_000,
+    };
+    // The engine would push a "comfortable" end-margin factor from the age-95 value — the adapter
+    // must NOT trust it; it recomputes from the last YearRow.
+    const kpis = makeKpis({
+      modelStatus: "valid",
+      robustnessBreakdown: [
+        { label: "Ingen cashflow-shortfall", detail: "", impact: "positive", magnitude: "high" },
+        { label: "Komfortabel slutmargin", detail: "Slutformue er 6.5× over 5-års forbrugsmargin.", impact: "positive", magnitude: "medium" },
+      ],
+    });
+    const r = buildPublicResult(inputs, ys, kpis);
+    const texts = r.drivers.map((d) => d.text);
+    // must NOT claim good end-of-plan margin (that would be the forbidden fixed-age-95 anchor)
+    expect(texts).not.toContain("Du har god margin ved planperiodens slutning.");
+    // reflects the real end (age 110, below the goal)
+    expect(texts).toContain("Du når ikke dit mål ved planperiodens slutning.");
   });
 });
 

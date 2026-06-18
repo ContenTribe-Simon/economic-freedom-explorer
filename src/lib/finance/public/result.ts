@@ -40,6 +40,10 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
       ? null
       : Math.max(currentAge, Math.min(lifeExpectancy, kpis.earliestSustainableStopAge));
 
+  // End of horizon = the LAST projected YearRow (never the fixed-age-95 KPI). Used by the
+  // horizon-correct end-of-horizon-margin driver.
+  const endOfHorizonNetWorth = years.length ? years[years.length - 1].netWorth : 0;
+
   return {
     status,
     earliestSustainableStopAge: earliest,
@@ -50,7 +54,12 @@ export function buildPublicResult(inputs: SimplePublicInputs, years: YearRow[], 
     netWorthByAge: netWorthSeries(years),
     desiredStopAge: Math.max(currentAge, Math.min(lifeExpectancy, inputs.desiredStopAge)),
     lifeExpectancy,
-    drivers: adaptRobustnessDrivers(kpis.robustnessBreakdown, { hasFiTarget }),
+    drivers: adaptRobustnessDrivers(kpis.robustnessBreakdown, {
+      hasFiTarget,
+      endOfHorizonNetWorth,
+      fiTargetMinNetWorth: inputs.fiTargetMinNetWorth ?? 0,
+      annualSpending: Math.max(1, inputs.monthlySpending * 12),
+    }),
     robustness: toRobustnessScore(kpis.financialRobustness),
     assumptionConfidence: toAssumptionConfidenceScore(kpis.assumptionConfidence),
   };
