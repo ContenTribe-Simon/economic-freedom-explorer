@@ -244,6 +244,41 @@ independently), so no depth cap is imposed.
 | `( git switch feature ) && git commit -m x` | main | ALLOW | grouped switch really moves off main to feature |
 | `( git switch @{-1} ) && git commit -m x` | feature, prev=main | DENY | grouping stripped but `@{-1}` preserved -> resolves to main |
 
+## 16) Prefix scan-forward — keywords, wrappers + their flags, env before `git`
+
+gphase 0 no longer uses an allowlist-then-break scan (which under-denied three
+times: grouping tokens, then a shell keyword and a wrapper flag). It now **scans
+forward to the first literal `git` token**, skipping everything before it —
+shell keywords (`if`/`then`/`do`/…), wrapper commands AND their flags
+(`sudo`, `env -u FOO`, `time`, `nice -n 10`), env assignments, already-stripped
+grouping, and anything unrecognized. Once `git` is found, phase 1/2 classify the
+subcommand exactly as before.
+
+This does NOT reopen the anchored-subcommand fix (5b132f8): scan-forward looks
+for the first `git` in the PREFIX, *before* any subcommand; the anchored fix is
+about not re-reading tokens *after* the subcommand's own arguments. Different
+position in the token stream, so `git commit -m "git switch feature"` still finds
+the leading `git` at position 0, classifies `commit`, and the embedded `git` in
+the message stays an ignored argument (verified below).
+
+Accepted cost (established safe bias, never under-deny): a non-git statement
+whose arguments contain the literal word `git` is over-classified and may
+over-deny (`echo git commit -m x` -> DENY on main).
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `if git switch main; then git commit -m x; fi` | feature | DENY | `if …` segment: `if` skipped, real `git switch main` found -> eff=main; the `then git commit` segment commits on main |
+| `if git switch feature; then git commit -m x; fi` | feature | ALLOW | the real switch moves to feature, off main |
+| `env -u FOO git commit -m x` | main | DENY | `env` and its flag `-u FOO` skipped, `git commit` found -> commit on main |
+| `sudo git commit -m x` | main | DENY | wrapper skipped |
+| `nice -n 10 git commit -m x` | main | DENY | wrapper and its flag skipped |
+| `FOO=bar git commit -m x` | main | DENY | env-assignment prefix skipped |
+| `env -u X env -u Y git commit -m x` | main | DENY | multiple wrappers skipped |
+| `echo git commit -m x` | main | DENY | accepted over-deny: scan finds the literal `git` argument; safe bias |
+| `git commit -m "git switch feature"` | main | DENY | anchored fix intact: leading `git` at pos 0 -> `commit`; embedded `git` is an argument |
+| `git tag -m "git switch main" v1` | main | ALLOW | leading subcommand is `tag`; embedded text ignored |
+| `npm run build` | main | ALLOW | no `git` token anywhere -> neither |
+
 ## S) settings.json `.env` deny anchoring — CORRECTED to `/.env` (authoritative)
 
 Not a hook case; recorded here so the correct form is not flip-flopped again.

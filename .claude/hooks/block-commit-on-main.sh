@@ -195,15 +195,17 @@ while IFS= read -r stmt; do
     case "$tok" in \{|\}) tok="" ;; esac
     [ -z "$tok" ] && continue
     if [ "$gphase" -eq 0 ]; then
-      # Before the git command: skip a leading env-assignment (`VAR=val`) or a
-      # known wrapper/keyword; anything else that is not `git` means this
-      # statement is not a git command at all.
-      case "$tok" in
-        git) gphase=1 ;;
-        *=*) : ;;
-        sudo|env|command|time|nohup|nice|stdbuf|setsid|then|do|else) : ;;
-        *) break ;;
-      esac
+      # Before the subcommand: SCAN FORWARD to the first literal `git` token,
+      # skipping everything else -- shell keywords (`if`, `then`, `do`, ...),
+      # wrapper commands and THEIR flags (`sudo`, `env -u FOO`, `time`, ...), env
+      # assignments (`VAR=val`), and anything unrecognized. We never break early
+      # on an unknown prefix token (that was the recurring under-deny: grouping
+      # tokens, then a shell keyword / wrapper flag). If no `git` token exists in
+      # the statement, `gphase` stays 0 and `subcmd` stays empty -> neither.
+      # Accepted cost (established safe bias): a non-git statement whose arguments
+      # contain the literal word `git` (e.g. `echo git commit -m x`) is
+      # over-classified and may over-deny -- never under-deny.
+      [ "$tok" = "git" ] && gphase=1
       continue
     fi
     if [ "$gphase" -eq 1 ]; then
