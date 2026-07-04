@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/AppShell";
 import Start from "./pages/public/Start";
 import SimpleInputs from "./pages/public/SimpleInputs";
+import Resultat from "./pages/public/Resultat";
 import Dashboard from "./pages/Dashboard";
 import Inputs from "./pages/Inputs";
 import Assumptions from "./pages/Assumptions";
@@ -42,6 +43,7 @@ const App = () => (
             {/* Public Frihedsmodel flow: full-bleed screens without the advanced chrome. */}
             <Route path="/start" element={<Start />} />
             <Route path="/simple-inputs" element={<SimpleInputs />} />
+            <Route path="/resultat" element={<Resultat />} />
 
             {/* Advanced app inside the shell. */}
             <Route element={<ShellLayout />}>

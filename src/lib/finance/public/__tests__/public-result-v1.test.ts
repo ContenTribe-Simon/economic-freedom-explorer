@@ -630,9 +630,13 @@ describe("robustness & assumption-confidence scalars", () => {
     // boundaries
     expect(toRobustnessScore(40).label).toBe("Middel robusthed");
     expect(toRobustnessScore(70).label).toBe("Høj robusthed");
-    expect(toAssumptionConfidenceScore(75)).toEqual({ score: 75, label: "Rimelig antagelsessikkerhed" });
-    expect(toAssumptionConfidenceScore(30).label).toBe("Lav antagelsessikkerhed");
-    expect(toAssumptionConfidenceScore(80).label).toBe("Høj antagelsessikkerhed");
+    // Assumption bands: human copy ("Forsigtige/Rimelige/Optimistiske antagelser") replaced the
+    // system-worded "…antagelsessikkerhed" labels — result-screen copy decision (2026-07-05).
+    // Same thresholds, same higher-is-better polarity as robustness; only the text changed.
+    expect(toAssumptionConfidenceScore(75)).toEqual({ score: 75, label: "Rimelige antagelser" });
+    expect(toAssumptionConfidenceScore(30).label).toBe("Optimistiske antagelser");
+    expect(toAssumptionConfidenceScore(80).label).toBe("Forsigtige antagelser");
+    expect(toAssumptionConfidenceScore(50).label).toBe("Rimelige antagelser"); // boundary
     // clamping / non-finite
     expect(toRobustnessScore(-10).score).toBe(0);
     expect(toRobustnessScore(150).score).toBe(100);
@@ -642,7 +646,10 @@ describe("robustness & assumption-confidence scalars", () => {
     expect(toRobustnessScore(90, "comfortable")).toEqual({ score: 90, label: "Høj robusthed" });
     expect(toRobustnessScore(90, "thin").score).toBeLessThan(70);
     expect(toRobustnessScore(90, "thin").label).not.toBe("Høj robusthed");
-    expect(toRobustnessScore(90, "missed").score).toBeLessThan(70);
+    // Missed-target severity: a publicly missed plan caps into the "Lav" band (39), never
+    // "Middel" — mirrors the engine's <=40 treatment of a real target miss (decision 2026-07-05).
+    expect(toRobustnessScore(90, "missed")).toEqual({ score: 39, label: "Lav robusthed" });
+    expect(toRobustnessScore(55, "missed").label).toBe("Lav robusthed");
     expect(toRobustnessScore(20, "missed")).toEqual({ score: 20, label: "Lav robusthed" }); // cap only lowers
   });
 
