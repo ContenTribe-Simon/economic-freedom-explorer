@@ -53,11 +53,16 @@
 # closed). `git switch`, `git checkout -b/-B`, and previous-branch refs are
 # treated as confident branch switches.
 #
-# Known limitation (errs safe): statement splitting is textual and not quote- or
-# heredoc-aware, so a commit MESSAGE (or other quoted argument) that itself
-# contains a switch-to-main and a commit separated by a shell operator can trip
-# this and be over-denied. That only ever over-blocks (deny), never lets a commit
-# reach main; reword the message or commit from a feature branch if it fires.
+# Classification is anchored: each statement is classified by its ACTUAL leading
+# git subcommand (the first non-flag token after `git` and its global flags), so
+# literal "switch"/"checkout"/"commit" text inside a statement's own arguments (a
+# quoted -m/-F message, a branch name, a file path, a tag message) is never
+# mis-read as a subcommand. Residual limitation (errs safe): statement splitting
+# is still textual and not quote-aware, so a quoted argument that itself contains
+# a shell separator (`&&`, `;`, `|`) is split into pieces; the real leading
+# subcommand of each piece is still classified correctly, so this never lets a
+# commit reach main -- at worst it evaluates a fragment as its own (usually
+# harmless) statement.
 #
 # Contract (Claude Code PreToolUse): reads the tool payload as JSON on stdin,
 # uses `.tool_input.command`; to block, prints a JSON object with
@@ -120,11 +125,6 @@ chain="${chain//;/$'\n'}"
 chain="${chain//|/$'\n'}"
 chain="${chain//&/$'\n'}"
 
-# git followed by global flags/tokens, then the given subcommand as a word.
-sw_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+(switch|checkout)([[:space:]]|$)'
-switch_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+switch([[:space:]]|$)'
-ci_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)'
-
 # Track the effective branch by NAME. `eff` is where a commit would currently
 # land; `eff_prev` is the branch before the last switch, used to resolve the
 # previous-branch shorthand (`-`, `@{-1}`) correctly when it appears mid-chain.
@@ -155,63 +155,83 @@ while IFS= read -r stmt; do
     if [ "$eff" = "main" ] || [ "$eff_prev" = "main" ]; then eff="main"; or_pin_main=1; else eff="$eff_prev"; fi
   fi
 
-  # A switch/checkout MAY move the effective branch. Parse the tokens after the
-  # subcommand to find the RESULTING branch:
-  #  - a create flag (`-c`/`-C` for switch, `-b`/`-B` for checkout) names the new
-  #    branch as its argument; a following start-point (even after `--`) is NOT
-  #    the resulting branch.
-  #  - otherwise the operand is the first non-flag token after the subcommand
-  #    (a lone `-` is a target; `--` is skipped).
-  # `--` means a path restore ONLY for `checkout` with no create flag
-  # (`git checkout -- <path>` / `<tree> -- <path>`), leaving eff unchanged.
-  # `git switch` never takes a pathspec, so there `--` is just "end of options".
-  if printf '%s' "$stmt" | grep -Eq "$sw_re"; then
-    is_switch=0
-    printf '%s' "$stmt" | grep -Eq "$switch_re" && is_switch=1
-
-    phase=0; want_create_arg=0; created=""; operand=""; dashdash=0; path_after=0
-    for tok in $stmt; do
-      # Normalize one layer of matching surrounding quotes on EACH token, so a
-      # quoted operator/flag/branch ("--", "-c", "main", '-') is still recognised
-      # (the shell would strip these quotes before git ever sees them).
+  # Classify the statement by its ACTUAL leading git subcommand, found by walking
+  # tokens from the start: skip any process-wrapper / env-assignment prefix, then
+  # `git`, then git's global flags (some take a separate-token argument), and the
+  # FIRST remaining token is the subcommand. Everything after it is arguments
+  # (a quoted -m/-F/-F message, a branch name, a file path, a tag message, ...)
+  # and can NEVER be re-read as a second git invocation. So a statement is
+  # classified as exactly one of switch/checkout, commit, or neither -- never
+  # both -- even if the words "switch"/"checkout"/"commit" appear literally
+  # inside its own arguments.
+  gphase=0            # 0=before git, 1=git global flags, 2=after the subcommand
+  want_gflag_arg=0
+  subcmd=""
+  want_create_arg=0; created=""; operand=""; dashdash=0; path_after=0
+  for tok in $stmt; do
+    # Normalize one layer of matching surrounding quotes on EACH token.
+    case "$tok" in
+      \"*\") tok="${tok#\"}"; tok="${tok%\"}" ;;
+      \'*\') tok="${tok#\'}"; tok="${tok%\'}" ;;
+    esac
+    if [ "$gphase" -eq 0 ]; then
+      # Before the git command: skip a leading env-assignment (`VAR=val`) or a
+      # known wrapper/keyword; anything else that is not `git` means this
+      # statement is not a git command at all.
       case "$tok" in
-        \"*\") tok="${tok#\"}"; tok="${tok%\"}" ;;
-        \'*\') tok="${tok#\'}"; tok="${tok%\'}" ;;
+        git) gphase=1 ;;
+        *=*) : ;;
+        sudo|env|command|time|nohup|nice|stdbuf|setsid|then|do|else) : ;;
+        *) break ;;
       esac
-      if [ "$phase" -eq 0 ]; then
-        case "$tok" in switch|checkout) phase=1 ;; esac
-        continue
-      fi
-      if [ "$want_create_arg" -eq 1 ]; then
-        # The token after a create flag is the NEW branch name (skip a `--`).
+      continue
+    fi
+    if [ "$gphase" -eq 1 ]; then
+      # After `git`, before the subcommand: skip global options. `-c`, `-C`,
+      # `--git-dir`, `--work-tree`, `--namespace`, etc. take a separate-token arg.
+      if [ "$want_gflag_arg" -eq 1 ]; then want_gflag_arg=0; continue; fi
+      case "$tok" in
+        -c|-C|--git-dir|--work-tree|--namespace|--super-prefix|--config-env) want_gflag_arg=1 ;;
+        -*) : ;;
+        *)  subcmd="$tok"; gphase=2 ;;
+      esac
+      continue
+    fi
+    # gphase 2: arguments after the subcommand. Only switch/checkout needs them,
+    # to find the RESULTING branch: a create flag (`-c`/`-C`/`-b`/`-B`) names the
+    # new branch as its argument; otherwise the operand is the first non-flag
+    # token (a lone `-` is a target; `--` handling below). For `checkout`, a token
+    # after `--` is a pathspec/start-point; for `switch`, `--` is only
+    # end-of-options and the branch target still follows it.
+    case "$subcmd" in
+      switch|checkout)
+        if [ "$want_create_arg" -eq 1 ]; then
+          case "$tok" in --) : ;; *) created="$tok"; want_create_arg=0 ;; esac
+          continue
+        fi
+        if [ "$dashdash" -eq 1 ] && [ "$subcmd" = "checkout" ]; then
+          path_after=1
+          continue
+        fi
         case "$tok" in
-          --) : ;;
-          *)  created="$tok"; want_create_arg=0 ;;
-        esac
-        continue
-      fi
-      if [ "$dashdash" -eq 1 ] && [ "$is_switch" -eq 0 ]; then
-        # For `checkout`, any token after `--` is a pathspec / start-point.
-        # (For `switch`, `--` is only end-of-options and the branch target still
-        # follows it, so it falls through and is captured as the operand below.)
-        path_after=1
-        continue
-      fi
-      case "$tok" in
-        --)          dashdash=1 ;;
-        -c|-C|-b|-B) want_create_arg=1 ;;
-        -)           [ -z "$operand" ] && operand="-" ;;
-        -*)          : ;;
-        *)           [ -z "$operand" ] && operand="$tok" ;;
-      esac
-    done
+          --)          dashdash=1 ;;
+          -c|-C|-b|-B) want_create_arg=1 ;;
+          -)           [ -z "$operand" ] && operand="-" ;;
+          -*)          : ;;
+          *)           [ -z "$operand" ] && operand="$tok" ;;
+        esac ;;
+    esac
+  done
 
+  is_switch=0
+  [ "$subcmd" = "switch" ] && is_switch=1
+
+  # --- switch/checkout: MAY move the effective branch ---
+  if [ "$subcmd" = "switch" ] || [ "$subcmd" = "checkout" ]; then
     # A checkout is a path RESTORE only when a real pathspec follows the `--`
     # (`git checkout [<tree>] -- <path>`). A bare trailing `--` with nothing after
-    # it (`git checkout <branch> --`) is a plain branch checkout with a
-    # disambiguating terminator, NOT a restore, so it falls through to the
-    # branch-switch logic below.
-    if [ "$is_switch" -eq 0 ] && [ -z "$created" ] && [ "$dashdash" -eq 1 ] && [ "$path_after" -eq 1 ]; then
+    # it (`git checkout <branch> --`) is a plain branch checkout, NOT a restore.
+    if [ "$subcmd" = "checkout" ] && [ -z "$created" ] && [ "$dashdash" -eq 1 ] && [ "$path_after" -eq 1 ]; then
       : # `checkout [<tree>] -- <path>`: path restore, leave eff unchanged.
     else
       # Resulting branch: the created branch, else the first operand.
@@ -274,8 +294,8 @@ while IFS= read -r stmt; do
   # runs and the commit lands on main. Biases to over-deny, never under-deny.
   [ "$or_pin_main" -eq 1 ] && eff="main"
 
-  # A commit lands on the current effective branch; if that is main, block.
-  if printf '%s' "$stmt" | grep -Eq "$ci_re"; then
+  # --- commit: lands on the current effective branch; block if that is main ---
+  if [ "$subcmd" = "commit" ]; then
     if [ "$eff" = "main" ]; then deny=1; break; fi
   fi
 done <<< "$chain"

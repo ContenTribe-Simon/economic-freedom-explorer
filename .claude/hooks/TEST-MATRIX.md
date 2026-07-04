@@ -198,29 +198,56 @@ so a non-main left target lets the right-hand switch move off main normally.
 | `git switch feature \|\| git switch main && git commit -m x` | main | DENY | if the left `switch feature` fails, the RHS switches to main; pre-LHS branch was main so main is reachable |
 | `git switch main \|\| git switch other && git commit -m x` | feature | DENY | left `switch main` succeeds -> on main; RHS never runs; main stays pinned |
 
-## S) settings.json `.env` deny anchoring (empirical, not the hook)
+## 14) Anchored classification — embedded text in a statement's own arguments
 
-Not a hook case, recorded here because it was tested empirically. The `.env`
-Read/Edit/Write deny patterns were changed from the leading-slash form
-(`Read(/.env)` …) to the documented project-root form (`Read(./.env)` …). Test:
-create a harmless `FOO=bar` probe at the project root (`.env.hookprobe`, matches
-`.env.*`) and attempt to Read it with the Read tool.
+Each statement is classified by its ACTUAL leading git subcommand (the first
+non-flag token after `git` and its global flags), so literal
+"switch"/"checkout"/"commit" text inside a quoted `-m`/`-F` message, a branch
+name, a file path, or a tag message is an argument and can never be mis-read as a
+subcommand. A statement is exactly one of switch/checkout, commit, or neither.
 
-| Setting form | Probe at project root | Read result | Rationale |
+| Command | From | Result | Rationale |
 |---|---|---|---|
-| `Read(/.env.*)` (before) | `./.env.hookprobe` | DENIED | in this session the root-level `.env.*` read was blocked |
-| `Read(./.env.*)` (after) | `./.env.hookprobe` | DENIED | the documented root-relative form also blocks it; protection maintained |
+| `git commit -m "git switch feature"` | main | DENY | leading subcommand is `commit`; the embedded `git switch feature` is message text -> a real commit on main |
+| `git commit -m "git switch feature"` | feature | ALLOW | off main; still a legitimate commit |
+| `git commit -m "unrelated message"` | main | DENY | regression: an ordinary commit on main is still blocked |
+| `git switch other -- afile && git commit -m "just committing"` | main | ALLOW | leading `switch` really moves eff to `other`; then a real commit on `other` -> off main. Both subcommands classified correctly |
+| `git commit -m "checkout main"` | main | DENY | embedded `checkout main` is message text; leading subcommand is `commit` |
+| `git commit -m "commit and switch main"` | main | DENY | message text ignored; commit on main |
+| `git tag -m "git switch main" v1` | main | ALLOW | leading subcommand is `tag`, not commit or switch -> neither; eff untouched, no commit |
+| `git commit -m "fix: switch to main layout"` | feature | ALLOW | commit on a feature branch; message text is irrelevant |
+| `git commit -m "git checkout main && git commit"` | feature | ALLOW | the message is split textually on `&&`, but each fragment's leading subcommand is `commit`, evaluated on feature -> allowed (the previous over-deny is gone) |
+| `git commit -m "git checkout main && git commit"` | main | DENY | same, but on main the leading `commit` is denied |
 
-Caveats (recorded honestly): the in-session test cannot fully isolate the
-mechanism — the deny message ("File is in a directory that is denied by your
-permission settings") fired under both forms, and it is unclear whether the
-running session hot-reloads `settings.json` mid-session, so the "after" read may
-reflect the new rules or the still-cached old ones. Either way the `./` form is
-the officially-documented project-root-relative syntax (a single leading slash
-anchors at the settings file's own directory, i.e. `.claude/`, per the docs), so
-the change removes the ambiguity Codex flagged; a fresh session uses the `./`
-rules unambiguously. Bash access to the probe path was also blocked, so it was
-removed via a glob that avoids the literal `.env` string.
+## S) settings.json `.env` deny anchoring — CORRECTED to `/.env` (authoritative)
+
+Not a hook case; recorded here so the correct form is not flip-flopped again.
+The `.env` Read/Edit/Write denies use the **single-leading-slash** form
+(`Read(/.env)`, `Read(/.env.*)`, and Edit/Write equivalents). This is the
+authoritative, documented behaviour and must not be changed to `./.env`.
+
+Per the official Claude Code docs
+(https://code.claude.com/docs/en/permissions, "Read and Edit", the `/path`
+resolution table): for a **project-level** settings file (`.claude/settings.json`)
+a single-leading-slash pattern `/path` resolves to **`<project root>/path`** —
+NOT the `.claude/` folder and NOT the filesystem root. By contrast `./path` (or a
+bare `path`) resolves relative to the **current working directory**, which is
+unsafe here: a session `cd`'d into a subdirectory would have `./.env` resolve to
+`<subdir>/.env`, leaving the real `<project root>/.env` reachable via `../.env` —
+reopening the exact bypass the first review pass (077d591) found and 81e95ae
+closed. So `/.env` is correct and `./.env` is a regression.
+
+| Form | Anchors to (project settings) | Verdict |
+|---|---|---|
+| `Read(/.env)` / `Read(/.env.*)` | `<project root>/.env[.*]` | CORRECT — protects the real root `.env` regardless of session cwd |
+| `Read(./.env)` / bare `Read(.env)` | `<cwd>/.env` | UNSAFE — from a subdir the root `.env` is reachable via `../.env` |
+
+History note: an earlier commit this round changed `/.env` → `./.env` based on an
+inconclusive in-session empirical test (the probe Read was DENIED under *both*
+forms, and it was never established whether the running session hot-reloads
+`settings.json` mid-session, so the test could not distinguish the two). That
+test is unreliable for this question; **the docs table above is the authoritative
+source**, and the change has been reverted. No re-run of the unreliable test.
 
 ---
 
