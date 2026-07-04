@@ -1,0 +1,72 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { DEFAULT_SIMPLE_INPUTS, type SimplePublicInputs } from "@/lib/finance/public";
+
+/**
+ * State for the public Frihedsmodel flow (Simple Inputs → Result → Save/Share).
+ *
+ * Deliberately separate from the advanced `useFinanceStore`: the public flow only ever holds the
+ * typed `SimplePublicInputs` surface and a list of locally saved calculations. All model work goes
+ * through the public adapter (`computePublicResult`) — nothing here touches the raw engine, and
+ * nothing here reads or writes the advanced store's scenarios.
+ *
+ * Persisted in localStorage only ("Gemmes kun på din egen enhed").
+ */
+
+export interface SavedCalculation {
+  id: string;
+  name: string;
+  /** Epoch ms. */
+  savedAt: number;
+  inputs: SimplePublicInputs;
+}
+
+interface PublicState {
+  inputs: SimplePublicInputs;
+  /** Patch one or more simple-input fields. */
+  setInputs: (patch: Partial<SimplePublicInputs>) => void;
+  /** Replace the whole input set (used by share-link hydration and "Åbn"). */
+  replaceInputs: (inputs: SimplePublicInputs) => void;
+  saved: SavedCalculation[];
+  /** Save the current inputs under a name; returns the new entry. */
+  saveCalculation: (name: string) => SavedCalculation;
+  removeCalculation: (id: string) => void;
+  /** Load a saved calculation into the active inputs. Returns false if not found. */
+  loadCalculation: (id: string) => boolean;
+}
+
+function newId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+}
+
+export const usePublicStore = create<PublicState>()(
+  persist(
+    (set, get) => ({
+      inputs: { ...DEFAULT_SIMPLE_INPUTS },
+      setInputs: (patch) => set((s) => ({ inputs: { ...s.inputs, ...patch } })),
+      replaceInputs: (inputs) => set({ inputs: { ...inputs } }),
+      saved: [],
+      saveCalculation: (name) => {
+        const clean = name.trim() || "Min plan";
+        const entry: SavedCalculation = {
+          id: newId(),
+          name: clean,
+          savedAt: Date.now(),
+          inputs: { ...get().inputs },
+        };
+        set((s) => ({ saved: [entry, ...s.saved] }));
+        return entry;
+      },
+      removeCalculation: (id) => set((s) => ({ saved: s.saved.filter((c) => c.id !== id) })),
+      loadCalculation: (id) => {
+        const entry = get().saved.find((c) => c.id === id);
+        if (!entry) return false;
+        set({ inputs: { ...entry.inputs } });
+        return true;
+      },
+    }),
+    { name: "frihedsmodel-public.v1" },
+  ),
+);

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/AppShell";
 import Start from "./pages/public/Start";
+import SimpleInputs from "./pages/public/SimpleInputs";
 import Dashboard from "./pages/Dashboard";
 import Inputs from "./pages/Inputs";
 import Assumptions from "./pages/Assumptions";
@@ -40,6 +41,7 @@ const App = () => (
           <Routes>
             {/* Public Frihedsmodel flow: full-bleed screens without the advanced chrome. */}
             <Route path="/start" element={<Start />} />
+            <Route path="/simple-inputs" element={<SimpleInputs />} />
 
             {/* Advanced app inside the shell. */}
             <Route element={<ShellLayout />}>
