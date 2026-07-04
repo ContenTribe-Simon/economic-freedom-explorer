@@ -53,7 +53,40 @@ repo's own design system and self-hosted fonts.
 ## 3. Golden rules (non-negotiable)
 
 1. **Never commit, push, or merge to `main` from an agent.** Work on a branch.
-   Simon merges manually after review.
+   Simon merges manually after review. Enforcement is layered, and deliberately honest
+   about its limits:
+   - `.claude/settings.json` denies `git push`, `git merge`, `git commit --amend`,
+     `git reset --hard`, `rm -rf`, and read/write/edit of `.env*` files. These are
+     **static, best-effort string-prefix patterns**, not a hard block: because they match
+     on the command prefix, a `git` global option or reordered flag before/around the
+     subcommand (e.g. `git -C . push`, `git commit -a --amend`) slips past them un-denied.
+     That is an accepted limitation, not a gap to chase with ever more patterns.
+   - The `.env*` **Read/Edit/Write** denies guard Claude's own file tools; they do **not**
+     cover Bash. `git diff .env` / `git add .env` can read or stage `.env` via Bash
+     (allowed by `Bash(git diff:*)` / `Bash(git add:*)`) without hitting those denies —
+     the same best-effort Bash-allow-list gap as above. This is **accepted, not fixed**:
+     the tracked `.env` here is the intentionally public Supabase browser config
+     (`VITE_`-prefixed publishable key). **Revisit if a genuinely secret `.env.local` (or
+     similar) is ever added** — then narrow the Bash git rules / add Bash env denies. See
+     `.claude/hooks/TEST-MATRIX.md` §B.
+   - The `PreToolUse` hook `.claude/hooks/block-commit-on-main.sh` is the **sole
+     authoritative guard** against a `git commit` landing on `main`: it walks the command
+     and denies the commit whenever the *effective* branch is `main` (directly, or after
+     switching to main in the same command) — a branch-aware check the static patterns
+     cannot make. There are intentionally **no** `git checkout main` / `git switch main`
+     deny rules; the hook covers being on main however the session got there.
+   - The hook is a **best-effort textual guard against ordinary agent command shapes, not
+     a hardened sandbox.** It covers the shapes agents actually emit (plain/compound
+     commands, `&&`/`||`/`;`, `if` conditions, a leading `!`, `while`/`until` loops, shell
+     grouping, quoted args and branch names, remote-tracking DWIM targets, wrapper
+     commands, and `bash -c '…'`/`sh -c`/`ssh`/`su -c`). More exotic wrapping — `eval`,
+     command substitution feeding an interpreter, `python -c`/`perl -e`, remote execution,
+     aliases, custom shell functions, variable-expanded branch targets
+     (`git switch "$BRANCH"`), or multi-step `@{-N}` (N ≥ 2) previous-branch chaining
+     inside one compound command — may still evade it and is **accepted as out of scope**,
+     not chased indefinitely. See `.claude/hooks/TEST-MATRIX.md` ("Scope & accepted
+     limits" and the Part-3 review log); the real backstop is Simon's review before
+     merge, not this hook.
 2. **One focused branch at a time, with scope agreed before work begins.** Do not
    make broad, unfocused changes across unrelated areas.
 3. **Do not touch secrets, `.env` files, tokens, or run destructive git operations**
