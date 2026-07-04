@@ -270,6 +270,18 @@ while IFS= read -r stmt; do
           --)          dashdash=1 ;;
           -c|-C|-b|-B|--create|--force-create|--orphan) want_create_arg=1 ;;
           --conflict|-U|--unified|--inter-hunk-context|--pathspec-from-file) want_flagvalue=1 ;;
+          -[cCbB]?*)
+            # GLUED create/reset form (`-cmain`, `-Cmain`, `-bfeat`, `-Bmain`):
+            # the attached name IS the created/target branch, same as the spaced
+            # form. This arm sits after the long-form arms so `--create` /
+            # `--conflict` (which also start with `-c`) match those first, and
+            # its second character can never be `-`, so no `--long` option lands
+            # here. Peel stray quote chars off the extracted name (`-c"main"`
+            # word-splits oddly) so a quoted glued name still resolves.
+            created="${tok#-?}"
+            case "$created" in \"*|\'*) created="${created#?}" ;; esac
+            case "$created" in *\"|*\') created="${created%?}" ;; esac
+            ;;
           -)           [ -z "$operand" ] && operand="-" ;;
           -*)          : ;;
           *)           [ -z "$operand" ] && operand="$tok" ;;

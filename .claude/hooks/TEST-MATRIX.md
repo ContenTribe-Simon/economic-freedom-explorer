@@ -447,6 +447,32 @@ that switch did not happen.
 | `git switch x ; case $? in 1) git commit -m x;; esac` | main | DENY | audit: `case $?` fragments arrive via `;` -> weak-sep reset covers them |
 | `! true && git commit -m x` | main | DENY | negated non-git statement; the commit still classifies on main |
 
+## 23) Glued create/reset short options (`-cX` `-CX` `-bX` `-BX`)
+
+The glued short-option forms (`git switch -Cmain`, `git checkout -Bmain`, valid
+per `git switch -h` / `git checkout -h`) previously fell into the generic `-*`
+skip and the attached branch name was never extracted. This CORRECTS an earlier
+Part-3 conclusion (see the revised entry in the review log): the old note
+claimed the miss "fails safe", but that held only when starting ON main. From a
+FEATURE branch, `-Cmain` left the target unresolved, eff stayed on the feature
+branch, and the following commit was wrongly allowed even though the real
+command resets/switches to main — an UNDER-deny. The glued name is now extracted
+as the created/target branch exactly like the spaced form (with stray quote
+characters peeled), placed after the long-form arms so `--create`/`--conflict`
+still match those first.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `git switch -Cmain && git commit -m x` | feature | DENY | glued force-create target is `main`; the commit lands on main (the corrected under-deny) |
+| `git checkout -Bmain && git commit -m x` | feature | DENY | checkout's glued `-B` form, same |
+| `git switch -cfeat2 && git commit -m x` | main | ALLOW | glued create to a non-main branch off main (the case the old note actually covered) |
+| `git switch -cfeat2 && git commit -m x` | feature | ALLOW | glued create, non-main target, from a non-main branch |
+| `git switch -Cmain && git commit -m x` | main | DENY | redundant reset to main; still main |
+| `git checkout -bfeat3 && git commit -m x` | feature | ALLOW | glued `-b` create |
+| `git checkout -Bmain-copy && git commit -m x` | main | ALLOW | created name is `main-copy`, not `main`; no false match |
+| `git switch -Cmain origin/x && git commit -m x` | feature | DENY | glued name wins; the start-point operand is ignored |
+| `git switch -c"main" && git commit -m x` | feature | DENY | stray quote peeled from the glued name -> `main` |
+
 ## A) settings.json — `git commit --amend` requires approval
 
 `Bash(git commit:*)` in the allow list also matched `git commit --amend`, which
@@ -534,10 +560,17 @@ Checked each category for an obvious untested variant. Fix only real bugs.
 - **`checkout -b <new> -- <path>`** — not a real bug: create flag present, so the
   result is the created branch (non-main), which is the honest outcome; committing
   on a freshly created branch is fine. No dedicated row needed beyond category 6.
-- **Glued create flag (`switch -cnewfeat`)** — KNOWN LIMITATION, no fix: the glued
-  short-option form is not parsed, so the created branch isn't extracted; it fails
-  SAFE (target unresolved -> on main, fail closed -> DENY). Agents use the spaced
-  form. Logged here so a future round doesn't mistake the over-deny for a new bug.
+- **Glued create flag (`switch -cnewfeat`, `-Cmain`, `-Bmain`)** — CORRECTED and
+  FIXED (was wrongly logged here as a safe no-fix limitation). The original note
+  claimed the unparsed glued form "fails safe (target unresolved -> on main,
+  fail closed -> DENY)". That conclusion was INCOMPLETE: it held only when
+  starting ON main. Starting from a feature branch, `git switch -Cmain` left the
+  target unresolved and eff on the feature branch — so a following commit was
+  wrongly ALLOWED even though the real command resets/switches to main (an
+  under-deny, found by Codex). The glued short-option forms are now parsed and
+  the attached name extracted as the created/target branch, same as the spaced
+  form. See category 23. Lesson recorded: "fails safe" claims must be argued
+  from BOTH starting branches, not just from main.
 - **`git -C <dir>` where `<dir>` is literally `switch`/`checkout`** — KNOWN
   LIMITATION, no fix: the naive token scan would treat that dir name as the
   subcommand. Absurd/unrealistic; not worth special-casing. Logged for awareness.
