@@ -71,6 +71,9 @@ compound ending in a commit unless noted.
 
 ## 4) `--` as path restore (checkout)
 
+A checkout is a path restore only when a **real pathspec follows `--`**. A bare
+trailing `--` with nothing after it is a plain branch checkout (see category 11).
+
 | Command | From | Result | Rationale |
 |---|---|---|---|
 | `git checkout -- src/foo.ts && git commit -m x` | main | DENY | `checkout -- <path>` restores a file, branch stays main |
@@ -142,6 +145,40 @@ start-point (even after `--`).
 | Case | From | Result | Rationale |
 |---|---|---|---|
 | Hook invoked as `"$CLAUDE_PROJECT_DIR"/.claude/hooks/...` with a project path containing spaces, `git switch main && git commit -m x` | feature | DENY | quoted `$CLAUDE_PROJECT_DIR` in settings.json survives spaces so the guard runs |
+
+## 11) `--` as a bare terminator on checkout (branch checkout, not restore)
+
+Per `git checkout -h` the form is `checkout [<branch>] [--]`, distinct from
+`checkout [<tree>] -- <path>`. A bare trailing `--` with **no pathspec after it**
+disambiguates the operand as a branch, so it is a genuine branch checkout, not a
+restore.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `git checkout main -- && git commit -m x` | main | DENY | bare `--` = branch checkout to main, not a restore; stays on main |
+| `git checkout main -- && git commit -m x` | feature | DENY | switches onto main (bare `--` is not a pathspec) |
+| `git checkout main -- afile && git commit -m x` | feature | ALLOW | a real pathspec follows `--`, so it is a genuine file restore (unchanged) |
+| `git checkout feat -- && git commit -m x` | main | ALLOW | bare `--` disambiguates `feat` as a branch -> confident switch off main |
+| `git checkout feat -- && git commit -m x` | feature | ALLOW | branch checkout to feat, never main |
+
+## 12) `||` separator (right side runs only if the left side failed)
+
+The splitter marks statements that follow `||`. Reaching the RHS of `||` proves
+the LHS FAILED, so a `git switch <x> || git commit` must not be treated as
+"we left main". A textual hook can't know whether `<x>` exists, so the
+**conservative choice** is: at a `||` boundary, treat the branch as `main` if
+`main` was reachable **either** before the LHS (`eff_prev`, where a failed switch
+leaves us) **or** after it (`eff`, an assumed-successful switch). This denies a
+following commit whenever main is reachable on either side, and never
+under-denies. (`&&`, `;`, `|`, `&` are plain sequential — no such asymmetry.)
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `git switch does-not-exist \|\| git commit -m x` | main | DENY | switch failed (that is why the RHS runs), so still on main |
+| `git switch main \|\| git commit -m x` | feature | DENY | conservative: if the switch "succeeded" we are on main, and if it failed the RHS commits on feature; main is reachable, so deny (over-safe) |
+| `git switch feat \|\| git commit -m x` | main | DENY | if the switch to feat fails, the RHS commits on main |
+| `git switch feat \|\| git commit -m x` | feature | ALLOW | neither the pre-switch branch nor the target is main |
+| `git switch main && git commit -m x \|\| echo done` | feature | DENY | the commit is on the `&&` side (onto main); the `\|\| echo` is irrelevant |
 
 ---
 

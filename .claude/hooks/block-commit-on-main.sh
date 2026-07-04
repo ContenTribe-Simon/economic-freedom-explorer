@@ -30,6 +30,8 @@
 #   - feature + "git switch -- main && git commit"         -> DENY  (switch: -- = end of opts)
 #   - main + "git switch -c new -- main && git commit"     -> ALLOW (new branch is `new`)
 #   - main + "git switch -- && git commit"                 -> DENY  (no target, fail closed)
+#   - feature + "git checkout main -- && git commit"       -> DENY  (bare `--` = branch checkout)
+#   - main + "git switch nope || git commit"               -> DENY  (|| RHS: switch failed, on main)
 # It never blocks `git switch`/`git checkout -b` itself, so the documented sync
 # step and branch creation keep working.
 #
@@ -108,10 +110,12 @@ if [ "$have_parser" -eq 0 ]; then
 fi
 
 # Walk the command as sequential statements, tracking the effective branch.
-# Split on shell separators without a real parser: turn && || ; | & into newlines.
+# Split on shell separators without a real parser: turn && ; | & into newlines.
+# `||` is different: reaching the RHS proves the LHS FAILED (see the loop), so
+# mark those statements with a sentinel prefix rather than flattening them.
 chain="$cmd"
 chain="${chain//&&/$'\n'}"
-chain="${chain//||/$'\n'}"
+chain="${chain//||/$'\n'__OR__}"
 chain="${chain//;/$'\n'}"
 chain="${chain//|/$'\n'}"
 chain="${chain//&/$'\n'}"
@@ -129,7 +133,22 @@ eff_prev=""
 
 deny=0
 while IFS= read -r stmt; do
+  # A statement carrying the `__OR__` sentinel followed `||`, so it runs ONLY
+  # because the previous statement FAILED. A textual hook can't know whether a
+  # failed `git switch <x>` target existed, so treat the branch conservatively:
+  # if `main` was reachable either BEFORE (eff_prev, where a failed switch leaves
+  # us) or AFTER (eff, an assumed-successful switch) that uncertain step, assume
+  # we are on main. This denies `git switch <x> || git commit` when either the
+  # pre-switch branch or the attempted target was main. (`&&`, `;`, `|`, `&`
+  # have no such asymmetry and are handled as plain sequential statements.)
+  sep_or=0
+  case "$stmt" in
+    __OR__*) sep_or=1; stmt="${stmt#__OR__}" ;;
+  esac
   [ -n "$stmt" ] || continue
+  if [ "$sep_or" -eq 1 ]; then
+    if [ "$eff" = "main" ] || [ "$eff_prev" = "main" ]; then eff="main"; else eff="$eff_prev"; fi
+  fi
 
   # A switch/checkout MAY move the effective branch. Parse the tokens after the
   # subcommand to find the RESULTING branch:
@@ -145,7 +164,7 @@ while IFS= read -r stmt; do
     is_switch=0
     printf '%s' "$stmt" | grep -Eq "$switch_re" && is_switch=1
 
-    phase=0; want_create_arg=0; created=""; operand=""; dashdash=0
+    phase=0; want_create_arg=0; created=""; operand=""; dashdash=0; path_after=0
     for tok in $stmt; do
       # Normalize one layer of matching surrounding quotes on EACH token, so a
       # quoted operator/flag/branch ("--", "-c", "main", '-') is still recognised
@@ -166,6 +185,13 @@ while IFS= read -r stmt; do
         esac
         continue
       fi
+      if [ "$dashdash" -eq 1 ] && [ "$is_switch" -eq 0 ]; then
+        # For `checkout`, any token after `--` is a pathspec / start-point.
+        # (For `switch`, `--` is only end-of-options and the branch target still
+        # follows it, so it falls through and is captured as the operand below.)
+        path_after=1
+        continue
+      fi
       case "$tok" in
         --)          dashdash=1 ;;
         -c|-C|-b|-B) want_create_arg=1 ;;
@@ -175,7 +201,12 @@ while IFS= read -r stmt; do
       esac
     done
 
-    if [ "$is_switch" -eq 0 ] && [ "$dashdash" -eq 1 ] && [ -z "$created" ]; then
+    # A checkout is a path RESTORE only when a real pathspec follows the `--`
+    # (`git checkout [<tree>] -- <path>`). A bare trailing `--` with nothing after
+    # it (`git checkout <branch> --`) is a plain branch checkout with a
+    # disambiguating terminator, NOT a restore, so it falls through to the
+    # branch-switch logic below.
+    if [ "$is_switch" -eq 0 ] && [ -z "$created" ] && [ "$dashdash" -eq 1 ] && [ "$path_after" -eq 1 ]; then
       : # `checkout [<tree>] -- <path>`: path restore, leave eff unchanged.
     else
       # Resulting branch: the created branch, else the first operand.
@@ -213,11 +244,13 @@ while IFS= read -r stmt; do
             resolved="$target" ;;
         esac
         # A bare `git checkout <token>` is ambiguous (branch vs path). Only a
-        # `switch`, a create flag (-c/-C/-b/-B), or a previous-branch ref is a
+        # `switch`, a create flag (-c/-C/-b/-B), a previous-branch ref, or a bare
+        # trailing `--` (which disambiguates the operand AS a branch) is a
         # CONFIDENT branch switch. Switching TO main is always honoured (deny
         # direction); otherwise an ambiguous checkout must not CLEAR on-main.
         confident=0
         { [ "$is_switch" -eq 1 ] || [ "$is_create" -eq 1 ] || [ "$prevref" -eq 1 ]; } && confident=1
+        { [ "$dashdash" -eq 1 ] && [ "$path_after" -eq 0 ]; } && confident=1
         if [ "$resolved" = "main" ]; then
           eff_prev="$eff"; eff="main"
         elif [ "$confident" -eq 1 ] || [ "$eff" != "main" ]; then
