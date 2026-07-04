@@ -175,28 +175,25 @@ while IFS= read -r stmt; do
   in_cond=0; first_seen=0   # in_cond: statement is an `if`/`elif` CONDITION
   want_create_arg=0; created=""; operand=""; dashdash=0; path_after=0
   for tok in $stmt; do
-    # Normalize each token: strip one layer of matching surrounding quotes, then
-    # any leading `(`/`{` and trailing `)`/`}` shell-grouping characters (to any
-    # depth), so a grouped command like "( git commit )", "(git commit -m x)",
-    # "(( ... ))" or "{ ... ; }" is seen through to the real `git` invocation and
-    # its target underneath. Without this, a leading grouping token broke the scan
-    # in gphase 0 and the statement was never classified -- an UNDER-deny. A token
-    # that was only quotes/grouping becomes empty and is skipped.
-    case "$tok" in
-      \"*\") tok="${tok#\"}"; tok="${tok%\"}" ;;
-      \'*\') tok="${tok#\'}"; tok="${tok%\'}" ;;
-    esac
-    # `(` and `)` are shell metacharacters and can be glued to a word, so strip
-    # any leading `(` and trailing `)` (to any depth). `{`/`}` are brace-group
-    # RESERVED WORDS -- grouping only when they are standalone tokens -- so drop a
-    # standalone `{`/`}` but leave a glued `}` intact (git ref syntax like
-    # `@{-1}` / `HEAD@{2}` must survive).
+    # Normalize each token by peeling shell delimiters until it stops changing: a
+    # leading OR trailing quote (" or '), and a leading `(` or trailing `)`. Each
+    # end is stripped INDEPENDENTLY -- not just a matched leading+trailing pair.
+    # This is essential: a multi-word quoted command handed to another interpreter
+    # (`bash -c 'git commit -m x'`, `sh -c '...'`, `ssh host 'git ...'`,
+    # `su -c '...'`) word-splits into `'git ... x'` with a stray LONE quote glued
+    # to the FIRST (`'git`) and LAST (`x'`) tokens; both must be recognized so the
+    # real `git` token and any switch target survive. A balanced `"main"`/'main'
+    # still normalizes to `main` (both ends peeled -> identical to before). `(`/`)`
+    # are metacharacters, peeled to any depth. `{`/`}` are brace-group reserved
+    # words: a standalone one is dropped below, but a glued `}` is left intact so
+    # git ref syntax (`@{-1}`, `HEAD@{2}`) survives.
     while :; do
-      case "$tok" in
-        \(*) tok="${tok#?}" ;;
-        *\)) tok="${tok%?}" ;;
-        *) break ;;
-      esac
+      before="$tok"
+      case "$tok" in \"*) tok="${tok#?}" ;; \'*) tok="${tok#?}" ;; esac
+      case "$tok" in *\") tok="${tok%?}" ;; *\') tok="${tok%?}" ;; esac
+      case "$tok" in \(*) tok="${tok#?}" ;; esac
+      case "$tok" in *\)) tok="${tok%?}" ;; esac
+      [ "$tok" = "$before" ] && break
     done
     case "$tok" in \{|\}) tok="" ;; esac
     [ -z "$tok" ] && continue

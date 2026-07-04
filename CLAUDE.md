@@ -50,18 +50,27 @@ The finance engine is `src/lib/finance/` (notably `projection.ts`, `types.ts`,
 1. **Never commit, push, or merge to `main` from an agent.** Work on a branch.
    Simon merges manually after review. Enforcement is layered, and deliberately honest
    about its limits:
-   - `.claude/settings.json` denies `git push`, `git merge`, `git reset --hard`, `rm -rf`,
-     and read/write/edit of `.env*` files. These are **static, best-effort string-prefix
-     patterns**, not a hard block: because they match on the command prefix, a `git`
-     global option before the subcommand (e.g. `git -C . push`, `git -c user.name=x merge
-     feat`) slips past them un-denied. That is an accepted limitation, not a gap to chase
-     with ever more patterns.
+   - `.claude/settings.json` denies `git push`, `git merge`, `git commit --amend`,
+     `git reset --hard`, `rm -rf`, and read/write/edit of `.env*` files. These are
+     **static, best-effort string-prefix patterns**, not a hard block: because they match
+     on the command prefix, a `git` global option or reordered flag before/around the
+     subcommand (e.g. `git -C . push`, `git commit -a --amend`) slips past them un-denied.
+     That is an accepted limitation, not a gap to chase with ever more patterns.
    - The `PreToolUse` hook `.claude/hooks/block-commit-on-main.sh` is the **sole
      authoritative guard** against a `git commit` landing on `main`: it walks the command
      and denies the commit whenever the *effective* branch is `main` (directly, or after
      switching to main in the same command) — a branch-aware check the static patterns
      cannot make. There are intentionally **no** `git checkout main` / `git switch main`
      deny rules; the hook covers being on main however the session got there.
+   - The hook is a **best-effort textual guard against ordinary agent command shapes, not
+     a hardened sandbox.** It covers the shapes agents actually emit (plain/compound
+     commands, `&&`/`||`/`;`, `if` conditions, shell grouping, quoted args and branch
+     names, wrapper commands, and `bash -c '…'`/`sh -c`/`ssh`/`su -c`). More exotic
+     wrapping — `eval`, command substitution feeding an interpreter, `python -c`/`perl -e`,
+     remote execution, aliases, custom shell functions — may still evade it and is
+     **accepted as out of scope**, not chased indefinitely. See
+     `.claude/hooks/TEST-MATRIX.md` ("Scope & accepted limits"); the real backstop is
+     Simon's review before merge, not this hook.
 2. **One focused branch at a time, with scope agreed before work begins.** Do not
    make broad, unfocused changes across unrelated areas.
 3. **Do not touch secrets, `.env` files, tokens, or run destructive git operations**

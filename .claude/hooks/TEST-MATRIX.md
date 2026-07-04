@@ -17,6 +17,25 @@ blocks `git switch` / branch creation / the documented sync step. It is
 best-effort accident defence; the hard guarantee is the hook denying the commit,
 not the settings.json string patterns.
 
+## Scope & accepted limits (permanent — read before opening a "bypass" finding)
+
+This hook is a **best-effort textual guard against ordinary agent command
+shapes, not a hardened sandbox.** It does not run a real shell; it textually
+splits and token-scans the command. It reliably covers the shapes an agent
+actually emits — plain and compound commands, `&&`/`||`/`;`, `if`/`elif`
+conditions, shell grouping, quoted arguments and branch names, wrapper commands,
+and quoted commands handed to another interpreter (`bash -c '…'`, `sh -c`,
+`ssh`, `su -c`). Beyond those, **more exotic wrapping mechanisms may still evade
+it and are accepted as OUT OF SCOPE** rather than chased indefinitely, e.g.:
+`eval "$var"`, command substitution feeding an interpreter
+(`bash -c "$(printf …)"`), other-language runners (`python -c`, `perl -e`,
+`node -e`), remote/deferred execution, aliases, and custom shell functions.
+
+The one guarantee that matters is unchanged: on `main`, an ordinary agent commit
+is denied. A future finding in one of the exotic categories above should be
+triaged as **"known category, already accepted"**, not a new emergency round.
+The real backstop is human review before merge (CLAUDE.md §3), not this hook.
+
 ## How to re-run
 
 Pipe a simulated PreToolUse payload
@@ -301,6 +320,26 @@ over-deny, never under-deny. A switch in a `then`/`else` BRANCH is not gated
 | `if git status; then git commit -m x; fi` | feature | ALLOW | non-switch condition; commit on feature |
 | `if git switch feature; then : ; elif git switch main; then git commit -m x; fi` | main | DENY | `elif` condition switch to main is also gated -> main reachable |
 | `if git switch other; then git switch feat2; git commit -m x; fi` | feature | ALLOW | the `then`-branch switch (not gated) moves to feat2; commit off main |
+
+## 18) Interpreter-wrapped quoted command (`bash -c '…'`, `sh -c`, `ssh`, `su -c`)
+
+A multi-word command handed to another interpreter as a quoted string
+word-splits (the splitter and token scan are quote-unaware) into `'git … x'`
+with a stray LONE quote glued to the first (`'git`) and last (`x'`) tokens. Token
+normalization now peels a lone leading OR trailing quote (not just a matched
+pair), so the real `git` token and any switch target are recognized on both ends.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `bash -c 'git commit -m x'` | main | DENY | `'git` -> `git`, `x'` -> `x`; scan finds the real commit on main |
+| `sh -c 'git commit -m x'` | main | DENY | same for `sh` |
+| `bash -c 'git commit -m x'` | feature | ALLOW | commit off main |
+| `bash -c "git commit -m x"` | main | DENY | double-quoted variant peeled the same way |
+| `su -c 'git commit -m x'` | main | DENY | any interpreter wrapper, no wrapper-list needed (scan-forward) |
+| `ssh host 'git commit -m x'` | main | DENY | remote-shell wrapper, same shape |
+| `bash -c 'git switch feature'` | main | ALLOW | the real switch is recognized as leaving main; no commit -> not over-denied |
+| `bash -c 'git switch main && git commit -m x'` | feature | DENY | splits on the inner `&&`: switch to main then commit -> on main |
+| `bash -c 'git switch feature && git commit -m x'` | main | ALLOW | switch to feature then commit -> off main |
 
 ## A) settings.json — `git commit --amend` requires approval
 
