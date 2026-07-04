@@ -1,37 +1,55 @@
 #!/usr/bin/env bash
 #
-# PreToolUse (Bash) hook: block `git commit` when HEAD is on `main`.
+# PreToolUse (Bash) hook: block a `git commit` that would land on `main`.
 #
-# Why a hook and not another deny pattern: static allow/deny strings in
-# settings.json cannot see runtime state. `Bash(git commit *)` is allowed on
-# every branch, so a session that starts on or reaches `main` could commit
-# there without a prompt, defeating CLAUDE.md golden rule #1 (agents never
-# commit to main). This hook inspects the *current branch* at call time.
+# Why a hook and not a static deny pattern: settings.json allow/deny strings
+# cannot see runtime state. `Bash(git commit *)` is allowed on every branch, so
+# a session on `main` could commit there without a prompt, defeating CLAUDE.md
+# golden rule #1 (agents never commit to main). This hook is now the
+# authoritative guard for that rule.
+#
+# Effective-branch reasoning (the important part): it is NOT enough to check the
+# live branch at call time. A single compound call such as
+#   git switch main && git commit -m x
+# is issued while the live branch is still the feature branch, yet the commit
+# lands on main. So the hook parses the command, splits it into sequential
+# statements on shell separators (&& || ; | & newline), and walks them in order
+# tracking the *effective* branch: a `git switch|checkout <target>` updates it,
+# and a `git commit` is denied if the effective branch is `main` at that point.
+# This means:
+#   - live-main + commit                                   -> DENY
+#   - feature + "git switch main && git commit"            -> DENY  (the bypass)
+#   - feature + "git checkout main && git commit"          -> DENY
+#   - "... && git switch -c feat/x && git commit"          -> ALLOW (off main first)
+#   - "git switch main && git fetch && git pull"           -> ALLOW (no commit)
+#   - live-main + "git switch -c feat && git commit"       -> ALLOW (left main)
+# It never blocks `git switch`/`git checkout -b` itself, so the documented sync
+# step and branch creation keep working.
+#
+# Known limitation (errs safe): statement splitting is textual and not quote- or
+# heredoc-aware, so a commit MESSAGE (or other quoted argument) that itself
+# contains a switch-to-main and a commit separated by a shell operator can trip
+# this and be over-denied. That only ever over-blocks (deny), never lets a commit
+# reach main; reword the message or commit from a feature branch if it fires.
 #
 # Contract (Claude Code PreToolUse): reads the tool payload as JSON on stdin,
 # uses `.tool_input.command`; to block, prints a JSON object with
 # hookSpecificOutput.permissionDecision = "deny" on stdout and exits 0.
-#
-# Design: the hook is a no-op unless the current branch is exactly `main`.
-# That keeps it invisible on feature branches and, crucially, never blocks
-# `git switch`/`git checkout -b` off main (the escape hatch stays open).
 
-set -uo pipefail
+set -uf -o pipefail   # -f: no pathname expansion — command text is tokenized as data, never run
 
 payload="$(cat)"
 
-# Resolve the current branch. `git branch --show-current` returns the branch
-# name (even on an unborn branch with no commits yet) and prints nothing on a
-# detached HEAD or outside a repo. In any of those non-"main" cases we allow
-# (exit 0) and stay out of the way.
-branch="$(git branch --show-current 2>/dev/null || true)"
-if [ "$branch" != "main" ]; then
+# Fast path: if the payload can't possibly contain a `git commit`, there is
+# nothing to guard on any branch. This keeps the hook cheap on the vast majority
+# of Bash calls (and avoids spawning a JSON parser for them).
+if ! printf '%s' "$payload" | grep -q 'commit'; then
   exit 0
 fi
 
-# On main: pull the shell command out of the payload. Try jq, then python3,
-# then node (this repo already requires Node/npm to run at all, so at least one
-# parser is essentially always present). Track whether any parser was available.
+# The payload mentions "commit". Extract the actual command string. Try jq, then
+# python3, then node (this repo already requires Node/npm to run at all, so at
+# least one parser is essentially always present). Track whether any was found.
 cmd=""
 have_parser=0
 if command -v jq >/dev/null 2>&1; then
@@ -45,27 +63,66 @@ elif command -v node >/dev/null 2>&1; then
   cmd="$(printf '%s' "$payload" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(((JSON.parse(s).tool_input)||{}).command||"")}catch(e){}})' 2>/dev/null || true)"
 fi
 
-# Fail CLOSED on main: if none of jq/python3/node is available we cannot see
-# what the command is, so deny as a precaution rather than let an unverified
-# command through in exactly the environment where the guard matters most.
-# (Off main we already returned above, so this never blocks feature-branch work.)
+live_branch="$(git branch --show-current 2>/dev/null || true)"
+
+deny_json() {
+  cat <<JSON
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"$1"}}
+JSON
+}
+
+# Fail CLOSED: the payload references a commit but we could not parse it to see
+# what it actually does. If the live branch is main, deny as a precaution. Off
+# main we allow (this only triggers with no jq/python3/node in PATH, which can't
+# run this Node repo anyway, and blanket-blocking feature-branch work is worse).
 if [ "$have_parser" -eq 0 ]; then
-  cat <<'JSON'
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by .claude/hooks/block-commit-on-main.sh: cannot verify command safety (no jq, python3 or node available to parse the tool payload), denying on main as a precaution. Switch to a feature branch (git switch -c <name>) and work there."}}
-JSON
+  if [ "$live_branch" = "main" ]; then
+    deny_json "Blocked by .claude/hooks/block-commit-on-main.sh: a commit was requested on 'main' but the command payload could not be parsed (no jq, python3 or node). Denying on main as a precaution. Switch to a feature branch (git switch -c <name>) and work there."
+  fi
   exit 0
 fi
 
-# Is this a `git commit`? Match `git` (word-boundaried) followed by any global
-# flags/tokens and then the `commit` subcommand. Tolerates `git -c x=y commit`
-# and `... && git commit ...` chains; does not match `git log --grep=commit`.
-if ! printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]_-])git([[:space:]]+[^;|&[:space:]]+)*[[:space:]]+commit([[:space:]]|$)'; then
-  exit 0
-fi
+# Walk the command as sequential statements, tracking the effective branch.
+# Split on shell separators without a real parser: turn && || ; | & into newlines.
+chain="$cmd"
+chain="${chain//&&/$'\n'}"
+chain="${chain//||/$'\n'}"
+chain="${chain//;/$'\n'}"
+chain="${chain//|/$'\n'}"
+chain="${chain//&/$'\n'}"
 
-# git commit on main -> deny. Static JSON, emitted without jq so blocking never
-# depends on a parser being present.
-cat <<'JSON'
-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by .claude/hooks/block-commit-on-main.sh: agents must never commit to 'main' (CLAUDE.md golden rule #1). Switch to a feature branch (git switch -c <name>) and commit there; Simon merges to main manually."}}
-JSON
+on_main=0
+[ "$live_branch" = "main" ] && on_main=1
+
+# git followed by global flags/tokens, then the given subcommand as a word.
+sw_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+(switch|checkout)([[:space:]]|$)'
+ci_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)'
+
+deny=0
+while IFS= read -r stmt; do
+  [ -n "$stmt" ] || continue
+
+  # A switch/checkout changes the effective branch to its target (the last
+  # non-flag token: handles `git switch main`, `git switch -c feat/x`,
+  # `git checkout -b feat`, `git -C path checkout main`).
+  if printf '%s' "$stmt" | grep -Eq "$sw_re"; then
+    target=""
+    for tok in $stmt; do
+      case "$tok" in
+        -*) : ;;
+        *)  target="$tok" ;;
+      esac
+    done
+    if [ "$target" = "main" ]; then on_main=1; else on_main=0; fi
+  fi
+
+  # A commit lands on the current effective branch; if that is main, block.
+  if printf '%s' "$stmt" | grep -Eq "$ci_re"; then
+    if [ "$on_main" -eq 1 ]; then deny=1; break; fi
+  fi
+done <<< "$chain"
+
+if [ "$deny" -eq 1 ]; then
+  deny_json "Blocked by .claude/hooks/block-commit-on-main.sh: this command would commit on 'main' (directly, or after switching to main in the same command) and agents must never commit to main (CLAUDE.md golden rule #1). Commit on a feature branch instead; Simon merges to main manually."
+fi
 exit 0
