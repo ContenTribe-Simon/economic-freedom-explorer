@@ -123,6 +123,10 @@ the pre-launch gate is the final go/no-go review before launch.
 - Security: Supabase Row Level Security on every table; only browser-facing keys; npm audit; no secrets in the bundle or repo.
 - Robustness / a11y: keyboard, visible focus, no blank-screen crashes.
 
+Phase 7's scope also includes an engine-side horizon-correctness fix (the yAt95 anchor vs. the
+last projected YearRow) plus expanded standard-scenario regression tests; see
+`docs/backlog-engine-horizon-and-tests-v1.md` for the detail.
+
 ### Phase 12 — pre-launch stress, security & go-live gate (checklist)
 
 - Full regression: whole suite green (unit + e2e + build) and CI green on the release branch.
@@ -140,6 +144,17 @@ MVP data contract → brand & UI concept → onboarding & input UI → result da
 **mid-build stress/security gate** → explanation/trust layer → hide advanced →
 sensitivity/top drivers → save/share/export → **pre-launch stress/security/go-live gate**.
 Phases 1–3 are complete; Phase 4 (brand & UI concept) is in progress.
+
+### Post-launch (beyond Phase 12)
+
+Two efforts are deliberately deferred out of the numbered phases and parked as backlog, so they
+are anchored to the roadmap and not lost:
+
+- A public brand/visual redesign (deferred during MVP momentum; see `docs/redesign-brief-v1.md`
+  for the exploration, diagnosis, and directions).
+- A dedicated data-visualization and UX design pass for the existing Advanced app (its
+  functionality was built ahead of its UX), a separate, later-added item in that same file,
+  distinct from Phase 9 (routing only, gating Advanced behind a door, no visual rework).
 
 ---
 
