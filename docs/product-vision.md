@@ -141,6 +141,20 @@ MVP data contract → brand & UI concept → onboarding & input UI → result da
 sensitivity/top drivers → save/share/export → **pre-launch stress/security/go-live gate**.
 Phases 1–3 are complete; Phase 4 (brand & UI concept) is in progress.
 
+### Post-launch (beyond Phase 12)
+
+Two efforts are deliberately deferred out of the numbered phases and parked as backlog, so they
+are anchored to the roadmap and not lost:
+
+- A public brand/visual redesign (deferred during MVP momentum; see `docs/redesign-brief-v1.md`
+  for the exploration, diagnosis, and directions). Also includes a separate, later-added item in
+  that same file: a dedicated data-visualization and UX design pass for the existing Advanced app
+  (its functionality was built ahead of its UX), distinct from Phase 9 (routing only, gating
+  Advanced behind a door, no visual rework).
+- An engine-side horizon-correctness fix (the yAt95 anchor vs. the last projected YearRow) plus
+  expanded standard-scenario regression tests, targeted at Phase 7's correctness gate; see
+  `docs/backlog-engine-horizon-and-tests-v1.md` for the detail.
+
 ---
 
 ## 7. Public MVP inputs & outputs
