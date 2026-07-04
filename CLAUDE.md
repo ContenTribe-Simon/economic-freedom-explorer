@@ -75,10 +75,11 @@ The finance engine is `src/lib/finance/` (notably `projection.ts`, `types.ts`,
      commands, `&&`/`||`/`;`, `if` conditions, shell grouping, quoted args and branch
      names, wrapper commands, and `bash -c '…'`/`sh -c`/`ssh`/`su -c`). More exotic
      wrapping — `eval`, command substitution feeding an interpreter, `python -c`/`perl -e`,
-     remote execution, aliases, custom shell functions — may still evade it and is
+     remote execution, aliases, custom shell functions, or multi-step `@{-N}` (N ≥ 2)
+     previous-branch chaining inside one compound command — may still evade it and is
      **accepted as out of scope**, not chased indefinitely. See
-     `.claude/hooks/TEST-MATRIX.md` ("Scope & accepted limits"); the real backstop is
-     Simon's review before merge, not this hook.
+     `.claude/hooks/TEST-MATRIX.md` ("Scope & accepted limits" and the Part-3 review
+     log); the real backstop is Simon's review before merge, not this hook.
 2. **One focused branch at a time, with scope agreed before work begins.** Do not
    make broad, unfocused changes across unrelated areas.
 3. **Do not touch secrets, `.env` files, tokens, or run destructive git operations**

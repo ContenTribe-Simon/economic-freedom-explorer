@@ -363,6 +363,34 @@ an ordinary "switch then commit" so it stays trusted.
 | `git switch feature ; git commit -m x` | feature | ALLOW | neither the target nor the pre-switch branch is main |
 | `git switch main ; git fetch ; git pull` | main | ALLOW | no commit anywhere |
 
+## 20) Options taking a separate value token (`--conflict <style>` etc.)
+
+Some switch/checkout options take a SEPARATE following value token (confirmed
+via `git switch -h` / `git checkout -h`). The generic `-*` skip ignored the flag
+but let its value fall through to operand capture, so the value (e.g. `merge`)
+was recorded as the branch target instead of the real branch that follows it.
+Covered set: `--conflict <style>` (both commands); checkout-only `-U`/`--unified
+<n>`, `--inter-hunk-context <n>`, `--pathspec-from-file <file>`. Long-form
+create flags `--create`/`--force-create`/`--orphan <branch>` are treated as
+create-type (their argument IS the resulting branch), same as `-c`/`-C`/`-b`/`-B`.
+Deliberately NOT consuming a following token: `--track[=…]` and
+`--recurse-submodules[=…]` (glued-only optional args) and all `--no-` negations
+(they take no value) — treating those as value-consuming would swallow a real
+branch target and could under-deny.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `git switch --conflict merge main && git commit -m x` | feature | DENY | `merge` is the `--conflict` value, consumed; the real target is `main` |
+| `git checkout --conflict merge main && git commit -m x` | feature | DENY | checkout supports the same flag (per `-h`); same handling |
+| `git switch --conflict merge feature && git commit -m x` | main | ALLOW | regression: real switch off main still recognized |
+| `git switch --conflict=merge main && git commit -m x` | feature | DENY | glued form stays in the generic `-*` skip; target `main` |
+| `git switch --no-conflict main && git commit -m x` | feature | DENY | `--no-` negation consumes nothing; `main` is the target |
+| `git switch --create feat2 && git commit -m x` | main | ALLOW | long-form create; resulting branch is `feat2` |
+| `git switch --create main-copy main && git commit -m x` | feature | ALLOW | created branch `main-copy` wins over the `main` start-point |
+| `git switch --orphan newbie && git commit -m x` | main | ALLOW | `--orphan` is create-type; resulting branch `newbie` |
+| `git switch --orphan main && git commit -m x` | feature | DENY | the orphan branch is literally named `main`; name-based deny |
+| `git checkout --pathspec-from-file specs.txt && git commit -m x` | main | DENY | the file value is consumed, no target -> fail closed, still main |
+
 ## A) settings.json — `git commit --amend` requires approval
 
 `Bash(git commit:*)` in the allow list also matched `git commit --amend`, which
@@ -472,3 +500,14 @@ Checked each category for an obvious untested variant. Fix only real bugs.
   agent command takes this shape, so it is deliberately OUT OF SCOPE rather than
   chased with more parsing (found by @claude; accepted, not fixed). The hook
   header comment is softened to note this exception.
+- **`@{-2}` and higher resolve against the PRE-COMMAND reflog** — KNOWN
+  LIMITATION, no fix (found by Codex). Only `@{-1}` has in-chain tracking (via
+  `eff_prev`); `@{-2}`, `@{-3}`, … are resolved with `git rev-parse` against the
+  real reflog as it stood BEFORE the command ran, ignoring any switches earlier
+  in the same compound Bash command that would shift the reflog positions. A
+  full fix needs a switch-history stack instead of the single `eff_prev`, for a
+  pattern (multi-step `@{-N}` chaining within one shell command) that is
+  extremely unlikely in practice. Note the resolution still fails CLOSED (an
+  unresolvable `@{-N}` is treated as main), so the plain single-statement
+  `@{-N}` cases stay correct; only the in-chain-shifted variant can misresolve.
+  Accepted; revisit only if agents ever actually emit chained `@{-N}` commands.

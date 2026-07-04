@@ -176,7 +176,7 @@ while IFS= read -r stmt; do
   want_gflag_arg=0
   subcmd=""
   in_cond=0; first_seen=0   # in_cond: statement is an `if`/`elif` CONDITION
-  want_create_arg=0; created=""; operand=""; dashdash=0; path_after=0
+  want_create_arg=0; want_flagvalue=0; created=""; operand=""; dashdash=0; path_after=0
   for tok in $stmt; do
     # Normalize each token by peeling shell delimiters until it stops changing: a
     # leading OR trailing quote (" or '), and a leading `(` or trailing `)`. Each
@@ -232,15 +232,26 @@ while IFS= read -r stmt; do
       continue
     fi
     # gphase 2: arguments after the subcommand. Only switch/checkout needs them,
-    # to find the RESULTING branch: a create flag (`-c`/`-C`/`-b`/`-B`) names the
-    # new branch as its argument; otherwise the operand is the first non-flag
-    # token (a lone `-` is a target; `--` handling below). For `checkout`, a token
-    # after `--` is a pathspec/start-point; for `switch`, `--` is only
+    # to find the RESULTING branch: a create-type flag (`-c`/`-C`/`-b`/`-B` and
+    # the long forms `--create`/`--force-create`, plus `--orphan`) names the new
+    # branch as its argument; otherwise the operand is the first non-flag token
+    # (a lone `-` is a target; `--` handling below). Options that take a SEPARATE
+    # non-branch value token (per `git switch -h` / `git checkout -h`:
+    # `--conflict <style>`, and checkout's `-U`/`--unified <n>`,
+    # `--inter-hunk-context <n>`, `--pathspec-from-file <file>`) consume that
+    # value so it is never mistaken for the branch target. Glued-only optional
+    # args (`--track[=...]`, `--recurse-submodules[=...]`) and `--no-` negations
+    # take no separate token and stay in the generic `-*` skip. For `checkout`, a
+    # token after `--` is a pathspec/start-point; for `switch`, `--` is only
     # end-of-options and the branch target still follows it.
     case "$subcmd" in
       switch|checkout)
         if [ "$want_create_arg" -eq 1 ]; then
           case "$tok" in --) : ;; *) created="$tok"; want_create_arg=0 ;; esac
+          continue
+        fi
+        if [ "$want_flagvalue" -eq 1 ]; then
+          want_flagvalue=0
           continue
         fi
         if [ "$dashdash" -eq 1 ] && [ "$subcmd" = "checkout" ]; then
@@ -249,7 +260,8 @@ while IFS= read -r stmt; do
         fi
         case "$tok" in
           --)          dashdash=1 ;;
-          -c|-C|-b|-B) want_create_arg=1 ;;
+          -c|-C|-b|-B|--create|--force-create|--orphan) want_create_arg=1 ;;
+          --conflict|-U|--unified|--inter-hunk-context|--pathspec-from-file) want_flagvalue=1 ;;
           -)           [ -z "$operand" ] && operand="-" ;;
           -*)          : ;;
           *)           [ -z "$operand" ] && operand="$tok" ;;
