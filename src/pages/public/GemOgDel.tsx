@@ -1,0 +1,293 @@
+import { useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Download, ExternalLink, Share2, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PublicHeader } from "@/components/public/PublicHeader";
+import { usePublicStore } from "@/store/publicStore";
+import { computePublicResult } from "@/lib/finance/public";
+import { formatDaLongDate, formatKr } from "@/lib/publicFormat";
+import { shareUrlFor } from "@/lib/publicShare";
+import "./start.css";
+
+/**
+ * Save/Share — the last screen of the public Frihedsmodel flow (Phase 5/11 local scope).
+ * Ported from design-reference/gem-og-del.html. Saving is local-only (usePublicStore persist,
+ * "Gemmes kun på din egen enhed"); the share link carries the inputs in the URL itself, so no
+ * backend or account is involved. Computation goes through the public adapter only.
+ */
+
+export default function GemOgDel() {
+  const navigate = useNavigate();
+  const inputs = usePublicStore((s) => s.inputs);
+  const saved = usePublicStore((s) => s.saved);
+  const saveCalculation = usePublicStore((s) => s.saveCalculation);
+  const removeCalculation = usePublicStore((s) => s.removeCalculation);
+  const loadCalculation = usePublicStore((s) => s.loadCalculation);
+
+  const result = useMemo(() => computePublicResult(inputs), [inputs]);
+  const shareUrl = useMemo(() => shareUrlFor(inputs), [inputs]);
+
+  const [name, setName] = useState("Min plan");
+  const [justSaved, setJustSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const savedTimer = useRef<number | undefined>(undefined);
+  const copyTimer = useRef<number | undefined>(undefined);
+
+  const onSave = () => {
+    saveCalculation(name);
+    setJustSaved(true);
+    window.clearTimeout(savedTimer.current);
+    savedTimer.current = window.setTimeout(() => setJustSaved(false), 2600);
+  };
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      // Clipboard can be unavailable (permissions); the field itself stays selectable.
+    }
+    setCopied(true);
+    window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => setCopied(false), 2200);
+  };
+
+  const onOpen = (id: string) => {
+    if (loadCalculation(id)) navigate("/resultat");
+  };
+
+  // Summary-preview copy from the real result (exact figures).
+  const onOrTight = result.status.kind !== "off_track";
+  const previewHeadline = onOrTight ? (
+    <>
+      Du kan stoppe ved <span className="italic text-[color:var(--fjord)]">alder {result.earliestSustainableStopAge ?? result.desiredStopAge}</span>.
+    </>
+  ) : (
+    <>
+      Pengene rækker til <span className="italic text-[color:var(--fjord)]">alder {result.moneyLastsToAge}</span>.
+    </>
+  );
+  const previewNumbers = `Formue ved stop ${formatKr(result.capitalAtStopAge)} · pengene rækker til ${result.moneyLastsToAge}`;
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto max-w-[720px] px-[clamp(18px,5vw,40px)]">
+        <PublicHeader
+          action={
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/resultat">
+                <ArrowLeft aria-hidden="true" />
+                Tilbage til svaret
+              </Link>
+            </Button>
+          }
+        />
+
+        <section className="fm-rise pt-[clamp(34px,6vw,58px)]">
+          <p className="mb-4 text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
+            Behold dit svar
+          </p>
+          <h1 className="m-0 font-display text-[clamp(30px,5vw,46px)] font-light leading-[1.08] tracking-[-0.015em] text-foreground">
+            Behold dit svar.
+          </h1>
+          <p className="mt-4 max-w-[32em] text-[clamp(16px,2.2vw,19px)] leading-[1.55] text-[color:var(--ink-soft)]">
+            Gem din beregning, så du kan vende tilbage til den, eller tag et resumé med dig.
+          </p>
+        </section>
+
+        <div className="mt-[clamp(28px,4vw,40px)] flex flex-col gap-[18px]">
+          {/* 1. Gem beregning */}
+          <section
+            aria-labelledby="b-save"
+            className="fm-rise rounded-[18px] border border-border bg-card p-[clamp(20px,3vw,26px)] shadow-sm"
+            style={{ animationDelay: "0.05s" }}
+          >
+            <div className="mb-1 flex items-center gap-[11px]">
+              <span className="inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-[color:var(--fjord-soft)] text-[color:var(--fjord)]">
+                <Download aria-hidden="true" className="h-[18px] w-[18px]" />
+              </span>
+              <h2 id="b-save" className="m-0 font-display text-[19px] font-normal tracking-[-0.01em] text-foreground">
+                Gem beregning
+              </h2>
+            </div>
+            <p className="m-0 mt-2 text-[13.5px] leading-[1.5] text-[color:var(--ink-soft)]">
+              Gemmes kun på din egen enhed. Vi sender ikke dine tal nogen steder.
+            </p>
+            <div className="mt-4 flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1">
+                <Label htmlFor="save-name" className="text-[13px] font-semibold text-foreground">
+                  Navn på beregningen
+                </Label>
+                <Input id="save-name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5 bg-white" />
+              </div>
+              <Button onClick={onSave} className="[&_svg]:size-[18px]">
+                <Check aria-hidden="true" />
+                Gem
+              </Button>
+            </div>
+            <div className="mt-2.5 min-h-[20px]">
+              <span
+                role="status"
+                aria-live="polite"
+                className={`inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-success transition-opacity motion-reduce:transition-none ${justSaved ? "opacity-100" : "opacity-0"}`}
+              >
+                {justSaved && (
+                  <>
+                    <CheckCircle2 aria-hidden="true" className="h-4 w-4" /> Gemt
+                  </>
+                )}
+              </span>
+            </div>
+
+            {saved.length > 0 && (
+              <>
+                <p className="mb-2 mt-[22px] text-[12px] font-semibold uppercase tracking-[0.08em] text-[color:var(--ink-soft)]">
+                  Gemte beregninger
+                </p>
+                <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                  {saved.map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 rounded-[11px] border border-border bg-[color:var(--paper-sunk)] px-3.5 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-[14.5px] font-medium text-foreground">{s.name}</div>
+                        <div className="mt-px text-[12.5px] text-[color:var(--ink-soft)]">{formatDaLongDate(s.savedAt)}</div>
+                      </div>
+                      <div className="flex flex-none items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onOpen(s.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 font-sans text-[14px] font-semibold text-[color:var(--fjord)] hover:bg-[color:var(--fjord-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          Åbn
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Fjern ${s.name}`}
+                          onClick={() => removeCalculation(s.id)}
+                          className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-lg text-[color:var(--ink-soft)] hover:bg-white hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <Trash2 aria-hidden="true" className="h-[17px] w-[17px]" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+
+          {/* 2. Tag et resumé med */}
+          <section
+            aria-labelledby="b-summary"
+            className="fm-rise rounded-[18px] border border-border bg-card p-[clamp(20px,3vw,26px)] shadow-sm"
+            style={{ animationDelay: "0.1s" }}
+          >
+            <div className="mb-1 flex items-center gap-[11px]">
+              <span className="inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-[color:var(--fjord-soft)] text-[color:var(--fjord)]">
+                <Share2 aria-hidden="true" className="h-[18px] w-[18px]" />
+              </span>
+              <h2 id="b-summary" className="m-0 font-display text-[19px] font-normal tracking-[-0.01em] text-foreground">
+                Tag et resumé med
+              </h2>
+            </div>
+            <p className="m-0 mt-2 text-[13.5px] leading-[1.5] text-[color:var(--ink-soft)]">
+              Et resumé med dit svar og de tal, du har tastet ind.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2.5">
+              <Button variant="outline" className="bg-card [&_svg]:size-[18px]" onClick={() => window.print()}>
+                <Download aria-hidden="true" />
+                Hent som PDF
+              </Button>
+            </div>
+            <div
+              aria-hidden="true"
+              className="mt-4 flex items-center gap-4 rounded-[14px] border border-border bg-[color:var(--paper-sunk)] px-4 py-3.5"
+            >
+              <div className="relative h-20 w-16 flex-none overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+                <span className="absolute left-2 top-2 h-[7px] w-[7px] rounded-full bg-[color:var(--dawn)] shadow-[0_0_0_3px_var(--dawn-soft)]" />
+                <svg className="absolute inset-x-0 bottom-0" viewBox="0 0 64 36" preserveAspectRatio="none" width="64" height="36">
+                  <path d="M0,30 C14,26 22,10 32,8 C42,10 50,22 64,28 L64,36 L0,36 Z" fill="var(--fjord)" fillOpacity="0.1" />
+                  <path d="M0,30 C14,26 22,10 32,8 C42,10 50,22 64,28" fill="none" stroke="var(--fjord)" strokeOpacity="0.5" strokeWidth="1.5" />
+                </svg>
+              </div>
+              <div>
+                <p className="m-0 font-display text-[15px] leading-[1.25] text-foreground">{previewHeadline}</p>
+                <p className="m-0 mt-1.5 text-[12.5px] text-[color:var(--ink-soft)] num">{previewNumbers}</p>
+              </div>
+            </div>
+          </section>
+
+          {/* 3. Del */}
+          <section
+            aria-labelledby="b-share"
+            className="fm-rise rounded-[18px] border border-[color:var(--brand-border)] p-[clamp(20px,3vw,26px)]"
+            style={{ animationDelay: "0.15s" }}
+          >
+            <div className="mb-1 flex items-center gap-[11px]">
+              <span className="inline-flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-[color:var(--paper-sunk)] text-[color:var(--ink-soft)]">
+                <ExternalLink aria-hidden="true" className="h-[17px] w-[17px]" />
+              </span>
+              <h2 id="b-share" className="m-0 font-display text-[19px] font-normal tracking-[-0.01em] text-foreground">
+                Del
+              </h2>
+            </div>
+            <p className="m-0 mt-2 text-[13.5px] leading-[1.5] text-[color:var(--ink-soft)]">
+              Linket indeholder dine tal, så den, du deler med, ser samme beregning.
+            </p>
+            <div className="mt-4 flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1">
+                <Label htmlFor="share-url" className="text-[13px] font-semibold text-foreground">
+                  Link til beregningen
+                </Label>
+                <Input
+                  id="share-url"
+                  readOnly
+                  value={shareUrl}
+                  onFocus={(e) => e.target.select()}
+                  className="mt-1.5 bg-white text-[13px]"
+                />
+              </div>
+              <Button variant="outline" className="bg-card [&_svg]:size-[17px]" onClick={onCopy}>
+                {copied ? <Check aria-hidden="true" /> : <Share2 aria-hidden="true" />}
+                {copied ? "Kopieret" : "Kopiér link"}
+              </Button>
+            </div>
+            <span
+              role="status"
+              aria-live="polite"
+              className={`mt-2.5 inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-success transition-opacity motion-reduce:transition-none ${copied ? "opacity-100" : "opacity-0"}`}
+            >
+              {copied && (
+                <>
+                  <CheckCircle2 aria-hidden="true" className="h-4 w-4" /> Linket er kopieret
+                </>
+              )}
+            </span>
+          </section>
+        </div>
+
+        <nav
+          aria-label="Videre"
+          className="fm-rise mb-14 mt-[clamp(26px,4vw,36px)] flex flex-wrap gap-[22px] border-t border-border pt-5"
+          style={{ animationDelay: "0.2s" }}
+        >
+          <Link
+            to="/resultat"
+            className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-lg px-0.5 py-1 font-sans text-[14.5px] font-semibold text-[color:var(--fjord)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Tilbage til svaret
+          </Link>
+          <Link
+            to="/start"
+            className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-lg px-0.5 py-1 font-sans text-[14.5px] font-semibold text-[color:var(--fjord)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Start en ny beregning <ArrowRight aria-hidden="true" className="h-4 w-4" />
+          </Link>
+        </nav>
+      </div>
+    </div>
+  );
+}

@@ -1,5 +1,5 @@
-import { useMemo, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, type ReactNode } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Check, Minus, Share2, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/public/PublicHeader";
@@ -7,6 +7,7 @@ import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
 import { formatKr } from "@/lib/publicFormat";
+import { decodeShareInputs } from "@/lib/publicShare";
 import "./start.css";
 import "./resultat.css";
 
@@ -107,6 +108,22 @@ function DriverRow({ driver }: { driver: PublicDriver }) {
 
 export default function Resultat() {
   const inputs = usePublicStore((s) => s.inputs);
+  const replaceInputs = usePublicStore((s) => s.replaceInputs);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Share-link hydration: /resultat?d=<encoded inputs> loads the sender's numbers into the
+  // local state ("Linket indeholder dine tal"), then cleans the URL. Decoding is defensive —
+  // a malformed param is simply ignored.
+  useEffect(() => {
+    const d = searchParams.get("d");
+    if (d == null) return;
+    const decoded = decodeShareInputs(d);
+    if (decoded) replaceInputs(decoded);
+    navigate("/resultat", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per mount/param change
+  }, [searchParams]);
+
   const result = useMemo(() => computePublicResult(inputs), [inputs]);
 
   const kind = result.status.kind;
