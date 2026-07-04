@@ -28,6 +28,8 @@
 #   - main + "git checkout -- src/foo.ts && git commit"    -> DENY  (path restore)
 #   - feature + "git checkout -- src/foo.ts && git commit" -> ALLOW (path restore)
 #   - feature + "git switch -- main && git commit"         -> DENY  (switch: -- = end of opts)
+#   - main + "git switch -c new -- main && git commit"     -> ALLOW (new branch is `new`)
+#   - main + "git switch -- && git commit"                 -> DENY  (no target, fail closed)
 # It never blocks `git switch`/`git checkout -b` itself, so the documented sync
 # step and branch creation keep working.
 #
@@ -129,76 +131,101 @@ deny=0
 while IFS= read -r stmt; do
   [ -n "$stmt" ] || continue
 
-  # A switch/checkout MAY move the effective branch. A `--` separator means a
-  # path restore ONLY for `checkout` (`git checkout -- <path>` / `<tree> -- <path>`
-  # restore files and do NOT change branch) -> leave eff untouched. `git switch`
-  # never takes a pathspec, so there `--` is just "end of options" and the branch
-  # target still follows it; switch is always processed as a branch change.
+  # A switch/checkout MAY move the effective branch. Parse the tokens after the
+  # subcommand to find the RESULTING branch:
+  #  - a create flag (`-c`/`-C` for switch, `-b`/`-B` for checkout) names the new
+  #    branch as its argument; a following start-point (even after `--`) is NOT
+  #    the resulting branch.
+  #  - otherwise the operand is the first non-flag token after the subcommand
+  #    (a lone `-` is a target; `--` is skipped).
+  # `--` means a path restore ONLY for `checkout` with no create flag
+  # (`git checkout -- <path>` / `<tree> -- <path>`), leaving eff unchanged.
+  # `git switch` never takes a pathspec, so there `--` is just "end of options".
   if printf '%s' "$stmt" | grep -Eq "$sw_re"; then
-    has_dashdash=0; has_bflag=0; is_switch=0
+    is_switch=0
     printf '%s' "$stmt" | grep -Eq "$switch_re" && is_switch=1
+
+    phase=0; want_create_arg=0; created=""; operand=""; dashdash=0
     for tok in $stmt; do
+      # Normalize one layer of matching surrounding quotes on EACH token, so a
+      # quoted operator/flag/branch ("--", "-c", "main", '-') is still recognised
+      # (the shell would strip these quotes before git ever sees them).
       case "$tok" in
-        --)    has_dashdash=1 ;;
-        -b|-B) has_bflag=1 ;;
+        \"*\") tok="${tok#\"}"; tok="${tok%\"}" ;;
+        \'*\') tok="${tok#\'}"; tok="${tok%\'}" ;;
+      esac
+      if [ "$phase" -eq 0 ]; then
+        case "$tok" in switch|checkout) phase=1 ;; esac
+        continue
+      fi
+      if [ "$want_create_arg" -eq 1 ]; then
+        # The token after a create flag is the NEW branch name (skip a `--`).
+        case "$tok" in
+          --) : ;;
+          *)  created="$tok"; want_create_arg=0 ;;
+        esac
+        continue
+      fi
+      case "$tok" in
+        --)          dashdash=1 ;;
+        -c|-C|-b|-B) want_create_arg=1 ;;
+        -)           [ -z "$operand" ] && operand="-" ;;
+        -*)          : ;;
+        *)           [ -z "$operand" ] && operand="$tok" ;;
       esac
     done
 
-    # Skip branch-change handling only for `checkout --` (path restore). For
-    # `switch`, process it even with `--` (the `--` token is skipped as a flag
-    # during target extraction below, so the branch target after it still wins).
-    if [ "$has_dashdash" -eq 0 ] || [ "$is_switch" -eq 1 ]; then
-      # No pathspec separator (or a switch): treat as a branch switch. Target =
-      # a lone "-"
-      # (previous branch) or the last non-flag token. Handles `git switch main`,
-      # `git switch -c feat/x`, `git checkout -b feat`, `git -C path checkout
-      # main`, and `git switch -`.
-      target=""
-      for tok in $stmt; do
-        case "$tok" in
-          -)  target="$tok" ;;
-          -*) : ;;
-          *)  target="$tok" ;;
+    if [ "$is_switch" -eq 0 ] && [ "$dashdash" -eq 1 ] && [ -z "$created" ]; then
+      : # `checkout [<tree>] -- <path>`: path restore, leave eff unchanged.
+    else
+      # Resulting branch: the created branch, else the first operand.
+      is_create=0
+      if [ -n "$created" ]; then target="$created"; is_create=1
+      else target="$operand"; fi
+
+      if [ -z "$target" ]; then
+        # No resolvable target (e.g. `git switch --`): unknown. Fail closed by
+        # leaving eff untouched, so an on-main state is never cleared here.
+        :
+      else
+        # Strip one layer of matching surrounding quotes ("main" / 'main').
+        case "$target" in
+          \"*\") target="${target#\"}"; target="${target%\"}" ;;
+          \'*\') target="${target#\'}"; target="${target%\'}" ;;
         esac
-      done
-      # Strip one layer of matching surrounding quotes ("main" / 'main').
-      case "$target" in
-        \"*\") target="${target#\"}"; target="${target%\"}" ;;
-        \'*\') target="${target#\'}"; target="${target%\'}" ;;
-      esac
-      # Resolve previous-branch shorthand (-, @{-1}, @{-N}) to a real branch name
-      # (in-chain history first, else the reflog); fail closed to main if it
-      # cannot be resolved.
-      prevref=0
-      case "$target" in
-        - | @\{-1\})
-          prevref=1
-          if [ -n "$eff_prev" ]; then
-            resolved="$eff_prev"
-          else
-            resolved="$(git rev-parse --abbrev-ref '@{-1}' 2>/dev/null || true)"
-            [ -n "$resolved" ] || resolved="main"
-          fi ;;
-        @\{-*\})
-          prevref=1
-          resolved="$(git rev-parse --abbrev-ref "$target" 2>/dev/null || true)"
-          [ -n "$resolved" ] || resolved="main" ;;
-        *)
-          resolved="$target" ;;
-      esac
-      # A bare `git checkout <token>` is ambiguous (branch vs path). Only a
-      # `switch`, a `checkout -b/-B`, or a previous-branch ref is a CONFIDENT
-      # branch switch. Switching TO main is always honoured (deny direction);
-      # otherwise an ambiguous checkout must not CLEAR the on-main state.
-      confident=0
-      { [ "$is_switch" -eq 1 ] || [ "$has_bflag" -eq 1 ] || [ "$prevref" -eq 1 ]; } && confident=1
-      if [ "$resolved" = "main" ]; then
-        eff_prev="$eff"; eff="main"
-      elif [ "$confident" -eq 1 ] || [ "$eff" != "main" ]; then
-        eff_prev="$eff"; eff="$resolved"
+        # Resolve previous-branch shorthand (-, @{-1}, @{-N}) to a real branch
+        # name (in-chain history first, else the reflog); fail closed to main.
+        prevref=0
+        case "$target" in
+          - | @\{-1\})
+            prevref=1
+            if [ -n "$eff_prev" ]; then
+              resolved="$eff_prev"
+            else
+              resolved="$(git rev-parse --abbrev-ref '@{-1}' 2>/dev/null || true)"
+              [ -n "$resolved" ] || resolved="main"
+            fi ;;
+          @\{-*\})
+            prevref=1
+            resolved="$(git rev-parse --abbrev-ref "$target" 2>/dev/null || true)"
+            [ -n "$resolved" ] || resolved="main" ;;
+          *)
+            resolved="$target" ;;
+        esac
+        # A bare `git checkout <token>` is ambiguous (branch vs path). Only a
+        # `switch`, a create flag (-c/-C/-b/-B), or a previous-branch ref is a
+        # CONFIDENT branch switch. Switching TO main is always honoured (deny
+        # direction); otherwise an ambiguous checkout must not CLEAR on-main.
+        confident=0
+        { [ "$is_switch" -eq 1 ] || [ "$is_create" -eq 1 ] || [ "$prevref" -eq 1 ]; } && confident=1
+        if [ "$resolved" = "main" ]; then
+          eff_prev="$eff"; eff="main"
+        elif [ "$confident" -eq 1 ] || [ "$eff" != "main" ]; then
+          eff_prev="$eff"; eff="$resolved"
+        fi
+        # else: ambiguous bare checkout to a non-main token while on main ->
+        # keep eff=main (fail closed); do not clear.
       fi
-      # else: ambiguous bare checkout to a non-main token while on main ->
-      # keep eff=main (fail closed); do not clear.
     fi
   fi
 
