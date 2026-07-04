@@ -1394,12 +1394,6 @@ function FormScreen({
     onChange: num("monthlySaving"),
     suffix: "kr"
   }), /*#__PURE__*/React.createElement(Field, {
-    label: "Pension i dag",
-    type: "number",
-    value: values.pension,
-    onChange: num("pension"),
-    suffix: "kr"
-  }), /*#__PURE__*/React.createElement(Field, {
     label: "Forventet afkast",
     type: "number",
     value: values.realReturn,
@@ -1784,12 +1778,8 @@ const DEFAULTS = {
   monthlySpend: 29500,
   savings: 420000,
   monthlySaving: 7500,
-  pension: 580000,
   realReturn: 4.5,
-  planAge: 60,
-  folkepensionAge: 67,
-  folkepensionMonthly: 7500,
-  pensionAccessAge: 65
+  planAge: 60
 };
 const STORE_KEY = "frihedsmodel.kit.values.v1";
 function App() {
@@ -1841,9 +1831,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
 
 // ui_kits/frihedsmodel-public/finance.js
 try { (() => {
-/* Frihedsmodel — a simplified, deterministic projection for the UI kit.
-   Real terms (nutidskroner). Not the real engine; just enough to make the
-   levers feel live. Values returned in millions of kr for the chart. */
+/* Frihedsmodel — a purely decorative curve generator for the UI kit. This is
+   NOT a financial model and NOT the real engine: it is just enough arithmetic
+   to make the levers feel live on the reference chart. One generic pool grows
+   at a flat rate, takes in the monthly contribution until the stop age, then
+   pays out the monthly spend. No accounts, no pension, no tax, no named
+   financial concepts. Values are in millions for the chart; do not port this. */
 (function () {
   function simulate(inp, stopAge) {
     const {
@@ -1852,42 +1845,23 @@ try { (() => {
       monthlySpend,
       savings,
       monthlySaving,
-      pension,
-      realReturn,
-      folkepensionAge,
-      folkepensionMonthly,
-      pensionAccessAge
+      realReturn
     } = inp;
     const r = realReturn / 100;
-    let free = savings;
-    let pen = pension;
+    let pool = savings;
     const data = [];
     let depletedAt = null;
-    let worstGap = 0;
     for (let age = currentAge; age <= lifeExpectancy; age++) {
-      const total = Math.max(0, free) + Math.max(0, pen);
       data.push({
         age,
-        value: total / 1e6
+        value: Math.max(0, pool) / 1e6
       });
-      free *= 1 + r;
-      pen *= 1 + r;
+      pool *= 1 + r;
       if (age < stopAge) {
-        free += monthlySaving * 12;
+        pool += monthlySaving * 12;
       } else {
-        let need = monthlySpend * 12;
-        if (age >= folkepensionAge) need -= folkepensionMonthly * 12;
-        need = Math.max(0, need);
-        if (age >= pensionAccessAge && pen > 0) {
-          const fromPen = Math.min(pen, need);
-          pen -= fromPen;
-          need -= fromPen;
-        }
-        free -= need;
-        if (free < 0) {
-          if (depletedAt === null) depletedAt = age;
-          worstGap = Math.max(worstGap, need); // approximate monthly gap basis
-        }
+        pool -= monthlySpend * 12;
+        if (pool < 0 && depletedAt === null) depletedAt = age;
       }
     }
     return {
@@ -1913,12 +1887,10 @@ try { (() => {
     const stopPoint = plan.data.find(d => d.age === inp.planAge);
     const capitalAtStop = stopPoint ? stopPoint.value : 0;
 
-    // Monthly gap at first shortfall (rough): remaining spend not covered.
+    // Monthly gap at first shortfall (rough, decorative): the monthly spend.
     let monthlyGap = 0;
     if (plan.depletedAt != null) {
-      let need = inp.monthlySpend;
-      if (plan.depletedAt >= inp.folkepensionAge) need -= inp.folkepensionMonthly;
-      monthlyGap = Math.max(0, Math.round(need / 500) * 500);
+      monthlyGap = Math.max(0, Math.round(inp.monthlySpend / 500) * 500);
     }
 
     // Status.
