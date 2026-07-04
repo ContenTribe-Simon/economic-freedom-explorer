@@ -23,8 +23,15 @@
 #   - "... && git switch -c feat/x && git commit"          -> ALLOW (off main first)
 #   - "git switch main && git fetch && git pull"           -> ALLOW (no commit)
 #   - live-main + "git switch -c feat && git commit"       -> ALLOW (left main)
+#   - feature (prev=main) + "git switch - && git commit"   -> DENY  (resolved)
+#   - 'git switch "main" && git commit'                    -> DENY  (dequoted)
 # It never blocks `git switch`/`git checkout -b` itself, so the documented sync
 # step and branch creation keep working.
+#
+# Target resolution: a quoted target has one layer of matching quotes stripped,
+# and previous-branch shorthand (`-`, `@{-1}`, `@{-N}`) is resolved to a real
+# branch name (from in-chain history, else the reflog); if it can't be resolved
+# it fails closed as main.
 #
 # Known limitation (errs safe): statement splitting is textual and not quote- or
 # heredoc-aware, so a commit MESSAGE (or other quoted argument) that itself
@@ -91,34 +98,65 @@ chain="${chain//;/$'\n'}"
 chain="${chain//|/$'\n'}"
 chain="${chain//&/$'\n'}"
 
-on_main=0
-[ "$live_branch" = "main" ] && on_main=1
-
 # git followed by global flags/tokens, then the given subcommand as a word.
 sw_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+(switch|checkout)([[:space:]]|$)'
 ci_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)'
+
+# Track the effective branch by NAME. `eff` is where a commit would currently
+# land; `eff_prev` is the branch before the last switch, used to resolve the
+# previous-branch shorthand (`-`, `@{-1}`) correctly when it appears mid-chain.
+eff="$live_branch"
+eff_prev=""
 
 deny=0
 while IFS= read -r stmt; do
   [ -n "$stmt" ] || continue
 
-  # A switch/checkout changes the effective branch to its target (the last
-  # non-flag token: handles `git switch main`, `git switch -c feat/x`,
-  # `git checkout -b feat`, `git -C path checkout main`).
+  # A switch/checkout moves the effective branch to its resolved target.
   if printf '%s' "$stmt" | grep -Eq "$sw_re"; then
+    # Target = a lone "-" (previous branch) or the last non-flag token. Handles
+    # `git switch main`, `git switch -c feat/x`, `git checkout -b feat`,
+    # `git -C path checkout main`, and `git switch -`.
     target=""
     for tok in $stmt; do
       case "$tok" in
+        -)  target="$tok" ;;
         -*) : ;;
         *)  target="$tok" ;;
       esac
     done
-    if [ "$target" = "main" ]; then on_main=1; else on_main=0; fi
+    # Strip one layer of matching surrounding quotes so a quoted "main"/'main'
+    # is recognised (the raw token keeps the quote characters otherwise).
+    case "$target" in
+      \"*\") target="${target#\"}"; target="${target%\"}" ;;
+      \'*\') target="${target#\'}"; target="${target%\'}" ;;
+    esac
+    # Resolve the ACTUAL target branch. Previous-branch shorthand (`-`, `@{-1}`,
+    # `@{-N}`) is resolved to a real branch name: from the in-chain history when
+    # a switch already happened this command, else from the reflog. If it cannot
+    # be resolved, fail CLOSED by treating it as main (deny), consistent with the
+    # no-parser case, rather than assuming it is safe.
+    case "$target" in
+      - | @\{-1\})
+        if [ -n "$eff_prev" ]; then
+          resolved="$eff_prev"
+        else
+          resolved="$(git rev-parse --abbrev-ref '@{-1}' 2>/dev/null || true)"
+          [ -n "$resolved" ] || resolved="main"
+        fi ;;
+      @\{-*\})
+        resolved="$(git rev-parse --abbrev-ref "$target" 2>/dev/null || true)"
+        [ -n "$resolved" ] || resolved="main" ;;
+      *)
+        resolved="$target" ;;
+    esac
+    eff_prev="$eff"
+    eff="$resolved"
   fi
 
   # A commit lands on the current effective branch; if that is main, block.
   if printf '%s' "$stmt" | grep -Eq "$ci_re"; then
-    if [ "$on_main" -eq 1 ]; then deny=1; break; fi
+    if [ "$eff" = "main" ]; then deny=1; break; fi
   fi
 done <<< "$chain"
 
