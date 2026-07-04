@@ -52,8 +52,9 @@ The voice is **plain, human Danish**. It is the most important part of the brand
 - **Numbers:** show the actual computed figure in whole kroner, no hedging ("ca."/"cirka"/"omkring"),
   e.g. "3.487.214 kr", not "ca. 3,5 mio. kr". Danish grouping and decimals (3,5 — comma decimal). Currency is "kr".
 - **Framing:** always a calculation, never advice. The standing line is
-  *"Et regneeksempel, ikke økonomisk rådgivning."* State once, clearly, that amounts are in
-  **nutidskroner** (today's money).
+  *"En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret
+  billede, ikke en garanti, og ikke som økonomisk rådgivning."* State once, clearly, that amounts
+  are in **nutidskroner** (today's money).
 - **Punctuation:** **no em dashes.** Use full stops or commas.
 - **Avoid:** hype ("lås din frihed op"), alarmism ("dine penge løber tør, handl nu"),
   filler, and classic AI phrasings. No emoji.
