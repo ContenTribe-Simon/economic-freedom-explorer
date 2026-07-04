@@ -1,0 +1,26 @@
+/* ============================================================
+   Frihedsmodel — Webfonts (self-hosted)
+   Display:  Spectral    (calm serif, used with restraint)
+   Body/UI:  Public Sans (humanist sans, tabular figures for data)
+
+   Both are SIL Open Font License, latin subset (covers Danish æ ø å),
+   served as local woff2 from assets/fonts/. No third-party requests.
+
+   For the Vite/React app, the cleanest equivalent is the npm packages:
+     npm i @fontsource/spectral @fontsource/public-sans
+   then import the weights you use (self-hosts via the bundler).
+   ============================================================ */
+
+/* ---- Spectral (display) ---- */
+@font-face { font-family: "Spectral"; font-style: normal; font-weight: 300; font-display: swap; src: url("../assets/fonts/spectral-latin-300-normal.woff2") format("woff2"); }
+@font-face { font-family: "Spectral"; font-style: normal; font-weight: 400; font-display: swap; src: url("../assets/fonts/spectral-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Spectral"; font-style: normal; font-weight: 500; font-display: swap; src: url("../assets/fonts/spectral-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Spectral"; font-style: normal; font-weight: 600; font-display: swap; src: url("../assets/fonts/spectral-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Spectral"; font-style: italic; font-weight: 400; font-display: swap; src: url("../assets/fonts/spectral-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Spectral"; font-style: italic; font-weight: 500; font-display: swap; src: url("../assets/fonts/spectral-latin-500-italic.woff2") format("woff2"); }
+
+/* ---- Public Sans (body / UI) ---- */
+@font-face { font-family: "Public Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("../assets/fonts/public-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Public Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("../assets/fonts/public-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Public Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("../assets/fonts/public-sans-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Public Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("../assets/fonts/public-sans-latin-700-normal.woff2") format("woff2"); }

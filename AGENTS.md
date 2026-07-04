@@ -31,6 +31,10 @@ rules, and the run/test commands. This file exists so tools that look for `AGENT
     number): "En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene
     som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning."
   - Honest and reassuring, never salesy or alarmist.
+- `design-reference/` holds the approved public screens exported from Claude Design
+  (layout, spacing and copy reference only). It is never built, imported, served, or
+  shipped; no agent should wire it into the app. Screens are ported into `src/` on the
+  repo's own design system and self-hosted fonts.
 
 ## For reviewers (Codex / `@claude`)
 
