@@ -21,12 +21,28 @@
       "Bash(git push *)",
       "Bash(git merge *)",
       "Bash(git checkout main)",
+      "Bash(git switch main)",
       "Bash(git reset --hard *)",
       "Bash(rm -rf *)",
       "Read(./.env)",
       "Read(./.env.*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
       "Write(./.env)",
       "Write(./.env.*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-commit-on-main.sh"
+          }
+        ]
+      }
     ]
   }
 }
