@@ -341,6 +341,28 @@ pair), so the real `git` token and any switch target are recognized on both ends
 | `bash -c 'git switch main && git commit -m x'` | feature | DENY | splits on the inner `&&`: switch to main then commit -> on main |
 | `bash -c 'git switch feature && git commit -m x'` | main | ALLOW | switch to feature then commit -> off main |
 
+## 19) Only `&&` trusts the prior switch — `;` `|` `&` `||` do not
+
+`A && B` runs B only if A succeeded, so reaching B proves A's switch took effect
+(trust it). Every OTHER separator — `;`, `|`, `&`, `||` — runs the next statement
+regardless of whether the prior switch actually succeeded, so a switch before any
+of them is NOT trusted: if main was reachable before it (the pre-switch branch)
+or after it (the attempted target), main is re-pinned. Generalizes the earlier
+`||`-only treatment. Biases to over-deny (a `;`-chained switch that really
+succeeds is treated as if it might have failed), never under-deny; use `&&` for
+an ordinary "switch then commit" so it stays trusted.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `git switch no-such-branch ; git commit -m x` | main | DENY | the `;` runs the commit even though the switch failed -> still on main |
+| `git switch no-such-branch \| git commit -m x` | main | DENY | pipe runs the RHS regardless of the switch's success |
+| `git switch no-such-branch & git commit -m x` | main | DENY | background `&` runs the commit regardless |
+| `git switch main ; git commit -m x` | feature | DENY | a real switch to main; the commit lands on main |
+| `git switch feature && git commit -m x` | main | ALLOW | regression: `&&` proves the switch succeeded -> off main, ordinary case still works |
+| `git switch feature ; git commit -m x` | main | DENY | accepted over-deny: `;` doesn't prove the switch succeeded, so the on-main path is possible |
+| `git switch feature ; git commit -m x` | feature | ALLOW | neither the target nor the pre-switch branch is main |
+| `git switch main ; git fetch ; git pull` | main | ALLOW | no commit anywhere |
+
 ## A) settings.json — `git commit --amend` requires approval
 
 `Bash(git commit:*)` in the allow list also matched `git commit --amend`, which
@@ -359,6 +381,24 @@ Best-effort caveat (same as the other prefix denies, per CLAUDE.md §3): a
 reordered spelling like `git commit -a --amend` puts `--amend` after another
 flag, so the prefix pattern does not match it -- an accepted limitation, not a
 hard block.
+
+## B) `.env` reachable via `git diff` / `git add` (Bash) — ACCEPTED limitation
+
+The `.env` Read/Edit/Write **tool** denies (§S) do not cover Bash: `git diff .env`
+can print `.env` content and `git add .env` can stage it, both broadly allowed
+via `Bash(git diff:*)` / `Bash(git add:*)`, without going through the denied
+file tools. This is the SAME class as the `git -C`/`-c` push/merge best-effort
+gap (CLAUDE.md §3): a Bash allow-list is best-effort, not a hard boundary. It is
+documented and accepted, **not** code-fixed, because:
+- the Read/Edit/Write denies remain the real protection against Claude's own
+  file tools (the common path);
+- the actual tracked `.env` in this repo is the intentionally **public** Supabase
+  browser config (`VITE_`-prefixed publishable/anon key, safe to commit per its
+  own header comment), so nothing sensitive is exposed today.
+
+REVISIT trigger (stated explicitly): if a genuinely secret `.env.local` (or any
+non-public env file) is ever introduced, this limitation must be reconsidered --
+narrow the Bash git allow rules or add Bash denies for env paths at that point.
 
 ## S) settings.json `.env` deny anchoring — CORRECTED to `/.env` (authoritative)
 

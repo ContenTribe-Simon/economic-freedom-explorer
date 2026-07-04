@@ -56,6 +56,14 @@ The finance engine is `src/lib/finance/` (notably `projection.ts`, `types.ts`,
      on the command prefix, a `git` global option or reordered flag before/around the
      subcommand (e.g. `git -C . push`, `git commit -a --amend`) slips past them un-denied.
      That is an accepted limitation, not a gap to chase with ever more patterns.
+   - The `.env*` **Read/Edit/Write** denies guard Claude's own file tools; they do **not**
+     cover Bash. `git diff .env` / `git add .env` can read or stage `.env` via Bash
+     (allowed by `Bash(git diff:*)` / `Bash(git add:*)`) without hitting those denies —
+     the same best-effort Bash-allow-list gap as above. This is **accepted, not fixed**:
+     the tracked `.env` here is the intentionally public Supabase browser config
+     (`VITE_`-prefixed publishable key). **Revisit if a genuinely secret `.env.local` (or
+     similar) is ever added** — then narrow the Bash git rules / add Bash env denies. See
+     `.claude/hooks/TEST-MATRIX.md` §B.
    - The `PreToolUse` hook `.claude/hooks/block-commit-on-main.sh` is the **sole
      authoritative guard** against a `git commit` landing on `main`: it walks the command
      and denies the commit whenever the *effective* branch is `main` (directly, or after

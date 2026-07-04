@@ -120,15 +120,18 @@ if [ "$have_parser" -eq 0 ]; then
 fi
 
 # Walk the command as sequential statements, tracking the effective branch.
-# Split on shell separators without a real parser: turn && ; | & into newlines.
-# `||` is different: reaching the RHS proves the LHS FAILED (see the loop), so
-# mark those statements with a sentinel prefix rather than flattening them.
+# Split on shell separators without a real parser. Only `&&` is safe to flatten
+# to a plain sequential newline: a real shell runs the RHS of `&&` ONLY if the
+# LHS succeeded, so reaching the RHS proves the LHS (and any switch in it) took
+# effect. Every OTHER separator -- `||`, `;`, `|`, `&` -- runs the next statement
+# regardless of whether the previous switch actually succeeded, so mark those
+# statements with a sentinel and do NOT trust the preceding switch's resolution.
 chain="$cmd"
 chain="${chain//&&/$'\n'}"
-chain="${chain//||/$'\n'__OR__}"
-chain="${chain//;/$'\n'}"
-chain="${chain//|/$'\n'}"
-chain="${chain//&/$'\n'}"
+chain="${chain//||/$'\n'__SEP__}"
+chain="${chain//;/$'\n'__SEP__}"
+chain="${chain//|/$'\n'__SEP__}"
+chain="${chain//&/$'\n'__SEP__}"
 
 # Track the effective branch by NAME. `eff` is where a commit would currently
 # land; `eff_prev` is the branch before the last switch, used to resolve the
@@ -138,26 +141,26 @@ eff_prev=""
 
 deny=0
 while IFS= read -r stmt; do
-  # A statement carrying the `__OR__` sentinel followed `||`, so it runs ONLY
-  # because the previous statement FAILED. A textual hook can't know whether a
-  # failed `git switch <x>` target existed, so treat the branch conservatively:
-  # if `main` was reachable either BEFORE (eff_prev, where a failed switch leaves
-  # us) or AFTER (eff, an assumed-successful switch) that uncertain step, assume
-  # we are on main. This denies `git switch <x> || git commit` when either the
-  # pre-switch branch or the attempted target was main. (`&&`, `;`, `|`, `&`
-  # have no such asymmetry and are handled as plain sequential statements.)
-  sep_or=0
+  # A statement carrying the `__SEP__` sentinel follows a non-`&&` separator
+  # (`||`, `;`, `|`, `&`), so it runs REGARDLESS of whether the previous
+  # statement's switch actually succeeded. (Only `&&` proves the prior switch
+  # took effect, since a real shell skips the RHS when the LHS fails.) So the
+  # preceding switch's resolution must NOT be trusted: if `main` was reachable
+  # either BEFORE it (eff_prev, where a failed switch leaves us) or AFTER it
+  # (eff, an assumed-successful switch), conservatively treat the branch as main.
+  # This denies e.g. `git switch <bad> ; git commit` / `... | ...` / `... & ...`
+  # / `... || ...` when the pre-switch branch or the attempted target was main.
+  sep_weak=0
   case "$stmt" in
-    __OR__*) sep_or=1; stmt="${stmt#__OR__}" ;;
+    __SEP__*) sep_weak=1; stmt="${stmt#__SEP__}" ;;
   esac
   [ -n "$stmt" ] || continue
-  # `or_pin_main` records that the conservative `||` reset landed on main (the
-  # LHS-succeeded world puts us on main). This statement's OWN switch only ran in
-  # the LHS-FAILED world, so it must NOT be allowed to clear that still-possible
-  # main; we re-pin eff to main after the switch/checkout logic below.
-  or_pin_main=0
-  if [ "$sep_or" -eq 1 ]; then
-    if [ "$eff" = "main" ] || [ "$eff_prev" = "main" ]; then eff="main"; or_pin_main=1; else eff="$eff_prev"; fi
+  # `pin_main` records that this conservative reset landed on main. THIS
+  # statement's OWN switch (whose success is likewise not proven) must not clear
+  # that still-possible main; we re-pin eff after the switch/checkout logic below.
+  pin_main=0
+  if [ "$sep_weak" -eq 1 ]; then
+    if [ "$eff" = "main" ] || [ "$eff_prev" = "main" ]; then eff="main"; pin_main=1; else eff="$eff_prev"; fi
   fi
 
   # Classify the statement by its ACTUAL leading git subcommand, found by walking
@@ -318,12 +321,13 @@ while IFS= read -r stmt; do
     fi
   fi
 
-  # If the `||` reset put us on main (LHS-succeeded world), re-pin main now: this
-  # statement's own switch (which only ran in the LHS-FAILED world) must not clear
-  # the still-possible main. This closes `git switch main || git switch feature
-  # && git commit`, where the switch to main succeeds so `switch feature` never
-  # runs and the commit lands on main. Biases to over-deny, never under-deny.
-  [ "$or_pin_main" -eq 1 ] && eff="main"
+  # If the non-`&&`-separator reset put us on main, re-pin main now: THIS
+  # statement's own switch (whose success is not proven any more than the
+  # previous one's) must not clear the still-possible main. This closes
+  # `git switch main || git switch feature && git commit` (the `||` case) and,
+  # generalized, any `git switch main {; | &} ...`. Biases to over-deny, never
+  # under-deny.
+  [ "$pin_main" -eq 1 ] && eff="main"
 
   # Conditionally-gated switch: a switch that is the CONDITION of an `if`/`elif`
   # only conditionally succeeds -- if it fails, the branch never changed and the
