@@ -49,8 +49,8 @@ The voice is **plain, human Danish**. It is the most important part of the brand
 - **Casing:** sentence case everywhere, including headings and buttons ("Justér dine tal",
   not "Justér Dine Tal").
 - **Sentences:** short. Active voice. One idea per sentence.
-- **Numbers:** use **"ca."** for figures to avoid false precision ("ca. 3,5 mio. kr", never
-  "3.487.214 kr"). Danish grouping and decimals (3,5 — comma decimal). Currency is "kr".
+- **Numbers:** show the actual computed figure in whole kroner, no hedging ("ca."/"cirka"/"omkring"),
+  e.g. "3.487.214 kr", not "ca. 3,5 mio. kr". Danish grouping and decimals (3,5 — comma decimal). Currency is "kr".
 - **Framing:** always a calculation, never advice. The standing line is
   *"Et regneeksempel, ikke økonomisk rådgivning."* State once, clearly, that amounts are in
   **nutidskroner** (today's money).
