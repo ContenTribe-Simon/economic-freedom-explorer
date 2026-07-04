@@ -27,6 +27,7 @@
 #   - 'git switch "main" && git commit'                    -> DENY  (dequoted)
 #   - main + "git checkout -- src/foo.ts && git commit"    -> DENY  (path restore)
 #   - feature + "git checkout -- src/foo.ts && git commit" -> ALLOW (path restore)
+#   - feature + "git switch -- main && git commit"         -> DENY  (switch: -- = end of opts)
 # It never blocks `git switch`/`git checkout -b` itself, so the documented sync
 # step and branch creation keep working.
 #
@@ -35,9 +36,12 @@
 # branch name (from in-chain history, else the reflog); if it can't be resolved
 # it fails closed as main.
 #
-# Path restore vs branch switch: `git checkout -- <path>` (or `<tree> -- <path>`)
-# restores files and never changes the branch, so a `--` separator in the
-# statement means the effective branch is left unchanged. A bare
+# Path restore vs branch switch: `--` means a path restore ONLY for `checkout`
+# (`git checkout -- <path>` / `<tree> -- <path>` restore files and never change
+# the branch), so a `--` in a checkout statement leaves the effective branch
+# unchanged. `git switch` never takes a pathspec: there `--` is just "end of
+# options" and the branch target still follows it, so switch is always processed
+# as a branch change (the `--` token is simply skipped during extraction). A bare
 # `git checkout <token>` (no `--`, no `-b`) is ambiguous (branch or path, which
 # this hook can't fully tell apart): switching TO main is always honoured, but
 # such an ambiguous checkout is NOT allowed to clear the on-main state — if we
@@ -125,9 +129,11 @@ deny=0
 while IFS= read -r stmt; do
   [ -n "$stmt" ] || continue
 
-  # A switch/checkout MAY move the effective branch. But `git checkout -- <path>`
-  # (and `git checkout <tree> -- <path>`) restores files and does NOT change the
-  # branch, so a `--` separator means "not a branch change" and eff is untouched.
+  # A switch/checkout MAY move the effective branch. A `--` separator means a
+  # path restore ONLY for `checkout` (`git checkout -- <path>` / `<tree> -- <path>`
+  # restore files and do NOT change branch) -> leave eff untouched. `git switch`
+  # never takes a pathspec, so there `--` is just "end of options" and the branch
+  # target still follows it; switch is always processed as a branch change.
   if printf '%s' "$stmt" | grep -Eq "$sw_re"; then
     has_dashdash=0; has_bflag=0; is_switch=0
     printf '%s' "$stmt" | grep -Eq "$switch_re" && is_switch=1
@@ -138,8 +144,12 @@ while IFS= read -r stmt; do
       esac
     done
 
-    if [ "$has_dashdash" -eq 0 ]; then
-      # No pathspec separator: treat as a branch switch. Target = a lone "-"
+    # Skip branch-change handling only for `checkout --` (path restore). For
+    # `switch`, process it even with `--` (the `--` token is skipped as a flag
+    # during target extraction below, so the branch target after it still wins).
+    if [ "$has_dashdash" -eq 0 ] || [ "$is_switch" -eq 1 ]; then
+      # No pathspec separator (or a switch): treat as a branch switch. Target =
+      # a lone "-"
       # (previous branch) or the last non-flag token. Handles `git switch main`,
       # `git switch -c feat/x`, `git checkout -b feat`, `git -C path checkout
       # main`, and `git switch -`.
