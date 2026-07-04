@@ -29,15 +29,31 @@ if [ "$branch" != "main" ]; then
   exit 0
 fi
 
-# On main: pull the shell command out of the payload. Prefer jq, fall back to
-# python3. If neither parses it, `cmd` stays empty and the match below fails,
-# so we allow, never blanket-blocking bash on main (you must still be able to
-# run `git switch` to leave main).
+# On main: pull the shell command out of the payload. Try jq, then python3,
+# then node (this repo already requires Node/npm to run at all, so at least one
+# parser is essentially always present). Track whether any parser was available.
 cmd=""
+have_parser=0
 if command -v jq >/dev/null 2>&1; then
+  have_parser=1
   cmd="$(printf '%s' "$payload" | jq -r '.tool_input.command // ""' 2>/dev/null || true)"
 elif command -v python3 >/dev/null 2>&1; then
+  have_parser=1
   cmd="$(printf '%s' "$payload" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' 2>/dev/null || true)"
+elif command -v node >/dev/null 2>&1; then
+  have_parser=1
+  cmd="$(printf '%s' "$payload" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(((JSON.parse(s).tool_input)||{}).command||"")}catch(e){}})' 2>/dev/null || true)"
+fi
+
+# Fail CLOSED on main: if none of jq/python3/node is available we cannot see
+# what the command is, so deny as a precaution rather than let an unverified
+# command through in exactly the environment where the guard matters most.
+# (Off main we already returned above, so this never blocks feature-branch work.)
+if [ "$have_parser" -eq 0 ]; then
+  cat <<'JSON'
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by .claude/hooks/block-commit-on-main.sh: cannot verify command safety (no jq, python3 or node available to parse the tool payload), denying on main as a precaution. Switch to a feature branch (git switch -c <name>) and work there."}}
+JSON
+  exit 0
 fi
 
 # Is this a `git commit`? Match `git` (word-boundaried) followed by any global
