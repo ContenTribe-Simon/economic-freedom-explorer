@@ -146,8 +146,13 @@ while IFS= read -r stmt; do
     __OR__*) sep_or=1; stmt="${stmt#__OR__}" ;;
   esac
   [ -n "$stmt" ] || continue
+  # `or_pin_main` records that the conservative `||` reset landed on main (the
+  # LHS-succeeded world puts us on main). This statement's OWN switch only ran in
+  # the LHS-FAILED world, so it must NOT be allowed to clear that still-possible
+  # main; we re-pin eff to main after the switch/checkout logic below.
+  or_pin_main=0
   if [ "$sep_or" -eq 1 ]; then
-    if [ "$eff" = "main" ] || [ "$eff_prev" = "main" ]; then eff="main"; else eff="$eff_prev"; fi
+    if [ "$eff" = "main" ] || [ "$eff_prev" = "main" ]; then eff="main"; or_pin_main=1; else eff="$eff_prev"; fi
   fi
 
   # A switch/checkout MAY move the effective branch. Parse the tokens after the
@@ -261,6 +266,13 @@ while IFS= read -r stmt; do
       fi
     fi
   fi
+
+  # If the `||` reset put us on main (LHS-succeeded world), re-pin main now: this
+  # statement's own switch (which only ran in the LHS-FAILED world) must not clear
+  # the still-possible main. This closes `git switch main || git switch feature
+  # && git commit`, where the switch to main succeeds so `switch feature` never
+  # runs and the commit lands on main. Biases to over-deny, never under-deny.
+  [ "$or_pin_main" -eq 1 ] && eff="main"
 
   # A commit lands on the current effective branch; if that is main, block.
   if printf '%s' "$stmt" | grep -Eq "$ci_re"; then

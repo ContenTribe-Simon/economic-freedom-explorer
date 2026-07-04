@@ -180,6 +180,48 @@ under-denies. (`&&`, `;`, `|`, `&` are plain sequential — no such asymmetry.)
 | `git switch feat \|\| git commit -m x` | feature | ALLOW | neither the pre-switch branch nor the target is main |
 | `git switch main && git commit -m x \|\| echo done` | feature | DENY | the commit is on the `&&` side (onto main); the `\|\| echo` is irrelevant |
 
+## 13) `||` re-derivation — the RHS's own switch must not clear a pinned main
+
+A statement following `||` runs only in the LHS-FAILED world, so its own
+switch/checkout must not clear a `main` that was still reachable via the
+LHS-succeeded world. After the conservative `||` reset lands on main
+(`or_pin_main`), eff is re-pinned to main once the statement's switch logic has
+run. Crucially this still **distinguishes** the legitimate case: the reset only
+pins main when the *left* side's target was main (or the pre-LHS branch was),
+so a non-main left target lets the right-hand switch move off main normally.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `git switch main \|\| git switch feature && git commit -m x` | feature | DENY | left `switch main` succeeds -> `switch feature` never runs -> commit on main; the RHS switch must not clear the pinned main |
+| `git switch nonexistent \|\| git switch feature && git commit -m x` | feature | ALLOW | left target is not main, so the reset does not pin main; the RHS `switch feature` (which really runs when the left fails) is honoured -> off main. Not an over-deny: distinguished by the left target |
+| `git switch nonexistent \|\| git switch main && git commit -m x` | feature | DENY | if the left fails, the RHS switches to main -> commit on main |
+| `git switch feature \|\| git switch main && git commit -m x` | main | DENY | if the left `switch feature` fails, the RHS switches to main; pre-LHS branch was main so main is reachable |
+| `git switch main \|\| git switch other && git commit -m x` | feature | DENY | left `switch main` succeeds -> on main; RHS never runs; main stays pinned |
+
+## S) settings.json `.env` deny anchoring (empirical, not the hook)
+
+Not a hook case, recorded here because it was tested empirically. The `.env`
+Read/Edit/Write deny patterns were changed from the leading-slash form
+(`Read(/.env)` …) to the documented project-root form (`Read(./.env)` …). Test:
+create a harmless `FOO=bar` probe at the project root (`.env.hookprobe`, matches
+`.env.*`) and attempt to Read it with the Read tool.
+
+| Setting form | Probe at project root | Read result | Rationale |
+|---|---|---|---|
+| `Read(/.env.*)` (before) | `./.env.hookprobe` | DENIED | in this session the root-level `.env.*` read was blocked |
+| `Read(./.env.*)` (after) | `./.env.hookprobe` | DENIED | the documented root-relative form also blocks it; protection maintained |
+
+Caveats (recorded honestly): the in-session test cannot fully isolate the
+mechanism — the deny message ("File is in a directory that is denied by your
+permission settings") fired under both forms, and it is unclear whether the
+running session hot-reloads `settings.json` mid-session, so the "after" read may
+reflect the new rules or the still-cached old ones. Either way the `./` form is
+the officially-documented project-root-relative syntax (a single leading slash
+anchors at the settings file's own directory, i.e. `.claude/`, per the docs), so
+the change removes the ambiguity Codex flagged; a fresh session uses the `./`
+rules unambiguously. Bash access to the probe path was also blocked, so it was
+removed via a glob that avoids the literal `.env` string.
+
 ---
 
 ## Part-3 review log — variants considered

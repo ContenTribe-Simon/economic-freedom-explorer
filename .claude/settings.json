@@ -22,12 +22,12 @@
       "Bash(git merge:*)",
       "Bash(git reset --hard:*)",
       "Bash(rm -rf:*)",
-      "Read(/.env)",
-      "Read(/.env.*)",
-      "Edit(/.env)",
-      "Edit(/.env.*)",
-      "Write(/.env)",
-      "Write(/.env.*)"
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Write(./.env)",
+      "Write(./.env.*)"
     ]
   },
   "hooks": {
