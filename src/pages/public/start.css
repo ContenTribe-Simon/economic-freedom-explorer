@@ -1,0 +1,90 @@
+/* Start screen (public onboarding) — entrance + horizon-motif motion.
+   Ported from design-reference/start.html. All motion is gated behind
+   prefers-reduced-motion: no-preference; with reduced motion everything
+   renders in its final, fully visible state with zero animation. */
+
+.fm-rise {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fm-rise {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: fm-rise 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  }
+  @keyframes fm-rise {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fm-motif .fm-motif-line {
+    stroke-dasharray: 1400;
+    stroke-dashoffset: 1400;
+    animation: fm-draw 1.6s cubic-bezier(0.33, 0.66, 0.4, 1) 0.2s forwards;
+  }
+  .fm-motif .fm-motif-fill-path {
+    opacity: 0;
+    animation: fm-motif-fill 0.7s ease 1.2s forwards;
+  }
+  .fm-motif .fm-motif-glow {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.4);
+    animation:
+      fm-glow-in 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) 1s both,
+      fm-glow-breathe 4.6s ease-in-out 1.7s infinite;
+  }
+  .fm-motif .fm-motif-dot {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0.4);
+    animation: fm-dot-in 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) 1s both;
+  }
+
+  @keyframes fm-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes fm-motif-fill {
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fm-glow-in {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes fm-dot-in {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    to {
+      opacity: 0.7;
+      transform: scale(1);
+    }
+  }
+  @keyframes fm-glow-breathe {
+    0%,
+    100% {
+      opacity: 0.88;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.07);
+    }
+  }
+}

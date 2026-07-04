@@ -10,8 +10,12 @@
     /* Frihedsmodel brand reference tokens (raw hex). Light mode is the default. */
     --paper: #F4F6F2;
     --ink: #17302B;
+    --ink-soft: #51635C;
     --fjord: #1C4A50;
+    --fjord-soft: #E2EBE7;
     --dawn: #CC8A43;
+    --dawn-soft: #F3E4D0;
+    --dawn-glow: #E2A85C;
     --sage: #5E8A6F;
     --clay: #B5503C;
     --brand-border: #DCE4DF;

@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/AppShell";
+import Start from "./pages/public/Start";
 import Dashboard from "./pages/Dashboard";
 import Inputs from "./pages/Inputs";
 import Assumptions from "./pages/Assumptions";
@@ -22,6 +23,13 @@ import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
+/** The advanced app renders inside the AppShell chrome (sidebar + nav). */
+const ShellLayout = () => (
+  <AppShell>
+    <Outlet />
+  </AppShell>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -29,24 +37,28 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-        <AppShell>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/cloud" element={<CloudPage />} />
-            <Route path="/inputs" element={<Inputs />} />
-            <Route path="/assumptions" element={<Assumptions />} />
-            <Route path="/projection" element={<Projection />} />
-            <Route path="/scenarios" element={<Scenarios />} />
-            <Route path="/report" element={<Report />} />
-            <Route path="/snapshots" element={<Snapshots />} />
-            <Route path="/life-events" element={<LifeEventsPage />} />
-            <Route path="/fire" element={<FirePage />} />
-            <Route path="/countries" element={<CountriesPage />} />
-            <Route path="/debug/model-validation" element={<ModelValidation />} />
-            <Route path="*" element={<NotFound />} />
+            {/* Public Frihedsmodel flow: full-bleed screens without the advanced chrome. */}
+            <Route path="/start" element={<Start />} />
+
+            {/* Advanced app inside the shell. */}
+            <Route element={<ShellLayout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/cloud" element={<CloudPage />} />
+              <Route path="/inputs" element={<Inputs />} />
+              <Route path="/assumptions" element={<Assumptions />} />
+              <Route path="/projection" element={<Projection />} />
+              <Route path="/scenarios" element={<Scenarios />} />
+              <Route path="/report" element={<Report />} />
+              <Route path="/snapshots" element={<Snapshots />} />
+              <Route path="/life-events" element={<LifeEventsPage />} />
+              <Route path="/fire" element={<FirePage />} />
+              <Route path="/countries" element={<CountriesPage />} />
+              <Route path="/debug/model-validation" element={<ModelValidation />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
           </Routes>
-        </AppShell>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
