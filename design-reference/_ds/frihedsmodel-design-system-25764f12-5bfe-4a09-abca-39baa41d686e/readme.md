@@ -123,12 +123,12 @@ blur, no frosted panels.
 - **System:** [Lucide](https://lucide.dev) — the same set the product uses (`lucide-react`
   in the repo). Clean, rounded, **2px stroke**, no fill. It pairs well with Public Sans.
 - **How to use:** prefer the design system's own **`Icon`** component
-  (`components/core/Icon.jsx`) — `<Icon name="info" size={18} />`. It carries the curated
+  — `<Icon name="info" size={18} />`. It carries the curated
   brand set (wayfinding, the explanation layer, controls, money, account, plus the
   `sunrise` mark glyph); `ICON_NAMES` lists every glyph and the Icons card in the Design
   System tab shows them all. For one-off HTML artifacts you can also load Lucide from CDN
   (`https://unpkg.com/lucide@latest`) or inline a single SVG.
-- **Info tooltips:** use the **`Tooltip`** component (`components/feedback/Tooltip.jsx`) for
+- **Info tooltips:** use the **`Tooltip`** component for
   the explanation layer. With no children it renders the default **info-dot** (the info
   icon) to sit beside a label; wrap your own trigger for a text affordance. Shows on hover
   and keyboard focus, toggles on tap, closes on Escape.
@@ -136,32 +136,30 @@ blur, no frosted panels.
   fjord for interactive, status tones inside callouts/badges.
 - **Emoji / unicode:** never. No emoji anywhere. No unicode glyphs as icons.
 - **The mark:** the brand mark is a small **sunrise dot** (a honey radial circle with a
-  soft dawn halo) — see `assets/mark.svg`. It echoes the frihedspunkt on the chart. The
-  wordmark is "Frihedsmodel" set in Spectral medium. The horizon motif lives at
-  `assets/horizon.svg`.
+  soft dawn halo). It echoes the frihedspunkt on the chart. The
+  wordmark is "Frihedsmodel" set in Spectral medium.
 
 ---
 
 ## Index / manifest
 
-**Root**
+**Root** — this is a lean reference export; only the files listed here are present.
 - `styles.css` — the single entry point consumers link. `@import`s only.
 - `tokens/` — `colors.css`, `typography.css`, `spacing.css`, `effects.css`, `fonts.css`.
-- `assets/` — `mark.svg` (sunrise mark), `horizon.svg` (the signature motif).
-- `readme.md` — this guide. `SKILL.md` — Agent-Skill wrapper.
+- `assets/fonts/` — the self-hosted `.woff2` files (Spectral, Public Sans).
+- `_ds_bundle.js` — the compiled components, exposed as `window.FrihedsmodelDesignSystem_25764f`.
+- `_ds_manifest.json` — generated metadata. Its `tokens`, `fonts` and `globalCssPaths`
+  entries match the files here; its component `sourcePath`s and its `components/*`,
+  `guidelines/` and `ui_kits/` card/kit paths describe the full original export and are
+  **not present** in this lean copy.
+- `readme.md` — this guide.
 
-**Components** (`window.FrihedsmodelDesignSystem_25764f`)
-- `components/core/` — `Button`, `StatusBadge`, `Stat`, `Card`, `Icon` (brand icon set + `ICON_NAMES`)
-- `components/forms/` — `Field`, `Lever`, `Segmented`
-- `components/feedback/` — `Callout`, `Tooltip` (info-icon + explanation bubble)
-- `components/dataviz/` — `HorizonChart` (the signature element)
-
-**UI kits**
-- `ui_kits/frihedsmodel-public/` — the answer-first public app (Welcome, Form, Result with
-  live levers). `index.html` is the interactive entry.
-
-**Foundation cards** (Design System tab) live in `guidelines/` — Colors, Type, Spacing,
-and Brand specimen cards. Component and kit cards are tagged in their own directories.
+**Components** — bundled in `_ds_bundle.js` (`window.FrihedsmodelDesignSystem_25764f`); no
+component source folders ship in this export.
+- Core — `Button`, `StatusBadge`, `Stat`, `Card`, `Icon` (brand icon set + `ICON_NAMES`)
+- Forms — `Field`, `Lever`, `Segmented`
+- Feedback — `Callout`, `Tooltip` (info-icon + explanation bubble)
+- Data viz — `HorizonChart` (the signature element)
 
 **Fonts:** Spectral and Public Sans are **self-hosted** as `.woff2` in `assets/fonts/`
 (latin subset, covers Danish æ ø å); the `@font-face` rules live in `tokens/fonts.css`.
