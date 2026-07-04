@@ -219,6 +219,31 @@ subcommand. A statement is exactly one of switch/checkout, commit, or neither.
 | `git commit -m "git checkout main && git commit"` | feature | ALLOW | the message is split textually on `&&`, but each fragment's leading subcommand is `commit`, evaluated on feature -> allowed (the previous over-deny is gone) |
 | `git commit -m "git checkout main && git commit"` | main | DENY | same, but on main the leading `commit` is denied |
 
+## 15) Leading shell grouping — `( ... )` and `{ ...; }`
+
+The anchored classifier's gphase 0 used to break on the first token that was not
+`git`, a wrapper, or a `VAR=val` assignment — so a leading grouping token broke
+the scan and the statement was never classified (an UNDER-deny that let a real
+commit through). Now each token has leading `(` and trailing `)` (shell
+metacharacters, any depth) stripped, and a standalone `{`/`}` (brace-group
+reserved words) dropped, so the scan reaches the real `git` underneath. A glued
+`}` (git ref syntax like `@{-1}`, `HEAD@{2}`) is deliberately left intact.
+Nesting depth is unbounded (each grouping token is stripped/skipped
+independently), so no depth cap is imposed.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `( git commit -m x )` | main | DENY | subshell parens stripped; real commit on main found |
+| `( git commit -m x )` | feature | ALLOW | grouped commit, off main |
+| `git switch main && ( git commit -m x )` | feature | DENY | switch onto main, then a grouped commit on main |
+| `{ git commit -m x ; }` | feature | ALLOW | brace group supported (standalone `{`/`}` dropped); commit on feature |
+| `(git commit -m x)` | main | DENY | glued `(git` / `x)` stripped; commit on main |
+| `(( git commit -m x ))` | main | DENY | double nesting stripped |
+| `{ ( git commit -m x ) ; }` | feature | ALLOW | mixed brace+subshell nesting |
+| `(git switch main) && git commit -m x` | feature | DENY | glued `(git` and trailing `)` on the target stripped -> `main`; subshell switch changes on-disk HEAD, so the later commit is on main |
+| `( git switch feature ) && git commit -m x` | main | ALLOW | grouped switch really moves off main to feature |
+| `( git switch @{-1} ) && git commit -m x` | feature, prev=main | DENY | grouping stripped but `@{-1}` preserved -> resolves to main |
+
 ## S) settings.json `.env` deny anchoring — CORRECTED to `/.env` (authoritative)
 
 Not a hook case; recorded here so the correct form is not flip-flopped again.

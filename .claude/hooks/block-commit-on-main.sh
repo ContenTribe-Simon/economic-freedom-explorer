@@ -169,11 +169,31 @@ while IFS= read -r stmt; do
   subcmd=""
   want_create_arg=0; created=""; operand=""; dashdash=0; path_after=0
   for tok in $stmt; do
-    # Normalize one layer of matching surrounding quotes on EACH token.
+    # Normalize each token: strip one layer of matching surrounding quotes, then
+    # any leading `(`/`{` and trailing `)`/`}` shell-grouping characters (to any
+    # depth), so a grouped command like "( git commit )", "(git commit -m x)",
+    # "(( ... ))" or "{ ... ; }" is seen through to the real `git` invocation and
+    # its target underneath. Without this, a leading grouping token broke the scan
+    # in gphase 0 and the statement was never classified -- an UNDER-deny. A token
+    # that was only quotes/grouping becomes empty and is skipped.
     case "$tok" in
       \"*\") tok="${tok#\"}"; tok="${tok%\"}" ;;
       \'*\') tok="${tok#\'}"; tok="${tok%\'}" ;;
     esac
+    # `(` and `)` are shell metacharacters and can be glued to a word, so strip
+    # any leading `(` and trailing `)` (to any depth). `{`/`}` are brace-group
+    # RESERVED WORDS -- grouping only when they are standalone tokens -- so drop a
+    # standalone `{`/`}` but leave a glued `}` intact (git ref syntax like
+    # `@{-1}` / `HEAD@{2}` must survive).
+    while :; do
+      case "$tok" in
+        \(*) tok="${tok#?}" ;;
+        *\)) tok="${tok%?}" ;;
+        *) break ;;
+      esac
+    done
+    case "$tok" in \{|\}) tok="" ;; esac
+    [ -z "$tok" ] && continue
     if [ "$gphase" -eq 0 ]; then
       # Before the git command: skip a leading env-assignment (`VAR=val`) or a
       # known wrapper/keyword; anything else that is not `git` means this
