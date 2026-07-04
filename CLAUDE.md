@@ -48,7 +48,9 @@ The finance engine is `src/lib/finance/` (notably `projection.ts`, `types.ts`,
 ## 3. Golden rules (non-negotiable)
 
 1. **Never commit, push, or merge to `main` from an agent.** Work on a branch.
-   Simon merges manually after review.
+   Simon merges manually after review. This is now also enforced at the tool level, not
+   only stated as convention: `.claude/settings.json` denies `git push`, `git merge`,
+   `git checkout main`, and destructive git for Claude Code sessions on this repo.
 2. **One focused branch at a time, with scope agreed before work begins.** Do not
    make broad, unfocused changes across unrelated areas.
 3. **Do not touch secrets, `.env` files, tokens, or run destructive git operations**
