@@ -23,13 +23,18 @@ This hook is a **best-effort textual guard against ordinary agent command
 shapes, not a hardened sandbox.** It does not run a real shell; it textually
 splits and token-scans the command. It reliably covers the shapes an agent
 actually emits — plain and compound commands, `&&`/`||`/`;`, `if`/`elif`
-conditions, shell grouping, quoted arguments and branch names, wrapper commands,
-and quoted commands handed to another interpreter (`bash -c '…'`, `sh -c`,
-`ssh`, `su -c`). Beyond those, **more exotic wrapping mechanisms may still evade
-it and are accepted as OUT OF SCOPE** rather than chased indefinitely, e.g.:
-`eval "$var"`, command substitution feeding an interpreter
-(`bash -c "$(printf …)"`), other-language runners (`python -c`, `perl -e`,
-`node -e`), remote/deferred execution, aliases, and custom shell functions.
+conditions, a leading `!` negation, `while`/`until` loops (via the
+weak-separator handling), shell grouping, quoted arguments and branch names,
+remote-tracking DWIM targets, wrapper commands, and quoted commands handed to
+another interpreter (`bash -c '…'`, `sh -c`, `ssh`, `su -c`). Beyond those,
+**more exotic wrapping mechanisms may still evade it and are accepted as OUT OF
+SCOPE** rather than chased indefinitely, e.g.: `eval "$var"`, command
+substitution feeding an interpreter (`bash -c "$(printf …)"`), other-language
+runners (`python -c`, `perl -e`, `node -e`), remote/deferred execution, aliases,
+custom shell functions, and **variable-expanded branch targets**
+(`git switch "$BRANCH" && git commit` — a textual hook cannot know the
+variable's value, so an under-deny is possible when `$BRANCH` is `main`; agents
+emit literal branch names, so this is accepted, not chased).
 
 The one guarantee that matters is unchanged: on `main`, an ordinary agent commit
 is denied. A future finding in one of the exotic categories above should be
@@ -391,6 +396,57 @@ branch target and could under-deny.
 | `git switch --orphan main && git commit -m x` | feature | DENY | the orphan branch is literally named `main`; name-based deny |
 | `git checkout --pathspec-from-file specs.txt && git commit -m x` | main | DENY | the file value is consumed, no target -> fail closed, still main |
 
+## 21) `-t` / `--track` remote-tracking DWIM (local name = remote prefix stripped)
+
+`git switch -t origin/main` / `git checkout --track origin/main` create and
+switch to a LOCAL branch named after the remote-tracking ref with the remote
+prefix stripped (verified against real git in a clone, not guessed):
+`origin/main` -> `main`, `remotes/origin/main` -> `main`,
+`refs/remotes/origin/feature-x` -> `feature-x`, and multi-slash
+`origin/team/main` -> `team/main` (ONLY the first/remote segment is stripped).
+The hook mirrors this: when an operand (not an explicit `-c`/`-b`/`--orphan`
+name, not a previous-branch ref) contains `/`, it strips optional `refs/`,
+optional `remotes/`, then the first segment, and collapses to `main` if that
+DWIM name is `main`. Deny-monotonic: stripping can only ADD a main match, so a
+local branch literally named e.g. `team/main` over-denies (accepted), never the
+reverse.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `git switch -t origin/main && git commit -m x` | feature | DENY | DWIM creates and switches to LOCAL `main`; the raw string `origin/main` never matching `main` was the under-deny |
+| `git checkout --track origin/main && git commit -m x` | feature | DENY | same via checkout's `--track` |
+| `git checkout --track origin/feature-x && git commit -m x` | feature | ALLOW | regression: a real non-main tracking branch still works |
+| `git switch -t origin/team/main && git commit -m x` | feature | ALLOW | multi-slash: real git creates `team/main` (only the remote segment is stripped), not `main` |
+| `git checkout --track remotes/origin/main && git commit -m x` | feature | DENY | `remotes/` spelling DWIMs to local `main` (verified) |
+| `git switch -t refs/remotes/origin/main && git commit -m x` | feature | DENY | full-ref spelling DWIMs to local `main` |
+| `git switch -t origin/feature-x && git commit -m x` | main | ALLOW | DWIM off main to `feature-x` |
+| `git switch team/main && git commit -m x` | feature | DENY | accepted over-deny: a local branch literally named `team/main` collapses to `main` textually; the hook cannot know whether it is a local slashed branch or a remote DWIM |
+| `git switch -c origin/main-x start && git commit -m x` | feature | ALLOW | an explicitly created name is literal; no stripping |
+
+## 22) Leading `!` negation (and the audited exit-status constructs)
+
+`! git switch X && git commit` runs the commit ONLY when the switch FAILED (`!`
+inverts the exit status), i.e. still on the pre-switch branch. So on a negated
+switch statement, eff STAYS at the pre-switch branch (the `&&`-follower world),
+and the attempted target is recorded in `eff_prev` so weak-separator followers
+(`;` `|` `&` `||`), which run regardless of (or on inverted) success, still see
+main reachability through the target. Switching TO main is deliberately NOT
+honoured on a negated statement: in the world where the `&&` follower runs,
+that switch did not happen.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `! git switch no-such-branch && git commit -m x` | main | DENY | commit runs in the switch-FAILED world = still main |
+| `! git switch main && git commit -m x` | feature | ALLOW | inverse case: if the switch to main SUCCEEDS, `!` exits 1 and `&&` skips the commit; the commit only runs when the switch failed -> feature. Either way no commit on main |
+| `! git switch main \|\| git commit -m x` | feature | DENY | the `\|\|` world is "negation failed" = switch SUCCEEDED = on main (caught via eff_prev=target + weak-sep pin) |
+| `! git switch main ; git commit -m x` | feature | DENY | `;` runs regardless; the on-main world is reachable |
+| `! git switch feature && git commit -m x` | main | DENY | failed world = still main |
+| `if ! git switch main; then git commit -m x; fi` | feature | DENY | `if` sets in_cond, which pins both worlds; over-deny of the then-world-on-feature case, accepted |
+| `until git switch main; do :; done; git commit -m x` | feature | DENY | audit: loop exits when the switch to main SUCCEEDS -> commit on main; weak-sep handling already covers it |
+| `while git switch feature; do git commit -m x; done` | main | DENY | audit: body world is `feature`, but the pre-switch main stays reachable via weak-sep pin; over-deny, safe |
+| `git switch x ; case $? in 1) git commit -m x;; esac` | main | DENY | audit: `case $?` fragments arrive via `;` -> weak-sep reset covers them |
+| `! true && git commit -m x` | main | DENY | negated non-git statement; the commit still classifies on main |
+
 ## A) settings.json — `git commit --amend` requires approval
 
 `Bash(git commit:*)` in the allow list also matched `git commit --amend`, which
@@ -511,3 +567,33 @@ Checked each category for an obvious untested variant. Fix only real bugs.
   unresolvable `@{-N}` is treated as main), so the plain single-statement
   `@{-N}` cases stay correct; only the in-chain-shifted variant can misresolve.
   Accepted; revisit only if agents ever actually emit chained `@{-N}` commands.
+- **Exit-status-conditional constructs — deliberate class audit** (done after
+  `!` became the fourth variant of the same root issue, following `||`,
+  `if`/`elif`, and `;`/`|`/`&`). Each bash construct that gates execution on a
+  prior command's exit status was checked against the current logic:
+  - `until git switch X; do …; done` — SAFE via weak-separator handling: the
+    body/followers arrive via `;` splits, and the poll-until-main shape
+    (`until git switch main; …; git commit`) correctly DENIES because the loop
+    exits when the switch SUCCEEDS. Matrix row in category 22.
+  - `while git switch X; do …; done` — SAFE (over-denies the from-main,
+    non-main-target body; accepted bias). Matrix row in category 22.
+  - `case $? in …` — SAFE: the fragments arrive via `;` splits -> weak-separator
+    reset. Matrix row in category 22.
+  - subshell condition `( git switch X ) && …` — already correct (category 15):
+    the exit status passes through the subshell unchanged.
+  - `elif` beyond the first branch — already covered: each `elif` is the first
+    token of its own `;`-split statement (category 17).
+  - `if ! git switch X; then …` — covered by in_cond, which pins both worlds
+    (over-denies the then-world-on-feature case; accepted). Matrix row in
+    category 22.
+  - `[[ $(git switch …) ]]` / `test` wrapping — command substitution, already
+    out of scope.
+  - **Variable-expanded targets** (`git switch "$BRANCH" && git commit`) — the
+    one structurally different gap found: a textual hook cannot know the
+    variable's value, so `$BRANCH`=main under-denies. Cannot be closed cheaply
+    (needs environment knowledge); agents emit literal branch names. ACCEPTED
+    and added to the Scope & accepted limits list, not fixed.
+  Conclusion: with `!` fixed and `while`/`until`/`case $?` verified safe, the
+  known exit-status-conditional constructs are all either handled, verified
+  safe, or explicitly documented — a fifth variant of THIS class should be
+  triaged against this list first.

@@ -32,6 +32,9 @@
 #   - main + "git switch -- && git commit"                 -> DENY  (no target, fail closed)
 #   - feature + "git checkout main -- && git commit"       -> DENY  (bare `--` = branch checkout)
 #   - main + "git switch nope || git commit"               -> DENY  (|| RHS: switch failed, on main)
+#   - feature + "git switch -t origin/main && git commit"  -> DENY  (tracking DWIM -> local main)
+#   - feature + "! git switch main && git commit"          -> ALLOW (&& runs only if switch FAILED)
+#   - main + "! git switch nope && git commit"             -> DENY  (failed world = still main)
 # It never blocks `git switch`/`git checkout -b` itself, so the documented sync
 # step and branch creation keep working.
 #
@@ -175,7 +178,7 @@ while IFS= read -r stmt; do
   gphase=0            # 0=before git, 1=git global flags, 2=after the subcommand
   want_gflag_arg=0
   subcmd=""
-  in_cond=0; first_seen=0   # in_cond: statement is an `if`/`elif` CONDITION
+  in_cond=0; negated=0; first_seen=0   # in_cond: `if`/`elif` CONDITION; negated: leading `!`
   want_create_arg=0; want_flagvalue=0; created=""; operand=""; dashdash=0; path_after=0
   for tok in $stmt; do
     # Normalize each token by peeling shell delimiters until it stops changing: a
@@ -215,7 +218,12 @@ while IFS= read -r stmt; do
       # CONDITION -- a switch in it is only conditionally successful (see below).
       if [ "$first_seen" -eq 0 ]; then
         first_seen=1
-        case "$tok" in if|elif) in_cond=1 ;; esac
+        # `if`/`elif` -> conditional CONDITION; a leading `!` inverts the exit
+        # status, so any `&&` follower runs ONLY when this statement FAILED.
+        case "$tok" in
+          if|elif) in_cond=1 ;;
+          "!")     negated=1 ;;
+        esac
       fi
       [ "$tok" = "git" ] && gphase=1
       continue
@@ -314,6 +322,30 @@ while IFS= read -r stmt; do
           *)
             resolved="$target" ;;
         esac
+        # Remote-tracking DWIM (verified against real git): `git switch -t
+        # origin/main` / `git checkout --track origin/main` create and switch to
+        # a LOCAL branch named after the remote-tracking ref with the remote
+        # prefix stripped -- origin/main -> main, remotes/origin/main -> main,
+        # refs/remotes/origin/feature-x -> feature-x, and a multi-slash
+        # origin/team/main -> team/main (ONLY the first/remote segment is
+        # stripped). So when the operand (not an explicitly created name, not a
+        # resolved previous-branch ref) contains a slash and its DWIM-derived
+        # local name is `main`, collapse it to main. Deny-monotonic: a stripped
+        # name can only ever ADD a main match (main itself has no slash), so a
+        # local branch literally named e.g. team/main over-denies, never the
+        # reverse. Applies with or without an explicit -t/--track, since bare
+        # `git switch origin/main`-style guessing DWIMs the same way.
+        if [ "$is_create" -eq 0 ] && [ "$prevref" -eq 0 ]; then
+          case "$resolved" in
+            */*)
+              dwim="$resolved"
+              dwim="${dwim#refs/}"
+              dwim="${dwim#remotes/}"
+              dwim="${dwim#*/}"
+              [ "$dwim" = "main" ] && resolved="main"
+              ;;
+          esac
+        fi
         # A bare `git checkout <token>` is ambiguous (branch vs path). Only a
         # `switch`, a create flag (-c/-C/-b/-B), a previous-branch ref, or a bare
         # trailing `--` (which disambiguates the operand AS a branch) is a
@@ -322,7 +354,16 @@ while IFS= read -r stmt; do
         confident=0
         { [ "$is_switch" -eq 1 ] || [ "$is_create" -eq 1 ] || [ "$prevref" -eq 1 ]; } && confident=1
         { [ "$dashdash" -eq 1 ] && [ "$path_after" -eq 0 ]; } && confident=1
-        if [ "$resolved" = "main" ]; then
+        if [ "$negated" -eq 1 ]; then
+          # `! git switch X`: the exit status is inverted, so an `&&` follower
+          # runs ONLY when the switch FAILED -- i.e. still on the pre-switch
+          # branch -- so eff stays put. Record the attempted target in eff_prev
+          # so weak-separator followers (`;` `|` `&` `||`), which run regardless
+          # of (or on inverted) success, still see main reachability through the
+          # target. Never honours switching TO main here: in the world where the
+          # `&&` follower runs, that switch did NOT happen.
+          eff_prev="$resolved"
+        elif [ "$resolved" = "main" ]; then
           eff_prev="$eff"; eff="main"
         elif [ "$confident" -eq 1 ] || [ "$eff" != "main" ]; then
           eff_prev="$eff"; eff="$resolved"

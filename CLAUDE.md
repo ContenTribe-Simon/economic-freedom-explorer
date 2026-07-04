@@ -72,14 +72,16 @@ The finance engine is `src/lib/finance/` (notably `projection.ts`, `types.ts`,
      deny rules; the hook covers being on main however the session got there.
    - The hook is a **best-effort textual guard against ordinary agent command shapes, not
      a hardened sandbox.** It covers the shapes agents actually emit (plain/compound
-     commands, `&&`/`||`/`;`, `if` conditions, shell grouping, quoted args and branch
-     names, wrapper commands, and `bash -c '…'`/`sh -c`/`ssh`/`su -c`). More exotic
-     wrapping — `eval`, command substitution feeding an interpreter, `python -c`/`perl -e`,
-     remote execution, aliases, custom shell functions, or multi-step `@{-N}` (N ≥ 2)
-     previous-branch chaining inside one compound command — may still evade it and is
-     **accepted as out of scope**, not chased indefinitely. See
-     `.claude/hooks/TEST-MATRIX.md` ("Scope & accepted limits" and the Part-3 review
-     log); the real backstop is Simon's review before merge, not this hook.
+     commands, `&&`/`||`/`;`, `if` conditions, a leading `!`, `while`/`until` loops, shell
+     grouping, quoted args and branch names, remote-tracking DWIM targets, wrapper
+     commands, and `bash -c '…'`/`sh -c`/`ssh`/`su -c`). More exotic wrapping — `eval`,
+     command substitution feeding an interpreter, `python -c`/`perl -e`, remote execution,
+     aliases, custom shell functions, variable-expanded branch targets
+     (`git switch "$BRANCH"`), or multi-step `@{-N}` (N ≥ 2) previous-branch chaining
+     inside one compound command — may still evade it and is **accepted as out of scope**,
+     not chased indefinitely. See `.claude/hooks/TEST-MATRIX.md` ("Scope & accepted
+     limits" and the Part-3 review log); the real backstop is Simon's review before
+     merge, not this hook.
 2. **One focused branch at a time, with scope agreed before work begins.** Do not
    make broad, unfocused changes across unrelated areas.
 3. **Do not touch secrets, `.env` files, tokens, or run destructive git operations**
