@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frihedsmodel — behold dit svar</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="_ds/frihedsmodel-design-system-25764f12-5bfe-4a09-abca-39baa41d686e/styles.css">
+<script src="_ds/frihedsmodel-design-system-25764f12-5bfe-4a09-abca-39baa41d686e/_ds_bundle.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg-page, #F4F6F2); color: var(--ink, #17302B); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 clamp(18px, 5vw, 40px); }
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 26px 0 0; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--dawn-glow), var(--dawn)); box-shadow: 0 0 0 4px var(--dawn-soft); }
+  .wordmark { font-family: var(--font-display); font-weight: 500; font-size: 21px; letter-spacing: -0.01em; color: var(--ink); }
+
+  .hero { padding: clamp(34px,6vw,58px) 0 0; }
+  .eyebrow { font-size: 12.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 16px; }
+  h1 { font-family: var(--font-display); font-weight: 300; font-size: clamp(30px,5vw,46px); line-height: 1.08; letter-spacing: -0.015em; color: var(--ink); margin: 0; }
+  .subhead { font-size: clamp(16px,2.2vw,19px); color: var(--ink-soft); line-height: 1.55; margin: 16px 0 0; max-width: 32em; }
+
+  .blocks { display: flex; flex-direction: column; gap: 18px; margin: clamp(28px,4vw,40px) 0 0; }
+  .block { background: var(--surface-card); border: 1px solid var(--line); border-radius: var(--radius-xl); padding: clamp(20px,3vw,26px); box-shadow: var(--shadow-card); }
+  .block.light { background: transparent; box-shadow: none; border-color: var(--border-soft); }
+  .bhead { display: flex; align-items: center; gap: 11px; margin: 0 0 4px; }
+  .bicon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--fjord-soft); color: var(--fjord); flex: none; }
+  .btitle { font-family: var(--font-display); font-weight: 400; font-size: 19px; color: var(--ink); margin: 0; letter-spacing: -0.01em; }
+  .bhelp { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin: 8px 0 0; }
+
+  .row { display: flex; gap: 10px; align-items: flex-end; }
+  .row > .grow { flex: 1; min-width: 0; }
+  .savedhead { font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin: 22px 0 8px; }
+  .saved { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .saved li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: var(--paper-sunk); border: 1px solid var(--border-soft); border-radius: var(--radius); }
+  .saved .name { font-family: var(--font-body); font-size: 14.5px; color: var(--ink); font-weight: 500; white-space: nowrap; }
+  .saved .meta { font-size: 12.5px; color: var(--ink-faint); margin-top: 1px; white-space: nowrap; }
+  .saved .acts { display: flex; align-items: center; gap: 4px; flex: none; }
+  .iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-sm); border: 1px solid transparent; background: none; color: var(--ink-faint); cursor: pointer; transition: color var(--dur) var(--ease-out), background var(--dur) var(--ease-out); }
+  .iconbtn:hover { background: var(--surface-raised); color: var(--clay); }
+  .iconbtn:focus-visible { outline: none; box-shadow: 0 0 0 var(--ring-width) var(--ring-color); color: var(--clay); }
+  .linkbtn { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--fjord); }
+  .linkbtn:hover { background: var(--fjord-soft); }
+  .linkbtn:focus-visible { outline: none; box-shadow: 0 0 0 var(--ring-width) var(--ring-color); }
+
+  .ok { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--sage); opacity: 0; transition: opacity var(--dur) var(--ease-out); }
+  .ok.show { opacity: 1; }
+
+  .twobtn { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .preview { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 14px 16px; background: var(--paper-sunk); border: 1px solid var(--border-soft); border-radius: var(--radius-md); }
+  .preview .swatch { flex: none; width: 64px; height: 80px; border-radius: 8px; background: var(--surface-card); border: 1px solid var(--line); position: relative; overflow: hidden; box-shadow: var(--shadow-xs); }
+  .preview .swatch .pmark { position: absolute; top: 8px; left: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--dawn); box-shadow: 0 0 0 3px var(--dawn-soft); }
+  .preview .swatch .pcurve { position: absolute; left: 0; right: 0; bottom: 0; }
+  .preview .ptext .pl { font-family: var(--font-display); font-size: 15px; color: var(--ink); line-height: 1.25; margin: 0; }
+  .preview .ptext .pl .em { color: var(--fjord); font-style: italic; }
+  .preview .ptext .pn { font-size: 12.5px; color: var(--ink-soft); margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+
+  .foot { display: flex; gap: 22px; flex-wrap: wrap; margin: clamp(26px,4vw,36px) 0 56px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .foot a { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-body); font-size: 14.5px; font-weight: 600; color: var(--fjord); text-decoration: none; padding: 4px 2px; border-radius: var(--radius-sm); white-space: nowrap; }
+  .foot a:hover { text-decoration: underline; }
+  .foot a:focus-visible { outline: none; box-shadow: 0 0 0 var(--ring-width) var(--ring-color); }
+
+  .rise { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .rise { opacity: 0; transform: translateY(10px); animation: rise 0.8s cubic-bezier(0.22,0.61,0.36,1) forwards; }
+    @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+  }
+  @media (max-width: 560px) { .row { flex-direction: column; align-items: stretch; } }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const { useState } = React;
+
+    function TrashIcon() {
+      return (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      );
+    }
+
+    function mount() {
+      const NS = window.FrihedsmodelDesignSystem_25764f;
+      if (!NS || !NS.Field) { return setTimeout(mount, 60); }
+      const { Button, Field, Icon } = NS;
+
+      function App() {
+        const [name, setName] = useState("Min plan");
+        const [saved, setSaved] = useState([{ id: 1, name: "Min plan", date: "17. juni 2026" }]);
+        const [justSaved, setJustSaved] = useState(false);
+        const [copied, setCopied] = useState(false);
+        const shareUrl = "https://frihedsmodel.dk/p/8fa2c1";
+
+        const onSave = () => {
+          const clean = (name || "").trim() || "Min plan";
+          setSaved((list) => [{ id: Date.now(), name: clean, date: "17. juni 2026" }, ...list]);
+          setJustSaved(true);
+          window.clearTimeout(onSave._t);
+          onSave._t = window.setTimeout(() => setJustSaved(false), 2600);
+        };
+        const onRemove = (id) => setSaved((list) => list.filter((s) => s.id !== id));
+        const onCopy = async () => {
+          try { await navigator.clipboard.writeText(shareUrl); } catch (e) {}
+          setCopied(true);
+          window.clearTimeout(onCopy._t);
+          onCopy._t = window.setTimeout(() => setCopied(false), 2200);
+        };
+
+        return (
+          <div className="wrap">
+            <header className="top">
+              <div className="brand"><span className="mark"></span><span className="wordmark">Frihedsmodel</span></div>
+              <Button variant="ghost" size="sm" href="resultat.html" icon={<Icon name="arrow-left" size={16} />}>Tilbage til svaret</Button>
+            </header>
+
+            <section className="hero rise">
+              <p className="eyebrow">Behold dit svar</p>
+              <h1>Behold dit svar.</h1>
+              <p className="subhead">Gem din beregning, så du kan vende tilbage til den, eller tag et resumé med dig.</p>
+            </section>
+
+            <div className="blocks">
+
+              {/* 1. Gem beregning */}
+              <section className="block rise" style={{ animationDelay: "0.05s" }} aria-labelledby="b-save">
+                <div className="bhead">
+                  <span className="bicon"><Icon name="download" size={18} /></span>
+                  <h2 className="btitle" id="b-save">Gem beregning</h2>
+                </div>
+                <p className="bhelp">Gemmes kun på din egen enhed. Vi sender ikke dine tal nogen steder.</p>
+                <div className="row" style={{ marginTop: "16px" }}>
+                  <Field className="grow" label="Navn på beregningen" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1 }} />
+                  <Button variant="primary" onClick={onSave} icon={<Icon name="check" size={18} />}>Gem</Button>
+                </div>
+                <div style={{ minHeight: "20px", marginTop: "10px" }}>
+                  <span className={`ok${justSaved ? " show" : ""}`} role="status" aria-live="polite">
+                    {justSaved && <><Icon name="check-circle" size={16} /> Gemt</>}
+                  </span>
+                </div>
+
+                <p className="savedhead">Gemte beregninger</p>
+                <ul className="saved">
+                  {saved.map((s) => (
+                    <li key={s.id}>
+                      <div>
+                        <div className="name">{s.name}</div>
+                        <div className="meta">{s.date}</div>
+                      </div>
+                      <div className="acts">
+                        <a className="linkbtn" href="resultat.html">Åbn</a>
+                        <button type="button" className="iconbtn" onClick={() => onRemove(s.id)} aria-label={`Fjern ${s.name}`}><TrashIcon /></button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              {/* 2. Tag et resumé med */}
+              <section className="block rise" style={{ animationDelay: "0.1s" }} aria-labelledby="b-summary">
+                <div className="bhead">
+                  <span className="bicon"><Icon name="share" size={18} /></span>
+                  <h2 className="btitle" id="b-summary">Tag et resumé med</h2>
+                </div>
+                <p className="bhelp">Et resumé med dit svar og de tal, du har tastet ind.</p>
+                <div className="twobtn" style={{ marginTop: "16px" }}>
+                  <Button variant="secondary" icon={<Icon name="download" size={18} />} onClick={() => window.print()}>Hent som PDF</Button>
+                  <Button variant="secondary" icon={<Icon name="download" size={18} />}>Hent som billede</Button>
+                </div>
+                <div className="preview" aria-hidden="true">
+                  <div className="swatch">
+                    <span className="pmark"></span>
+                    <svg className="pcurve" viewBox="0 0 64 36" preserveAspectRatio="none" width="64" height="36">
+                      <path d="M0,30 C14,26 22,10 32,8 C42,10 50,22 64,28 L64,36 L0,36 Z" fill="var(--fjord)" fillOpacity="0.1" />
+                      <path d="M0,30 C14,26 22,10 32,8 C42,10 50,22 64,28" fill="none" stroke="var(--fjord)" strokeOpacity="0.5" strokeWidth="1.5" />
+                    </svg>
+                  </div>
+                  <div className="ptext">
+                    <p className="pl">Du kan stoppe ved <span className="em">alder 58</span>.</p>
+                    <p className="pn">Formue ved stop 3.486.500 kr · pengene rækker til 90</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* 3. Del */}
+              <section className="block light rise" style={{ animationDelay: "0.15s" }} aria-labelledby="b-share">
+                <div className="bhead">
+                  <span className="bicon" style={{ background: "var(--paper-sunk)", color: "var(--ink-soft)" }}><Icon name="external" size={17} /></span>
+                  <h2 className="btitle" id="b-share">Del</h2>
+                </div>
+                <p className="bhelp">Linket indeholder dine tal, så den, du deler med, ser samme beregning.</p>
+                <div className="row" style={{ marginTop: "16px" }}>
+                  <Field className="grow" label="Link til beregningen" value={shareUrl} readOnly onFocus={(e) => e.target.select()} style={{ flex: 1 }} />
+                  <Button variant="secondary" onClick={onCopy} icon={<Icon name={copied ? "check" : "share"} size={17} />}>{copied ? "Kopieret" : "Kopiér link"}</Button>
+                </div>
+                <span className={`ok${copied ? " show" : ""}`} style={{ marginTop: "10px" }} role="status" aria-live="polite">{copied && <><Icon name="check-circle" size={16} /> Linket er kopieret</>}</span>
+              </section>
+
+            </div>
+
+            <nav className="foot rise" style={{ animationDelay: "0.2s" }} aria-label="Videre">
+              <a href="resultat.html"><Icon name="arrow-left" size={16} /> Tilbage til svaret</a>
+              <a href="start.html">Start en ny beregning <Icon name="arrow-right" size={16} /></a>
+            </nav>
+          </div>
+        );
+      }
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    }
+    mount();
+  </script>
+</body>
+</html>

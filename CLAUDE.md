@@ -43,6 +43,11 @@ The finance engine is `src/lib/finance/` (notably `projection.ts`, `types.ts`,
 `modelValidation.ts`). Runtime state is `src/store/financeStore.ts`. Pages are in
 `src/pages/`.
 
+`design-reference/` holds the approved public screens exported from Claude Design
+(layout, spacing and copy reference only). It is never built, imported, served, or
+shipped, and no agent should wire it into the app; screens are ported into `src/` on the
+repo's own design system and self-hosted fonts.
+
 ---
 
 ## 3. Golden rules (non-negotiable)

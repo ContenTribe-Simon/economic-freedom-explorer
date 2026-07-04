@@ -1,0 +1,77 @@
+/* ============================================================
+   Frihedsmodel — Color tokens
+   Light mode only. Nordic daylight: calm, trustworthy, human.
+   The one warm accent (dawn) is reserved for the single most
+   important moment (the frihedspunkt). All intended pairings
+   meet WCAG AA.
+   ============================================================ */
+
+:root {
+  /* ---- Base palette (raw values) ---- */
+  --paper:        #F4F6F2; /* page background, soft daylight */
+  --paper-sunk:   #EBEEE7; /* sunken surfaces: slider tracks, neutral callouts */
+  --card:         #FBFCFA; /* near-white warm card surface */
+  --surface-card: #FBFCFA; /* alias used across kits */
+  --surface-raised:#FFFFFF; /* raised chip / selected segment */
+
+  --ink:          #17302B; /* primary text, deep evergreen-near-black */
+  --ink-soft:     #51635C; /* secondary text */
+  --ink-faint:    #7C8B85; /* tertiary text, captions, axis labels */
+
+  --line:         #DCE4DF; /* default soft border / hairline */
+  --border-soft:  #DCE4DF; /* alias */
+  --border-strong:#C7D2CB; /* emphasised border (inputs, dividers) */
+
+  --fjord:        #1C4A50; /* PRIMARY — deep teal-blue, trust + horizon */
+  --fjord-deep:   #163C41; /* primary pressed/hover */
+  --fjord-soft:   #E2EBE7; /* primary tint surface */
+
+  --dawn:         #CC8A43; /* ACCENT — honey/dawn, the one warm moment */
+  --dawn-deep:    #B57834; /* accent pressed / accent text on tint */
+  --dawn-soft:    #F3E4D0; /* accent tint / focus glow */
+  --dawn-glow:    #E2A85C; /* lighter inner of the sunrise mark gradient */
+
+  /* ---- Status (muted, never neon) ---- */
+  --sage:         #5E8A6F; /* on track / success */
+  --sage-soft:    #EAF1EC; /* success surface */
+  --sage-line:    #D2E2D7; /* success border */
+
+  --amber:        #CC8A43; /* tight / caution (shares the dawn hue) */
+  --amber-soft:   #F6ECDC; /* caution surface */
+  --amber-line:   #EAD6B8; /* caution border */
+
+  --clay:         #B5503C; /* risk / destructive */
+  --clay-soft:    #F6E4DF; /* risk surface */
+  --clay-line:    #E7C5BC; /* risk border */
+
+  /* ---- Chart aliases (the horizon signature) ---- */
+  --chart-grid:    var(--line);
+  --chart-line:    var(--fjord);
+  --chart-freedom: var(--dawn);
+
+  /* ============================================================
+     Semantic aliases — prefer these in new work
+     ============================================================ */
+  --bg-page:       var(--paper);
+  --bg-page-alt:   var(--paper-sunk);
+  --surface-sunk:  var(--paper-sunk);
+
+  --text-strong:   var(--ink);
+  --text-body:     var(--ink-soft);
+  --text-muted:    var(--ink-faint);
+  --text-on-fjord: var(--paper);
+  --text-on-dawn:  #2A1B0C;
+
+  --primary:       var(--fjord);
+  --primary-hover: var(--fjord-deep);
+  --primary-tint:  var(--fjord-soft);
+
+  --accent:        var(--dawn);
+  --accent-hover:  var(--dawn-deep);
+  --accent-tint:   var(--dawn-soft);
+
+  /* status semantics */
+  --status-ok:     var(--sage);
+  --status-tight:  var(--amber);
+  --status-risk:   var(--clay);
+}

@@ -1,0 +1,27 @@
+/* ============================================================
+   Frihedsmodel — Spacing & layout tokens
+   Quiet and spacious. 4px base step. (Radii, borders, shadows
+   and motion live in effects.css.)
+   ============================================================ */
+
+:root {
+  /* ---- Spacing scale (4px base) ---- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* ---- Page rhythm ---- */
+  --gutter:      clamp(18px, 5vw, 40px); /* @kind spacing */ /* page side padding */
+  --section-gap: clamp(20px, 4vw, 40px); /* between major blocks */
+  --content-max: 980px;                  /* answer-first reading frame */
+  --reading-max: 720px;                  /* the answer column */
+  --form-max:    760px;                  /* the input form */
+}

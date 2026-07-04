@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frihedsmodel — dine tal</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="_ds/frihedsmodel-design-system-25764f12-5bfe-4a09-abca-39baa41d686e/styles.css">
+<script src="_ds/frihedsmodel-design-system-25764f12-5bfe-4a09-abca-39baa41d686e/_ds_bundle.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg-page, #F4F6F2); color: var(--ink, #17302B); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 clamp(18px, 5vw, 40px); }
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 26px 0 0; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--dawn-glow), var(--dawn)); box-shadow: 0 0 0 4px var(--dawn-soft); }
+  .wordmark { font-family: var(--font-display); font-weight: 500; font-size: 21px; letter-spacing: -0.01em; color: var(--ink); }
+
+  .hero { padding: clamp(34px,6vw,60px) 0 0; max-width: 720px; }
+  .eyebrow { font-size: 12.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 16px; }
+  .h1 { font-family: var(--font-display); font-weight: 300; font-size: clamp(28px,5vw,46px); line-height: 1.1; letter-spacing: -0.015em; color: var(--ink); margin: 0; }
+  .lede { font-size: clamp(16px,2.2vw,18px); color: var(--ink-soft); line-height: 1.55; margin: 16px 0 0; max-width: 33em; }
+
+  .groups { display: flex; flex-direction: column; gap: clamp(20px,3vw,28px); margin: clamp(28px,4vw,40px) 0 0; }
+  .group { background: var(--surface-card); border: 1px solid var(--line); border-radius: var(--radius-xl); padding: clamp(20px,3vw,28px); box-shadow: var(--shadow-card); }
+  .ghead { display: flex; align-items: center; gap: 11px; margin: 0 0 20px; }
+  .gicon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: var(--fjord-soft); color: var(--fjord); flex: none; }
+  .gtitle { font-family: var(--font-display); font-weight: 400; font-size: 20px; color: var(--ink); margin: 0; letter-spacing: -0.01em; }
+  .gsub { font-size: 13px; color: var(--ink-faint); margin: 1px 0 0; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 28px; }
+  .span2 { grid-column: 1 / -1; }
+
+  .fieldlabel { display: inline-flex; align-items: center; gap: 7px; }
+  .helper { font-family: var(--font-body); font-size: 13px; color: var(--ink-faint); margin: 6px 0 0; line-height: 1.45; }
+
+  .optbtn { display: inline-flex; align-items: center; gap: 8px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-body); font-size: 14.5px; font-weight: 600; color: var(--fjord); }
+  .optbtn svg { transition: transform var(--dur) var(--ease-out); }
+  .optbtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+  .foot { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: clamp(26px,4vw,36px) 0 56px; }
+  .disclaimer { font-size: 13.5px; color: var(--ink-faint); }
+
+  .rise { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .rise { opacity: 0; transform: translateY(10px); animation: rise 0.8s cubic-bezier(0.22,0.61,0.36,1) forwards; }
+    @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+  }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const { useState } = React;
+
+    const DEFAULTS = {
+      currentAge: 36,
+      planToAge: 90,
+      income: 480000,
+      monthlySpend: 22000,
+      savings: 350000,
+      monthlySaving: 5000,
+      pension: 600000,
+      pensionFromAge: 67,
+      realReturn: 4.5,
+      stopAge: 60,
+      minEndWealth: 0,
+    };
+
+    const da = (n) => Number(n || 0).toLocaleString("da-DK");
+    const pct = (v) => `${Number(v).toFixed(1).replace(".", ",")} %`;
+    const yr = (v) => `${v} år`;
+
+    function mount() {
+      const NS = window.FrihedsmodelDesignSystem_25764f;
+      if (!NS || !NS.Field) { return setTimeout(mount, 60); }
+      const { Button, Field, Lever, Tooltip, Callout, Icon } = NS;
+
+      // Label with optional info tooltip, used above label-less Fields.
+      function FieldLabel({ id, children, tip }) {
+        return (
+          <label htmlFor={id} className="fieldlabel" style={{ fontFamily: "var(--font-body)", fontSize: "14px", fontWeight: 600, color: "var(--ink)" }}>
+            {children}
+            {tip && <Tooltip label={tip} />}
+          </label>
+        );
+      }
+
+      // A number field with units, optional tooltip + helper line.
+      function NumField({ id, label, tip, help, value, onChange, suffix, className }) {
+        return (
+          <div className={className} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <FieldLabel id={id} tip={tip}>{label}</FieldLabel>
+            <Field id={id} type="number" value={value} onChange={onChange} suffix={suffix} inputMode="numeric" min={0} />
+            {help && <span className="helper" style={{ margin: 0 }}>{help}</span>}
+          </div>
+        );
+      }
+
+      // A slider (Lever) with its own label+readout, plus optional tooltip + helper.
+      function SliderField({ id, label, tip, help, value, min, max, step, onChange, format, className }) {
+        const labelNode = tip
+          ? <span className="fieldlabel">{label}<Tooltip label={tip} /></span>
+          : label;
+        return (
+          <div className={className} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <Lever id={id} label={labelNode} value={value} min={min} max={max} step={step} onChange={onChange} format={format} />
+            {help && <span className="helper">{help}</span>}
+          </div>
+        );
+      }
+
+      function App() {
+        const [v, setV] = useState(DEFAULTS);
+        const [showOptional, setShowOptional] = useState(false);
+        const num = (k) => (e) => setV((s) => ({ ...s, [k]: Number(e.target.value) }));
+
+        return (
+          <div className="wrap">
+            <header className="top">
+              <div className="brand"><span className="mark"></span><span className="wordmark">Frihedsmodel</span></div>
+              <Button variant="ghost" size="sm" href="resultat.html">Spring til svar</Button>
+            </header>
+
+            <section className="hero rise">
+              <p className="eyebrow">Dine tal</p>
+              <h1 className="h1">Skriv dine tal ind, så regner vi dit svar ud.</h1>
+              <p className="lede">Felterne er fyldt ud med almindelige tal, så du kan se et svar med det samme. Ret det, der ikke passer til dig. Alle beløb er i nutidskroner.</p>
+            </section>
+
+            <div className="groups">
+
+              <section className="group rise" style={{ animationDelay: "0.05s" }}>
+                <div className="ghead">
+                  <span className="gicon"><Icon name="user" size={18} /></span>
+                  <div>
+                    <h2 className="gtitle">Dig</h2>
+                    <p className="gsub">Hvem planen er for, og hvor langt den skal nå.</p>
+                  </div>
+                </div>
+                <div className="grid">
+                  <SliderField id="lv-alder" label="Din alder" value={v.currentAge} min={18} max={75} step={1} onChange={num("currentAge")} format={yr} />
+                  <SliderField id="lv-plan" label="Planlæg til alder" tip="Den alder planen skal nå. Vælg gerne lidt højt, så pengene rækker hele livet." help="Mange regner med ca. 90." value={v.planToAge} min={70} max={105} step={1} onChange={num("planToAge")} format={yr} />
+                </div>
+              </section>
+
+              <section className="group rise" style={{ animationDelay: "0.1s" }}>
+                <div className="ghead">
+                  <span className="gicon"><Icon name="wallet" size={18} /></span>
+                  <div>
+                    <h2 className="gtitle">Din økonomi i dag</h2>
+                    <p className="gsub">Det du tjener, bruger og har lagt til side.</p>
+                  </div>
+                </div>
+                <div className="grid">
+                  <NumField id="f-income" label="Årlig indkomst før skat" tip="Din løn før skat, om året. Tæl gerne faste tillæg med." help="kr om året, i nutidskroner." value={v.income} onChange={num("income")} suffix="kr" />
+                  <NumField id="f-spend" label="Månedligt forbrug" help="Det du regner med at bruge om måneden." value={v.monthlySpend} onChange={num("monthlySpend")} suffix="kr" />
+                  <NumField id="f-savings" label="Nuværende investeringer og opsparing" tip="Alt du har stående, ud over pension: aktier, fonde og frie penge." value={v.savings} onChange={num("savings")} suffix="kr" />
+                  <NumField id="f-msaving" label="Månedlig opsparing" help="Det du lægger til side hver måned." value={v.monthlySaving} onChange={num("monthlySaving")} suffix="kr" />
+                </div>
+              </section>
+
+              <section className="group rise" style={{ animationDelay: "0.15s" }}>
+                <div className="ghead">
+                  <span className="gicon"><Icon name="shield" size={18} /></span>
+                  <div>
+                    <h2 className="gtitle">Pension</h2>
+                    <p className="gsub">Det du har sparet op, og hvornår du kan bruge det.</p>
+                  </div>
+                </div>
+                <div className="grid">
+                  <NumField id="f-pension" label="Pensionssaldo" tip="Det samlede beløb på dine pensionsordninger i dag." help="Saml gerne flere ordninger til ét tal." value={v.pension} onChange={num("pension")} suffix="kr" />
+                  <SliderField id="lv-pfrom" label="Pension tilgængelig fra alder" tip="Den alder, hvor du kan begynde at hæve din pension. Ofte ca. 67." value={v.pensionFromAge} min={60} max={75} step={1} onChange={num("pensionFromAge")} format={yr} />
+                </div>
+              </section>
+
+              <section className="group rise" style={{ animationDelay: "0.2s" }}>
+                <div className="ghead">
+                  <span className="gicon"><Icon name="trending-up" size={18} /></span>
+                  <div>
+                    <h2 className="gtitle">Forventninger og mål</h2>
+                    <p className="gsub">Hvad du venter af afkastet, og hvornår du gerne vil stoppe.</p>
+                  </div>
+                </div>
+                <div className="grid">
+                  <SliderField id="lv-return" label="Forventet årligt afkast" tip="Afkast efter inflation, altså i nutidskroner. Ca. 4 til 5 % er almindeligt på lang sigt." help="Efter inflation." value={v.realReturn} min={0} max={8} step={0.1} onChange={num("realReturn")} format={pct} />
+                  <SliderField id="lv-stop" label="Ønsket stop-alder" tip="Den alder, du gerne vil stoppe med at arbejde. Vi viser, om tallene rækker." value={v.stopAge} min={40} max={75} step={1} onChange={num("stopAge")} format={yr} />
+
+                  <div className="span2" style={{ borderTop: "1px solid var(--line)", paddingTop: "18px", marginTop: "2px" }}>
+                    <button type="button" className="optbtn" aria-expanded={showOptional} onClick={() => setShowOptional((o) => !o)}>
+                      <Icon name="chevron-down" size={16} />
+                      Valgfrit: mål for formue ved planens slutning
+                    </button>
+                    {showOptional && (
+                      <div style={{ marginTop: "16px", maxWidth: "calc(50% - 14px)" }}>
+                        <NumField id="f-minend" label="Mål for mindste formue ved planens slutning" tip="Vil du efterlade noget, eller have en buffer til sidst? Lad stå på 0, hvis pengene bare skal række." help="0 betyder, at pengene må nå at blive brugt op." value={v.minEndWealth} onChange={num("minEndWealth")} suffix="kr" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+            </div>
+
+            <Callout tone="neutral" icon={<Icon name="info" size={18} />} style={{ marginTop: "24px" }}>
+              Alle beløb er i nutidskroner, så de er sammenlignelige med dagens priser. Et regneeksempel, ikke økonomisk rådgivning.
+            </Callout>
+
+            <div className="foot">
+              <Button variant="primary" size="lg" href="resultat.html" iconRight={<Icon name="arrow-right" size={18} />}>Se mit svar</Button>
+              <span className="disclaimer">Du kan altid rette tallene bagefter.</span>
+            </div>
+          </div>
+        );
+      }
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    }
+    mount();
+  </script>
+</body>
+</html>

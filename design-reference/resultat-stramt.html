@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frihedsmodel — dit svar</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="_ds/frihedsmodel-design-system-25764f12-5bfe-4a09-abca-39baa41d686e/styles.css">
+<script src="_ds/frihedsmodel-design-system-25764f12-5bfe-4a09-abca-39baa41d686e/_ds_bundle.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg-page, #F4F6F2); color: var(--ink, #17302B); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 clamp(18px, 5vw, 40px); }
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 26px 0 0; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--dawn-glow), var(--dawn)); box-shadow: 0 0 0 4px var(--dawn-soft); }
+  .wordmark { font-family: var(--font-display); font-weight: 500; font-size: 21px; letter-spacing: -0.01em; color: var(--ink); }
+
+  .hero { padding: clamp(40px,7vw,72px) 0 0; max-width: 720px; }
+  .eyebrow-row { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
+  .eyebrow { font-size: 12.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; margin: 0; }
+  .answer { font-family: var(--font-display); font-weight: 300; font-size: clamp(34px,6vw,56px); line-height: 1.08; letter-spacing: -0.015em; color: var(--ink); margin: 0; }
+  .answer .age { color: var(--fjord); font-weight: 500; font-style: italic; }
+  .takeaway { font-size: clamp(17px,2.4vw,20px); color: var(--ink-soft); line-height: 1.55; margin: 20px 0 0; max-width: 34em; }
+
+  .hsec { margin: clamp(26px,4.5vw,46px) 0 0; }
+  .hcap { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; gap: 16px; flex-wrap: wrap; }
+  .hcap h2 { font-family: var(--font-display); font-weight: 400; font-size: 19px; color: var(--ink); margin: 0; }
+  .hcap span { font-size: 13px; color: var(--ink-faint); }
+  .frame { background: var(--surface-card); border: 1px solid var(--line); border-radius: var(--radius-xl); padding: 20px clamp(10px,2vw,24px) 14px; box-shadow: var(--shadow-card); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+
+  .foot { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: clamp(26px,4vw,38px) 0 16px; }
+  .disclaimer { font-size: 13px; color: var(--ink-faint); line-height: 1.55; max-width: 58em; margin: 0 0 56px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+  .rise { opacity: 1; }
+  @media (prefers-reduced-motion: no-preference) {
+    .rise { opacity: 0; transform: translateY(10px); animation: rise 0.85s cubic-bezier(0.22,0.61,0.36,1) forwards; }
+    @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+    .draw svg path.hz-line { stroke-dasharray: 2400; stroke-dashoffset: 2400; animation: draw 1.5s cubic-bezier(0.33,0.66,0.4,1) 0.35s forwards; }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+  }
+  @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const DATA = [
+      {age:36,value:0.5},{age:42,value:1.0},{age:48,value:1.5},{age:54,value:1.95},
+      {age:60,value:2.2},{age:66,value:2.0},{age:74,value:1.4},{age:82,value:0.7},
+      {age:88,value:0.2},{age:90,value:0.08}
+    ];
+    const R = { freedomAge: 60, planAge: 60, lifeExpectancy: 90, capital: "2.150.000 kr" };
+
+    function mount() {
+      const NS = window.FrihedsmodelDesignSystem_25764f;
+      if (!NS || !NS.HorizonChart) { return setTimeout(mount, 60); }
+      const { Button, Card, Stat, StatusBadge, Icon } = NS;
+
+      // Horizon chart, extended from the DS signature with a calm money scale (y)
+      // and a sparse age scale (x). Line, fill, sunrise marker and plan tick are
+      // kept identical to the design-system component.
+      function Horizon({ data, freedomAge, planAge, freedomOnPlan = false, ariaLabel }) {
+        const W = 900, H = 364;
+        const padL = 80, padR = 30, padT = 26, padB = 48;
+        const minAge = data[0].age, maxAge = data[data.length - 1].age;
+        const axisMax = 3; // mio. kr, just above the peak (2,2 mio)
+        const x = (age) => padL + ((age - minAge) / (maxAge - minAge)) * (W - padL - padR);
+        const y = (v) => (H - padB) - (v / axisMax) * (H - padT - padB);
+
+        const pts = data.map((d) => `${x(d.age).toFixed(1)},${y(d.value).toFixed(1)}`);
+        const linePath = "M" + pts.join(" L");
+        const areaPath = `M${x(minAge).toFixed(1)},${y(data[0].value).toFixed(1)} L` + pts.slice(1).join(" L") +
+          ` L${x(maxAge).toFixed(1)},${(H - padB).toFixed(1)} L${x(minAge).toFixed(1)},${(H - padB).toFixed(1)} Z`;
+
+        const valueAt = (age) => {
+          if (age <= data[0].age) return data[0].value;
+          if (age >= data[data.length - 1].age) return data[data.length - 1].value;
+          for (let i = 1; i < data.length; i++) {
+            if (age <= data[i].age) {
+              const a = data[i - 1], b = data[i];
+              return a.value + ((age - a.age) / (b.age - a.age)) * (b.value - a.value);
+            }
+          }
+          return data[data.length - 1].value;
+        };
+
+        const moneyTicks = [0, 1, 2, 3];
+        const ageTicks = [36, 45, 55, 65, 75, 85, 90];
+        const ageLabel = (a) => (a === 36 ? "I dag (36)" : String(a));
+        const uid = "hzx";
+
+        return (
+          <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={ariaLabel}
+               style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+            <defs>
+              <linearGradient id={`fill-${uid}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="var(--fjord)" stopOpacity="0.13" />
+                <stop offset="1" stopColor="var(--fjord)" stopOpacity="0.01" />
+              </linearGradient>
+              <radialGradient id={`glow-${uid}`} cx="50%" cy="50%" r="50%">
+                <stop offset="0" stopColor="var(--dawn)" stopOpacity="0.45" />
+                <stop offset="1" stopColor="var(--dawn)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+
+            {/* money scale: faint gridlines + labels */}
+            {moneyTicks.map((t) => (
+              <g key={`m${t}`}>
+                <line x1={padL} y1={y(t)} x2={W - padR} y2={y(t)}
+                      stroke="var(--line)" strokeWidth={t === 0 ? 1.5 : 1} opacity={t === 0 ? 1 : 0.6} />
+                <text x={padL - 12} y={y(t) + 4} textAnchor="end"
+                      fontFamily="var(--font-body)" fontSize="12" fontWeight="500" fill="var(--ink-soft)">
+                  {t === 0 ? "0 kr" : `${t} mio. kr`}
+                </text>
+              </g>
+            ))}
+
+            <path d={areaPath} fill={`url(#fill-${uid})`} />
+
+            {planAge != null && (
+              <g>
+                <line x1={x(planAge)} y1={H - padB} x2={x(planAge)} y2={y(valueAt(planAge)) - 4}
+                      stroke="var(--ink-faint)" strokeWidth="1" strokeDasharray="3 4" opacity="0.5" />
+                {!freedomOnPlan && (
+                  <text x={x(planAge) + 8} y={y(valueAt(planAge)) + 4}
+                        fontFamily="var(--font-body)" fontSize="12" fontWeight="500" fill="var(--ink-faint)">Din plan {planAge}</text>
+                )}
+              </g>
+            )}
+
+            <path className="hz-line" d={linePath} fill="none" stroke="var(--chart-line)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+            {freedomAge != null && (
+              <g>
+                {!freedomOnPlan && (
+                  <line x1={x(freedomAge)} y1={H - padB} x2={x(freedomAge)} y2={y(valueAt(freedomAge))}
+                        stroke="var(--chart-freedom)" strokeWidth="1.5" />
+                )}
+                <circle cx={x(freedomAge)} cy={y(valueAt(freedomAge))} r="22" fill={`url(#glow-${uid})`} />
+                <circle cx={x(freedomAge)} cy={y(valueAt(freedomAge))} r="7" fill="var(--chart-freedom)" />
+                <circle cx={x(freedomAge)} cy={y(valueAt(freedomAge))} r="7" fill="none" stroke="var(--paper)" strokeWidth="2" />
+                <text x={x(freedomAge)} y={y(valueAt(freedomAge)) - 21} textAnchor="middle"
+                      fontFamily="var(--font-body)" fontSize="13" fontWeight="600" fill="var(--dawn-deep)">Frihedspunkt {freedomAge}</text>
+              </g>
+            )}
+
+            {/* age scale */}
+            {ageTicks.map((a, i) => (
+              <text key={`a${a}`} x={x(a)} y={H - padB + 24}
+                    textAnchor={i === 0 ? "start" : i === ageTicks.length - 1 ? "end" : "middle"}
+                    fontFamily="var(--font-body)" fontSize="12" fontWeight="500" fill="var(--ink-soft)">{ageLabel(a)}</text>
+            ))}
+          </svg>
+        );
+      }
+
+      function App() {
+        return (
+          <div className="wrap">
+            <header className="top">
+              <div className="brand"><span className="mark"></span><span className="wordmark">Frihedsmodel</span></div>
+              <Button variant="ghost" size="sm" href="simple-inputs.html" icon={<Icon name="sliders" size={16} />}>Justér dine tal</Button>
+            </header>
+
+            <section className="hero rise">
+              <div className="eyebrow-row">
+                <p className="eyebrow">Dit svar</p>
+                <StatusBadge status="tight" style={{ whiteSpace: "nowrap" }}>Stramt</StatusBadge>
+              </div>
+              <h1 className="answer">Du kan stoppe ved <span className="age">alder {R.freedomAge}</span>, men det er stramt.</h1>
+              <p className="takeaway">Med dine nuværende tal rækker pengene til {R.lifeExpectancy}, men marginen er lille. Små ændringer i forbrug eller opsparing kan rykke billedet.</p>
+            </section>
+
+            <section className="hsec rise draw" style={{ animationDelay: "0.08s" }}>
+              <div className="hcap">
+                <h2>Din horisont</h2>
+                <span>Formue over tid, fra i dag til {R.lifeExpectancy} år.</span>
+              </div>
+              <div className="frame">
+                <Horizon
+                  data={DATA}
+                  freedomAge={R.freedomAge}
+                  planAge={R.planAge}
+                  freedomOnPlan={true}
+                  ariaLabel={`Din formue stiger til en top på ca. 2,2 mio. kr omkring alder ${R.planAge}, og rækker akkurat til ${R.lifeExpectancy}, hvor den er tæt på nul. Frihedspunktet, hvor du tidligst kan stoppe, falder sammen med din plan ved alder ${R.freedomAge}, og marginen til sidst er lille.`}
+                />
+              </div>
+            </section>
+
+            <section className="cards rise" style={{ animationDelay: "0.14s" }}>
+              <Card><Stat label="Formue når du stopper" value={R.capital} sub={`ved din planlagte stop-alder (${R.planAge})`} /></Card>
+              <Card><Stat label="Margin" value="Lille" sub={`pengene rækker knap til ${R.lifeExpectancy}`} tone="accent" /></Card>
+              <Card><Stat label="Frihedspunkt" value={`alder ${R.freedomAge}`} sub="ikke tidligere med dine tal" /></Card>
+            </section>
+
+            <div className="foot rise" style={{ animationDelay: "0.2s" }}>
+              <Button variant="primary" size="lg" href="simple-inputs.html" icon={<Icon name="sliders" size={18} />}>Justér dine tal</Button>
+              <Button variant="secondary" size="lg" href="gem-og-del.html" icon={<Icon name="share" size={18} />}>Gem eller del</Button>
+            </div>
+
+            <p className="disclaimer">En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning.</p>
+          </div>
+        );
+      }
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    }
+    mount();
+  </script>
+</body>
+</html>
