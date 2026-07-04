@@ -25,6 +25,8 @@
 #   - live-main + "git switch -c feat && git commit"       -> ALLOW (left main)
 #   - feature (prev=main) + "git switch - && git commit"   -> DENY  (resolved)
 #   - 'git switch "main" && git commit'                    -> DENY  (dequoted)
+#   - main + "git checkout -- src/foo.ts && git commit"    -> DENY  (path restore)
+#   - feature + "git checkout -- src/foo.ts && git commit" -> ALLOW (path restore)
 # It never blocks `git switch`/`git checkout -b` itself, so the documented sync
 # step and branch creation keep working.
 #
@@ -32,6 +34,16 @@
 # and previous-branch shorthand (`-`, `@{-1}`, `@{-N}`) is resolved to a real
 # branch name (from in-chain history, else the reflog); if it can't be resolved
 # it fails closed as main.
+#
+# Path restore vs branch switch: `git checkout -- <path>` (or `<tree> -- <path>`)
+# restores files and never changes the branch, so a `--` separator in the
+# statement means the effective branch is left unchanged. A bare
+# `git checkout <token>` (no `--`, no `-b`) is ambiguous (branch or path, which
+# this hook can't fully tell apart): switching TO main is always honoured, but
+# such an ambiguous checkout is NOT allowed to clear the on-main state — if we
+# are on main and can't be sure a real switch happened, main stays main (fail
+# closed). `git switch`, `git checkout -b/-B`, and previous-branch refs are
+# treated as confident branch switches.
 #
 # Known limitation (errs safe): statement splitting is textual and not quote- or
 # heredoc-aware, so a commit MESSAGE (or other quoted argument) that itself
@@ -100,6 +112,7 @@ chain="${chain//&/$'\n'}"
 
 # git followed by global flags/tokens, then the given subcommand as a word.
 sw_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+(switch|checkout)([[:space:]]|$)'
+switch_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+switch([[:space:]]|$)'
 ci_re='(^|[^[:alnum:]_-])git([[:space:]]+[^[:space:]]+)*[[:space:]]+commit([[:space:]]|$)'
 
 # Track the effective branch by NAME. `eff` is where a commit would currently
@@ -112,46 +125,71 @@ deny=0
 while IFS= read -r stmt; do
   [ -n "$stmt" ] || continue
 
-  # A switch/checkout moves the effective branch to its resolved target.
+  # A switch/checkout MAY move the effective branch. But `git checkout -- <path>`
+  # (and `git checkout <tree> -- <path>`) restores files and does NOT change the
+  # branch, so a `--` separator means "not a branch change" and eff is untouched.
   if printf '%s' "$stmt" | grep -Eq "$sw_re"; then
-    # Target = a lone "-" (previous branch) or the last non-flag token. Handles
-    # `git switch main`, `git switch -c feat/x`, `git checkout -b feat`,
-    # `git -C path checkout main`, and `git switch -`.
-    target=""
+    has_dashdash=0; has_bflag=0; is_switch=0
+    printf '%s' "$stmt" | grep -Eq "$switch_re" && is_switch=1
     for tok in $stmt; do
       case "$tok" in
-        -)  target="$tok" ;;
-        -*) : ;;
-        *)  target="$tok" ;;
+        --)    has_dashdash=1 ;;
+        -b|-B) has_bflag=1 ;;
       esac
     done
-    # Strip one layer of matching surrounding quotes so a quoted "main"/'main'
-    # is recognised (the raw token keeps the quote characters otherwise).
-    case "$target" in
-      \"*\") target="${target#\"}"; target="${target%\"}" ;;
-      \'*\') target="${target#\'}"; target="${target%\'}" ;;
-    esac
-    # Resolve the ACTUAL target branch. Previous-branch shorthand (`-`, `@{-1}`,
-    # `@{-N}`) is resolved to a real branch name: from the in-chain history when
-    # a switch already happened this command, else from the reflog. If it cannot
-    # be resolved, fail CLOSED by treating it as main (deny), consistent with the
-    # no-parser case, rather than assuming it is safe.
-    case "$target" in
-      - | @\{-1\})
-        if [ -n "$eff_prev" ]; then
-          resolved="$eff_prev"
-        else
-          resolved="$(git rev-parse --abbrev-ref '@{-1}' 2>/dev/null || true)"
-          [ -n "$resolved" ] || resolved="main"
-        fi ;;
-      @\{-*\})
-        resolved="$(git rev-parse --abbrev-ref "$target" 2>/dev/null || true)"
-        [ -n "$resolved" ] || resolved="main" ;;
-      *)
-        resolved="$target" ;;
-    esac
-    eff_prev="$eff"
-    eff="$resolved"
+
+    if [ "$has_dashdash" -eq 0 ]; then
+      # No pathspec separator: treat as a branch switch. Target = a lone "-"
+      # (previous branch) or the last non-flag token. Handles `git switch main`,
+      # `git switch -c feat/x`, `git checkout -b feat`, `git -C path checkout
+      # main`, and `git switch -`.
+      target=""
+      for tok in $stmt; do
+        case "$tok" in
+          -)  target="$tok" ;;
+          -*) : ;;
+          *)  target="$tok" ;;
+        esac
+      done
+      # Strip one layer of matching surrounding quotes ("main" / 'main').
+      case "$target" in
+        \"*\") target="${target#\"}"; target="${target%\"}" ;;
+        \'*\') target="${target#\'}"; target="${target%\'}" ;;
+      esac
+      # Resolve previous-branch shorthand (-, @{-1}, @{-N}) to a real branch name
+      # (in-chain history first, else the reflog); fail closed to main if it
+      # cannot be resolved.
+      prevref=0
+      case "$target" in
+        - | @\{-1\})
+          prevref=1
+          if [ -n "$eff_prev" ]; then
+            resolved="$eff_prev"
+          else
+            resolved="$(git rev-parse --abbrev-ref '@{-1}' 2>/dev/null || true)"
+            [ -n "$resolved" ] || resolved="main"
+          fi ;;
+        @\{-*\})
+          prevref=1
+          resolved="$(git rev-parse --abbrev-ref "$target" 2>/dev/null || true)"
+          [ -n "$resolved" ] || resolved="main" ;;
+        *)
+          resolved="$target" ;;
+      esac
+      # A bare `git checkout <token>` is ambiguous (branch vs path). Only a
+      # `switch`, a `checkout -b/-B`, or a previous-branch ref is a CONFIDENT
+      # branch switch. Switching TO main is always honoured (deny direction);
+      # otherwise an ambiguous checkout must not CLEAR the on-main state.
+      confident=0
+      { [ "$is_switch" -eq 1 ] || [ "$has_bflag" -eq 1 ] || [ "$prevref" -eq 1 ]; } && confident=1
+      if [ "$resolved" = "main" ]; then
+        eff_prev="$eff"; eff="main"
+      elif [ "$confident" -eq 1 ] || [ "$eff" != "main" ]; then
+        eff_prev="$eff"; eff="$resolved"
+      fi
+      # else: ambiguous bare checkout to a non-main token while on main ->
+      # keep eff=main (fail closed); do not clear.
+    fi
   fi
 
   # A commit lands on the current effective branch; if that is main, block.
