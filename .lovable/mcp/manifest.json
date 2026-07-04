@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "frihedsmodel-mcp",
+      "version": "0.1.0",
+      "title": "Frihedsmodel"
+    },
+    "tools": [
+      {
+        "name": "estimate_fire_number",
+        "title": "Estimate FIRE number",
+        "description": "Estimate the invested capital required for financial independence from an annual spending level and a safe withdrawal rate (default 4%). Real terms.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "annualSpending": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Desired annual spending in kroner (real terms, present-day value)."
+            },
+            "safeWithdrawalRate": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 0.2,
+              "default": 0.04,
+              "description": "Safe withdrawal rate as a decimal, e.g. 0.04 for 4%."
+            }
+          },
+          "required": [
+            "annualSpending"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "project_savings_growth",
+        "title": "Project savings growth",
+        "description": "Project the real (inflation-adjusted) future value of a starting balance plus monthly contributions over N years at a real annual return.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "startingBalance": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Current invested balance in kroner (real terms)."
+            },
+            "monthlyContribution": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Ongoing monthly contribution in kroner (real terms)."
+            },
+            "years": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 80,
+              "description": "Number of years to project."
+            },
+            "realAnnualReturn": {
+              "type": "number",
+              "minimum": -0.2,
+              "maximum": 0.5,
+              "default": 0.04,
+              "description": "Expected real annual return as a decimal, e.g. 0.04 for 4%."
+            }
+          },
+          "required": [
+            "startingBalance",
+            "monthlyContribution",
+            "years"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
