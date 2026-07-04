@@ -57,12 +57,17 @@
 # git subcommand (the first non-flag token after `git` and its global flags), so
 # literal "switch"/"checkout"/"commit" text inside a statement's own arguments (a
 # quoted -m/-F message, a branch name, a file path, a tag message) is never
-# mis-read as a subcommand. Residual limitation (errs safe): statement splitting
-# is still textual and not quote-aware, so a quoted argument that itself contains
-# a shell separator (`&&`, `;`, `|`) is split into pieces; the real leading
-# subcommand of each piece is still classified correctly, so this never lets a
-# commit reach main -- at worst it evaluates a fragment as its own (usually
-# harmless) statement.
+# mis-read as a subcommand. Residual limitations (err safe in the normal case):
+#  - statement splitting is still textual and not quote-aware, so a quoted
+#    argument that contains a shell separator (`&&`, `;`, `|`) is split into
+#    pieces; each piece's real leading subcommand is still classified correctly.
+#  - the gphase-0 scan finds the first literal `git` token anywhere in a
+#    statement, so a non-git statement whose arguments contain `git <verb>` is
+#    over-classified. This over-denies safely EXCEPT one contrived case: an
+#    echoed non-main switch inside a non-git statement (e.g.
+#    `echo git switch feature && git commit` on main) can clear the on-main state
+#    and under-deny. No realistic agent command takes this shape, so it is OUT OF
+#    SCOPE (accepted and documented in TEST-MATRIX.md), not fixed.
 #
 # Contract (Claude Code PreToolUse): reads the tool payload as JSON on stdin,
 # uses `.tool_input.command`; to block, prints a JSON object with
@@ -167,6 +172,7 @@ while IFS= read -r stmt; do
   gphase=0            # 0=before git, 1=git global flags, 2=after the subcommand
   want_gflag_arg=0
   subcmd=""
+  in_cond=0; first_seen=0   # in_cond: statement is an `if`/`elif` CONDITION
   want_create_arg=0; created=""; operand=""; dashdash=0; path_after=0
   for tok in $stmt; do
     # Normalize each token: strip one layer of matching surrounding quotes, then
@@ -205,6 +211,12 @@ while IFS= read -r stmt; do
       # Accepted cost (established safe bias): a non-git statement whose arguments
       # contain the literal word `git` (e.g. `echo git commit -m x`) is
       # over-classified and may over-deny -- never under-deny.
+      # If the FIRST prefix token is `if`/`elif`, this statement is a conditional
+      # CONDITION -- a switch in it is only conditionally successful (see below).
+      if [ "$first_seen" -eq 0 ]; then
+        first_seen=1
+        case "$tok" in if|elif) in_cond=1 ;; esac
+      fi
       [ "$tok" = "git" ] && gphase=1
       continue
     fi
@@ -315,6 +327,20 @@ while IFS= read -r stmt; do
   # && git commit`, where the switch to main succeeds so `switch feature` never
   # runs and the commit lands on main. Biases to over-deny, never under-deny.
   [ "$or_pin_main" -eq 1 ] && eff="main"
+
+  # Conditionally-gated switch: a switch that is the CONDITION of an `if`/`elif`
+  # only conditionally succeeds -- if it fails, the branch never changed and the
+  # `else` branch runs on the pre-switch branch; if it succeeds, the `then` branch
+  # runs on the target. So its resolution must not be trusted to have left main:
+  # if main is reachable either way -- the post-switch target (`eff`) OR the
+  # pre-switch branch (`eff_prev`) -- re-pin main, which persists (via eff) to the
+  # then/else branches. Same conservative "don't trust a conditionally-gated
+  # switch" treatment the `||` case already gets; the third conditional-execution
+  # carve-out after `||`. Biases to over-deny (a then-branch commit on a non-main
+  # target from main is over-denied), never under-deny.
+  if [ "$in_cond" -eq 1 ] && { [ "$subcmd" = "switch" ] || [ "$subcmd" = "checkout" ]; }; then
+    { [ "$eff" = "main" ] || [ "$eff_prev" = "main" ]; } && eff="main"
+  fi
 
   # --- commit: lands on the current effective branch; block if that is main ---
   if [ "$subcmd" = "commit" ]; then

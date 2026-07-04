@@ -279,6 +279,48 @@ over-deny (`echo git commit -m x` -> DENY on main).
 | `git tag -m "git switch main" v1` | main | ALLOW | leading subcommand is `tag`; embedded text ignored |
 | `npm run build` | main | ALLOW | no `git` token anywhere -> neither |
 
+## 17) Conditionally-gated switch in an `if`/`elif` condition
+
+A switch that is the CONDITION of an `if`/`elif` only conditionally succeeds:
+if it fails the branch never changed (the `else` branch runs on the pre-switch
+branch); if it succeeds the `then` branch runs on the target. So its resolution
+is not trusted -- if main is reachable either way (the post-switch target OR the
+pre-switch branch), eff is re-pinned to main (persisting to then/else). This is
+the same conservative treatment `||` already gets (the third conditional-execution
+carve-out). It distinguishes the legit case by the targets, and biases to
+over-deny, never under-deny. A switch in a `then`/`else` BRANCH is not gated
+(if reached, it ran) and is trusted as normal.
+
+| Command | From | Result | Rationale |
+|---|---|---|---|
+| `if git switch does-not-exist; then :; else git commit -m x; fi` | main | DENY | the condition switch fails, the `else` commit runs on the still-current main |
+| `if git switch feature; then git commit -m x; fi` | feature | ALLOW | neither the target (feature) nor the pre-switch branch (feature) is main |
+| `if git switch main; then git commit -m x; fi` | feature | DENY | if the condition switch to main succeeds, the `then` commit is on main |
+| `if git switch feature; then git commit -m x; fi` | main | DENY | accepted over-deny: the `else`-on-main path (switch fails) is possible, so main is pinned even though the `then` commit would be on feature |
+| `if git status; then git commit -m x; fi` | main | DENY | non-switch condition changes nothing; commit on main |
+| `if git status; then git commit -m x; fi` | feature | ALLOW | non-switch condition; commit on feature |
+| `if git switch feature; then : ; elif git switch main; then git commit -m x; fi` | main | DENY | `elif` condition switch to main is also gated -> main reachable |
+| `if git switch other; then git switch feat2; git commit -m x; fi` | feature | ALLOW | the `then`-branch switch (not gated) moves to feat2; commit off main |
+
+## A) settings.json — `git commit --amend` requires approval
+
+`Bash(git commit:*)` in the allow list also matched `git commit --amend`, which
+rewrites the current tip (a history rewrite, forbidden by CLAUDE.md §3). Added
+`Bash(git commit --amend:*)` to the deny list so amend requires approval like
+`push`/`merge`/`reset --hard` already do. (The hook independently classifies an
+amend as a `commit`, so an amend on `main` is also blocked by the hook; the
+settings deny is what stops an amend on a feature branch.)
+
+| Command | Guarded by | Result | Rationale |
+|---|---|---|---|
+| `git commit --amend -m x` | settings deny + hook | blocked | deny `Bash(git commit --amend:*)`; also a commit-on-main via the hook when on main |
+| `git commit --amend -m x` (feature) | settings deny | blocked | hook allows an amend on a feature branch, but the settings deny requires approval |
+
+Best-effort caveat (same as the other prefix denies, per CLAUDE.md §3): a
+reordered spelling like `git commit -a --amend` puts `--amend` after another
+flag, so the prefix pattern does not match it -- an accepted limitation, not a
+hard block.
+
 ## S) settings.json `.env` deny anchoring — CORRECTED to `/.env` (authoritative)
 
 Not a hook case; recorded here so the correct form is not flip-flopped again.
@@ -340,3 +382,14 @@ Checked each category for an obvious untested variant. Fix only real bugs.
   LIMITATION (errs safe): statement splitting is textual, not quote/heredoc-aware,
   so such a message is over-denied. Never lets a commit reach main; reword or
   commit from a feature branch.
+- **Echoed non-main switch inside a non-git statement** — ACCEPTED EXCEPTION, NOT
+  fixed (the one case that UNDER-denies, so called out separately from the
+  over-deny limitations above). The gphase-0 scan finds the first literal `git`
+  token anywhere in a statement, so `echo git switch feature && git commit -m x`
+  on main is read as two statements: the first "switches" eff to `feature`
+  (clearing main), and the second commits, allowed. This contradicts the
+  "over-classification only ever over-denies" claim. It requires a shell-echoed
+  switch-to-a-non-main-branch immediately before a real commit — no realistic
+  agent command takes this shape, so it is deliberately OUT OF SCOPE rather than
+  chased with more parsing (found by @claude; accepted, not fixed). The hook
+  header comment is softened to note this exception.
