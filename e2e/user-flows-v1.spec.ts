@@ -10,9 +10,12 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 let pageErrors: string[] = [];
-test.beforeEach(({ page }) => {
+test.beforeEach(async ({ page }) => {
   pageErrors = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
+  // These are advanced-app flows: open the Advanced door up front (the persisted per-device
+  // opt-in). The door itself is covered in smoke.spec.ts's "Advanced door" describe.
+  await page.addInitScript(() => localStorage.setItem("frihedsmodel-advanced-door.v1", "open"));
 });
 test.afterEach(() => {
   expect(pageErrors, `uncaught runtime errors: ${pageErrors.join(" | ")}`).toEqual([]);
@@ -40,7 +43,7 @@ function numField(page: Page, label: string) {
 
 test.describe("User flows", () => {
   test("1. create a new scenario — it becomes active and appears in the selector", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await scenarioSelect(page).waitFor();
 
     await page.getByRole("button", { name: "+ Nyt" }).click();
@@ -51,7 +54,7 @@ test.describe("User flows", () => {
     await expect(page.locator("header input")).toHaveValue("Scenarie 2");
 
     // It is also present in the selector dropdown list.
-    await page.goto("/");
+    await page.goto("/dashboard");
     await scenarioSelect(page).click();
     await expect(page.getByRole("option", { name: /Scenarie 2/ })).toBeVisible();
     await page.keyboard.press("Escape");
@@ -116,7 +119,7 @@ test.describe("User flows", () => {
   });
 
   test("5. export JSON — downloads a parseable model payload with core data", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: /Eksporter JSON/ }).click();
     const download = await downloadPromise;
@@ -136,7 +139,7 @@ test.describe("User flows", () => {
   });
 
   test("6. import JSON — REPLACES current data (local-only data is gone, imported is active)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     // Grab a valid, full-shape scenario template by exporting the default model.
     const dl = page.waitForEvent("download");
     await page.getByRole("button", { name: /Eksporter JSON/ }).click();
@@ -150,7 +153,7 @@ test.describe("User flows", () => {
     await page.getByRole("button", { name: "Gem snapshot" }).click();
     await page.goto("/snapshots");
     await expect(page.getByText(/Historik \(/)).toBeVisible(); // a snapshot exists locally now
-    await page.goto("/");
+    await page.goto("/dashboard");
 
     // Build a DISJOINT payload: a single, differently-identified scenario and NO snapshots.
     const importedId = "imported-only-1";
@@ -172,7 +175,7 @@ test.describe("User flows", () => {
     await expect(page.locator("header input")).toHaveValue("Imported Only"); // activeScenarioId → imported
 
     // ...the old LOCAL-ONLY scenario is gone (full replace, not merge)...
-    await page.goto("/");
+    await page.goto("/dashboard");
     await scenarioSelect(page).click();
     await expect(page.getByRole("option", { name: "Imported Only" })).toBeVisible();
     await expect(page.getByRole("option", { name: "Scenarie 2" })).toHaveCount(0);
@@ -190,7 +193,7 @@ test.describe("User flows", () => {
   });
 
   test("7. importing invalid JSON shows an error and does not blank-screen", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await page.locator('input[type="file"]').setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{ this is not valid json ]") });
     await expect(page.getByText("Importer model?")).toBeVisible();
     await page.getByRole("button", { name: "Erstat data" }).click();

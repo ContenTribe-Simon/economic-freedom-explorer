@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 
 const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/inputs", label: "Variabler", icon: Sliders },
   { to: "/life-events", label: "Livsfaser", icon: Calendar },
   { to: "/projection", label: "År-for-år", icon: Table },
