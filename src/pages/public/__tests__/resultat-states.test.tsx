@@ -95,10 +95,33 @@ describe("Result screen states (real PublicResult data)", () => {
     if (r.bottleneck.kind !== "shortfall") throw new Error("fixture must have a shortfall bottleneck");
     const gap = `${Math.round(r.bottleneck.monthlyGap).toLocaleString("da-DK")} kr`;
     expect(screen.getByText(new RegExp(`mangler du ${gap.replace(/\./g, "\\.")} om måneden`))).toBeTruthy();
-    // Depletion marker in the chart aria, no freedom marker claim
+    // Depletion marker in the chart aria — and since this plan HAS a real freedom point
+    // (the card shows it), the chart and aria must agree with it, not deny it.
     const aria = screen.getByRole("img").getAttribute("aria-label") ?? "";
     expect(aria).toContain(`Pengene slipper op ved alder ${r.bottleneck.firstShortfallAge}`);
-    expect(aria).toContain("ikke et bæredygtigt tidligt frihedspunkt");
+    expect(r.earliestSustainableStopAge).not.toBeNull();
+    expect(aria).toContain(`Frihedspunktet, hvor pengene rækker hele vejen, er ved alder ${r.earliestSustainableStopAge}`);
+    expect(aria).not.toContain("ikke et bæredygtigt");
+    // The sunrise marker itself renders on the chart at the freedom age.
+    expect(screen.getByText(`Frihedspunkt ${r.earliestSustainableStopAge}`)).toBeTruthy();
+  });
+
+  it("off track with NO sustainable stop age: marker omitted and aria says so", () => {
+    const noFreedom: SimplePublicInputs = {
+      ...DEFAULT_SIMPLE_INPUTS,
+      monthlySpending: 60_000,
+      monthlySavings: 0,
+      currentInvestments: 0,
+      pensionBalance: 0,
+    };
+    const r = computePublicResult(noFreedom);
+    expect(r.status.kind).toBe("off_track");
+    expect(r.earliestSustainableStopAge).toBeNull();
+    renderWith(noFreedom);
+    const aria = screen.getByRole("img").getAttribute("aria-label") ?? "";
+    expect(aria).toContain("Der er ikke et bæredygtigt tidligt frihedspunkt");
+    expect(screen.queryByText(/^Frihedspunkt \d+$/)).toBeNull();
+    expect(screen.getByText("Ikke fundet")).toBeTruthy();
   });
 
   it("off track suppresses positive 'helps' drivers on screen (display decision D1)", () => {

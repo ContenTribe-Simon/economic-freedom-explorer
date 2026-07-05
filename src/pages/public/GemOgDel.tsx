@@ -34,6 +34,7 @@ export default function GemOgDel() {
   const [copied, setCopied] = useState(false);
   const savedTimer = useRef<number | undefined>(undefined);
   const copyTimer = useRef<number | undefined>(undefined);
+  const shareFieldRef = useRef<HTMLInputElement>(null);
 
   const onSave = () => {
     saveCalculation(name);
@@ -46,7 +47,11 @@ export default function GemOgDel() {
     try {
       await navigator.clipboard.writeText(shareUrl);
     } catch {
-      // Clipboard can be unavailable (permissions); the field itself stays selectable.
+      // Clipboard unavailable or denied: never claim success. Select the link field instead
+      // so the user can copy manually.
+      shareFieldRef.current?.focus();
+      shareFieldRef.current?.select();
+      return;
     }
     setCopied(true);
     window.clearTimeout(copyTimer.current);
@@ -244,6 +249,7 @@ export default function GemOgDel() {
                 </Label>
                 <Input
                   id="share-url"
+                  ref={shareFieldRef}
                   readOnly
                   value={shareUrl}
                   onFocus={(e) => e.target.select()}

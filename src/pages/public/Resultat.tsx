@@ -188,13 +188,24 @@ export default function Resultat() {
       </>
     );
     takeaway = `Det er ${shortYears} år for kort. Du kan lukke hullet ved at arbejde lidt længere, spare mere op eller justere dit forbrug.`;
+    // Off track can still have a real freedom point (a later stop age that WOULD hold — the
+    // Frihedspunkt card shows it). The chart and the aria text follow the adapter: marker and
+    // "Frihedspunktet …" sentence when earliestSustainableStopAge exists, and the reference's
+    // "no sustainable freedom point" sentence only when it is genuinely null. (The reference
+    // fixture hardcoded freedomAge={null}, which contradicted the card for fixable plans.)
+    const offTrackFreedom = result.earliestSustainableStopAge;
     chart = (
       <HorizonChart
         points={result.netWorthByAge}
-        freedomAge={null}
+        freedomAge={offTrackFreedom}
         planAge={plan}
+        freedomOnPlan={offTrackFreedom === plan}
         depletion={{ age: shortfallAge, label: `Pengene slipper op, ${shortfallAge}` }}
-        ariaLabel={`Din formue stiger til en top på ${peakKr} ved alder ${peakPoint.age} og falder derefter. Pengene slipper op ved alder ${shortfallAge}, altså ${shortYears} år før de skulle række til ${horizonEnd}. Der er ikke et bæredygtigt tidligt frihedspunkt i dette scenarie.`}
+        ariaLabel={`Din formue stiger til en top på ${peakKr} ved alder ${peakPoint.age} og falder derefter. Pengene slipper op ved alder ${shortfallAge}, altså ${shortYears} år før de skulle række til ${horizonEnd}. ${
+          offTrackFreedom != null
+            ? `Frihedspunktet, hvor pengene rækker hele vejen, er ved alder ${offTrackFreedom}.`
+            : "Der er ikke et bæredygtigt tidligt frihedspunkt i dette scenarie."
+        }`}
       />
     );
     cards = (

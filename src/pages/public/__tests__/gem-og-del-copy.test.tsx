@@ -1,0 +1,72 @@
+/**
+ * Save/Share copy button — the "Kopieret" success state must reflect reality (Codex P2):
+ * when the Clipboard API is unavailable or writeText rejects, no success state may appear;
+ * the share field is selected instead so the user can copy manually.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import GemOgDel from "../GemOgDel";
+import { usePublicStore } from "@/store/publicStore";
+import { DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
+
+function renderScreen() {
+  return render(
+    <TooltipProvider>
+      <MemoryRouter initialEntries={["/gem-og-del"]}>
+        <GemOgDel />
+      </MemoryRouter>
+    </TooltipProvider>,
+  );
+}
+
+function mockClipboard(writeText: (() => Promise<void>) | undefined) {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: writeText ? { writeText } : undefined,
+  });
+}
+
+beforeEach(() => {
+  usePublicStore.setState({ inputs: { ...DEFAULT_SIMPLE_INPUTS }, saved: [] });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("share-link copy state", () => {
+  it("shows the success state only when the clipboard write actually succeeds", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    mockClipboard(writeText);
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Kopiér link" }));
+    await waitFor(() => expect(screen.getByText("Linket er kopieret")).toBeTruthy());
+    expect(writeText).toHaveBeenCalledOnce();
+  });
+
+  it("REGRESSION: a rejected clipboard write shows NO success state and selects the field", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    mockClipboard(writeText);
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Kopiér link" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    // No lie: neither the status line nor the button's "Kopieret" state appears.
+    expect(screen.queryByText("Linket er kopieret")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Kopieret" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Kopiér link" })).toBeTruthy();
+    // The manual fallback: the share field is focused (and thereby selected).
+    const field = screen.getByLabelText("Link til beregningen", { selector: "input" });
+    await waitFor(() => expect(document.activeElement).toBe(field));
+  });
+
+  it("REGRESSION: a missing Clipboard API behaves like a failure, not a success", async () => {
+    mockClipboard(undefined);
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: "Kopiér link" }));
+    const field = screen.getByLabelText("Link til beregningen", { selector: "input" });
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    expect(screen.queryByText("Linket er kopieret")).toBeNull();
+  });
+});
