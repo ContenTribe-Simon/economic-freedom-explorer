@@ -119,6 +119,31 @@ describe("printed summary (Hent som PDF)", () => {
   });
 });
 
+describe("rehydrated saved list", () => {
+  it("REGRESSION: legacy junk like saved:[null] cannot crash the save/share screen", async () => {
+    // Codex P2: a hand-edited or legacy localStorage value such as saved:[null] used to pass
+    // rehydration as-is and crash /gem-og-del on s.id/s.name, locking the user out of the
+    // screen until storage was cleared.
+    localStorage.setItem(
+      "frihedsmodel-public.v1",
+      JSON.stringify({
+        state: {
+          inputs: { ...DEFAULT_SIMPLE_INPUTS },
+          saved: [null, { id: "ok", name: "Min rigtige plan", savedAt: 1_750_000_000_000, inputs: { ...DEFAULT_SIMPLE_INPUTS } }],
+        },
+        version: 0,
+      }),
+    );
+    await usePublicStore.persist.rehydrate();
+    renderScreen();
+    // The screen renders, the junk entry is gone and the real one is intact.
+    expect(screen.getByText("Gem beregning")).toBeTruthy();
+    expect(screen.getByText("Min rigtige plan")).toBeTruthy();
+    expect(usePublicStore.getState().saved).toHaveLength(1);
+    localStorage.removeItem("frihedsmodel-public.v1");
+  });
+});
+
 describe("start a new calculation", () => {
   it("REGRESSION: 'Start en ny beregning' resets the active inputs to the defaults, keeping saved entries", () => {
     const custom = { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 777_000, desiredStopAge: 55 };

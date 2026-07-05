@@ -193,6 +193,47 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
     localStorage.removeItem("frihedsmodel-public.v1");
   });
 
+  it("REGRESSION: persisted saved entries are normalized per entry, never trusted as a whole array", async () => {
+    localStorage.setItem(
+      "frihedsmodel-public.v1",
+      JSON.stringify({
+        state: {
+          inputs: { ...DEFAULT_SIMPLE_INPUTS },
+          saved: [
+            null, // legacy/hand-edited junk that crashed /gem-og-del on s.id/s.name
+            "junk",
+            42,
+            { id: "no-inputs", name: "Uden tal", savedAt: 1 }, // nothing to load -> dropped
+            { name: 7, savedAt: "yesterday", inputs: { ...DEFAULT_SIMPLE_INPUTS, pensionBalance: -5 } },
+            { id: "dup", name: "Første", savedAt: 2, inputs: { ...DEFAULT_SIMPLE_INPUTS } },
+            { id: "dup", name: "Anden", savedAt: 3, inputs: { ...DEFAULT_SIMPLE_INPUTS } },
+          ],
+        },
+        version: 0,
+      }),
+    );
+    await usePublicStore.persist.rehydrate();
+    const saved = usePublicStore.getState().saved;
+    // Junk and inputs-less entries are dropped; the three loadable ones survive.
+    expect(saved).toHaveLength(3);
+    for (const entry of saved) {
+      expect(typeof entry.id).toBe("string");
+      expect(entry.id.length).toBeGreaterThan(0);
+      expect(typeof entry.name).toBe("string");
+      expect(Number.isFinite(entry.savedAt)).toBe(true);
+      // Each entry's inputs went through the sanitizer and compute cleanly.
+      expect(() => computePublicResult(entry.inputs)).not.toThrow();
+    }
+    // Field normalization: non-string name falls back, non-finite savedAt falls back,
+    // invalid input values are clamped.
+    expect(saved[0].name).toBe("Min plan");
+    expect(saved[0].savedAt).toBe(0);
+    expect(saved[0].inputs.pensionBalance).toBe(0);
+    // Duplicate ids are made unique (React keys and removeCalculation stay per-entry).
+    expect(new Set(saved.map((s) => s.id)).size).toBe(3);
+    localStorage.removeItem("frihedsmodel-public.v1");
+  });
+
   it("REGRESSION: stop-age bounds are the user's PLAN range, [currentAge, lifeExpectancy]", () => {
     // Low end: a valid early stop below the old hardcoded 40 floor is enterable and storable.
     store().setInputs({ currentAge: 35, desiredStopAge: 38 });

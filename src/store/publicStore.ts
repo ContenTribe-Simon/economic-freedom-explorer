@@ -42,6 +42,36 @@ function newId(): string {
     : Math.random().toString(36).slice(2);
 }
 
+/**
+ * Rehydration guard for the saved list: legacy or hand-edited localStorage must not smuggle
+ * malformed entries past the type (`saved: [null]` would crash /gem-og-del on `s.id`/`s.name`
+ * and lock the user out of the screen until storage is cleared). Entries without a usable
+ * `inputs` object are dropped (there is nothing to load); everything else is normalized field
+ * by field — id (regenerated when missing or duplicated, so React keys and removeCalculation
+ * stay per-entry), name, savedAt, and the inputs through the same sanitizer as every other
+ * write path.
+ */
+function sanitizeSavedCalculations(raw: unknown): SavedCalculation[] {
+  if (!Array.isArray(raw)) return [];
+  const seenIds = new Set<string>();
+  const clean: SavedCalculation[] = [];
+  for (const item of raw) {
+    if (item == null || typeof item !== "object") continue;
+    const e = item as Record<string, unknown>;
+    if (e.inputs == null || typeof e.inputs !== "object") continue;
+    let id = typeof e.id === "string" && e.id.length > 0 ? e.id : newId();
+    if (seenIds.has(id)) id = newId();
+    seenIds.add(id);
+    clean.push({
+      id,
+      name: typeof e.name === "string" && e.name.trim().length > 0 ? e.name.trim() : "Min plan",
+      savedAt: typeof e.savedAt === "number" && Number.isFinite(e.savedAt) ? e.savedAt : 0,
+      inputs: sanitizeSimpleInputs({ ...(e.inputs as Record<string, unknown>) }),
+    });
+  }
+  return clean;
+}
+
 export const usePublicStore = create<PublicState>()(
   persist(
     (set, get) => ({
@@ -86,7 +116,7 @@ export const usePublicStore = create<PublicState>()(
         return {
           ...current,
           inputs: sanitizeSimpleInputs({ ...rawInputs }),
-          saved: Array.isArray(p.saved) ? (p.saved as SavedCalculation[]) : current.saved,
+          saved: Array.isArray(p.saved) ? sanitizeSavedCalculations(p.saved) : current.saved,
         };
       },
     },
