@@ -29,9 +29,23 @@ async function expectNotBlank(page: Page): Promise<void> {
 
 const SIDEBAR_LINKS = ["Dashboard", "Variabler", "Livsfaser", "År-for-år", "Scenarier", "FIRE", "Lande", "Antagelser", "Rapport", "Snapshots", "Cloud"];
 
+/**
+ * Open the Advanced door before the app boots. These are advanced-app smoke tests, and the
+ * door opt-in is persisted per device — seeding it reproduces the state of a device that has
+ * chosen the advanced model, which is the precondition these tests run under. The door
+ * itself (fresh device) is covered by the "Advanced door" describe below.
+ */
+async function withDoorOpen(page: Page): Promise<void> {
+  await page.addInitScript(() => localStorage.setItem("frihedsmodel-advanced-door.v1", "open"));
+}
+
 test.describe("App shell & navigation", () => {
+  test.beforeEach(async ({ page }) => {
+    await withDoorOpen(page);
+  });
+
   test("app loads without a blank screen and shows the sidebar navigation", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await expect(page.getByText("Frihedsmodel")).toBeVisible(); // brand in sidebar
     for (const label of SIDEBAR_LINKS) {
       await expect(page.getByRole("link", { name: label }), `nav link "${label}"`).toBeVisible();
@@ -40,7 +54,7 @@ test.describe("App shell & navigation", () => {
   });
 
   test("navigating across the main routes via the sidebar never crashes or goes blank", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     // Excludes "Rapport" (print view hides the sidebar) and "Cloud" (auth redirect) — both
     // covered separately below.
     const steps: Array<[label: string, urlPart: string]> = [
@@ -52,19 +66,23 @@ test.describe("App shell & navigation", () => {
       ["Lande", "/countries"],
       ["Antagelser", "/assumptions"],
       ["Snapshots", "/snapshots"],
-      ["Dashboard", "/"],
+      ["Dashboard", "/dashboard"],
     ];
     for (const [label, urlPart] of steps) {
       await page.getByRole("link", { name: label }).click();
-      await expect(page, `URL after clicking "${label}"`).toHaveURL(new RegExp(`${urlPart === "/" ? "/" : urlPart}$`));
+      await expect(page, `URL after clicking "${label}"`).toHaveURL(new RegExp(`${urlPart}$`));
       await expectNotBlank(page);
     }
   });
 });
 
 test.describe("Core user-facing pages render", () => {
+  test.beforeEach(async ({ page }) => {
+    await withDoorOpen(page);
+  });
+
   test("Dashboard shows core dashboard content", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await expect(page.getByText("Kapitaludvikling")).toBeVisible();
     await expectNotBlank(page);
   });
@@ -145,6 +163,54 @@ test.describe("Core user-facing pages render", () => {
     const failText = (await page.getByTestId("validation-fail-count").innerText()).trim();
     expect(Number.isNaN(Number(passText))).toBe(false);
     expect(Number.isNaN(Number(failText))).toBe(false);
+    await expectNotBlank(page);
+  });
+});
+
+test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
+  test("the public flow is the default entry: '/' lands on Start", async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/start$/);
+    await expect(page.getByRole("heading", { name: "Se hvornår du kan stoppe med at arbejde." })).toBeVisible();
+    await expectNotBlank(page);
+  });
+
+  test("a direct advanced URL shows the door; opting in opens the app AT that URL and is remembered", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expect(page.getByText("Du er på vej ind i den avancerede model.")).toBeVisible();
+    await expect(page.getByText("Kapitaludvikling")).not.toBeVisible();
+    await page.getByTestId("open-advanced-door").click();
+    // Same URL, requested page appears; no redirect dance.
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByText("Kapitaludvikling")).toBeVisible();
+    // The opt-in is remembered on the device: later direct navigation goes straight through.
+    await page.goto("/inputs");
+    await expect(page.getByText("Person & alder")).toBeVisible();
+    await expectNotBlank(page);
+  });
+
+  test("the debug surface sits behind the same door", async ({ page }) => {
+    await page.goto("/debug/model-validation");
+    await expect(page.getByText("Du er på vej ind i den avancerede model.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Model validation" })).not.toBeVisible();
+    await expectNotBlank(page);
+  });
+
+  test("the door's back link returns to the public flow", async ({ page }) => {
+    await page.goto("/scenarios");
+    await page.getByRole("link", { name: /Tilbage til den enkle udgave/ }).click();
+    await expect(page).toHaveURL(/\/start$/);
+    await expectNotBlank(page);
+  });
+
+  test("the public flow's quiet 'Avanceret' entry hits the door on a fresh device", async ({ page }) => {
+    // The data contract's single low-emphasis entry lives on the Save/Share screen. Clicking
+    // it goes through the Advanced door like any other advanced URL — it must never bypass it.
+    await page.goto("/gem-og-del");
+    await page.getByRole("link", { name: "Avanceret" }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByText("Du er på vej ind i den avancerede model.")).toBeVisible();
+    await expect(page.getByText("Kapitaludvikling")).not.toBeVisible();
     await expectNotBlank(page);
   });
 });

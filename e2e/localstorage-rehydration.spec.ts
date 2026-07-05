@@ -13,9 +13,12 @@ import { test, expect, type Page } from "@playwright/test";
 const KEY = "finance-tool.v1"; // Zustand persist storage key (financeStore.ts)
 
 let pageErrors: string[] = [];
-test.beforeEach(({ page }) => {
+test.beforeEach(async ({ page }) => {
   pageErrors = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
+  // Advanced-app rehydration flows: open the Advanced door up front (persisted per-device
+  // opt-in, separate key from the finance-tool.v1 blob these tests manipulate).
+  await page.addInitScript(() => localStorage.setItem("frihedsmodel-advanced-door.v1", "open"));
 });
 test.afterEach(() => {
   expect(pageErrors, `uncaught runtime errors: ${pageErrors.join(" | ")}`).toEqual([]);
@@ -169,7 +172,7 @@ test.describe("localStorage persistence & rehydration", () => {
   });
 
   test("scenario changes are persisted to localStorage", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await page.getByRole("button", { name: "+ Nyt" }).click(); // adds "Scenarie 2" and makes it active
 
     // The new scenario + active-id are written to localStorage by the persist middleware.
@@ -182,7 +185,7 @@ test.describe("localStorage persistence & rehydration", () => {
   });
 
   test("reload restores the active scenario", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await page.getByRole("button", { name: "+ Nyt" }).click();
     await expect.poll(async () => (await readPersisted(page))?.state?.scenarios?.length ?? 0).toBe(2);
 
@@ -234,7 +237,7 @@ test.describe("localStorage persistence & rehydration", () => {
   });
 
   test("legacy persisted data rehydrates without crash and migrates", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await seedAndReload(page, legacyBlob());
 
     // App shell still renders (no blank screen) and the legacy scenario survived migration.
@@ -258,7 +261,7 @@ test.describe("localStorage persistence & rehydration", () => {
   });
 
   test("corrupted localStorage does not blank-screen the app", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/dashboard");
     await seedAndReload(page, "{ this is : not valid JSON ]]"); // garbage
 
     // The app falls back gracefully and still renders the shell.

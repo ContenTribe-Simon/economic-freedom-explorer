@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,15 +22,22 @@ import FirePage from "./pages/Fire";
 import CountriesPage from "./pages/Countries";
 import ModelValidation from "./pages/ModelValidation";
 import { AuthProvider } from "@/hooks/useAuth";
+import { AdvancedGate } from "./pages/AdvancedDoor";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
-/** The advanced app renders inside the AppShell chrome (sidebar + nav). */
+/**
+ * The advanced app renders inside the AppShell chrome (sidebar + nav), behind the Advanced
+ * door (product structure §4): the public flow is the default entry, and the advanced surface
+ * is opt-in — same engine, same data, full functionality once through the door.
+ */
 const ShellLayout = () => (
-  <AppShell>
-    <Outlet />
-  </AppShell>
+  <AdvancedGate>
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  </AdvancedGate>
 );
 
 const App = () => (
@@ -41,15 +48,20 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Public Frihedsmodel flow: full-bleed screens without the advanced chrome. */}
+            {/* The public Frihedsmodel flow is the DEFAULT entry (product structure §4):
+                "/" leads into it; full-bleed screens without the advanced chrome. */}
+            <Route path="/" element={<Navigate to="/start" replace />} />
             <Route path="/start" element={<Start />} />
             <Route path="/simple-inputs" element={<SimpleInputs />} />
             <Route path="/resultat" element={<Resultat />} />
             <Route path="/gem-og-del" element={<GemOgDel />} />
 
-            {/* Advanced app inside the shell. */}
+            {/* Advanced app inside the shell, behind the Advanced door (see AdvancedDoor.tsx).
+                Paths are unchanged except the dashboard, which moves from "/" to /dashboard —
+                deep links keep working once the door has been opened on the device. The debug
+                route sits inside the same gate: nothing raw is reachable from the public path. */}
             <Route element={<ShellLayout />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/cloud" element={<CloudPage />} />
               <Route path="/inputs" element={<Inputs />} />
@@ -62,8 +74,10 @@ const App = () => (
               <Route path="/fire" element={<FirePage />} />
               <Route path="/countries" element={<CountriesPage />} />
               <Route path="/debug/model-validation" element={<ModelValidation />} />
-              <Route path="*" element={<NotFound />} />
             </Route>
+
+            {/* Unknown URLs land on a plain 404 on the PUBLIC side of the door. */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

@@ -140,6 +140,12 @@ is hidden/deferred. This is what a designer builds from. Copy shown is indicativ
 - A single low-emphasis entry ("Avanceret") that leads to the existing advanced surface
   (scenarios, snapshots, life events, FIRE, countries, full tables). Not designed in this
   spec — it reuses the current advanced pages until a later phase.
+- **Deferred (considered, not forgotten):** pre-filling the advanced app from the public flow
+  — mapping the overlapping Simple Inputs fields (age, income, spending, savings, stop age,
+  pension) into `useFinanceStore` before navigating. Deliberately out of MVP scope: the
+  advanced model's field set is much larger, so a partial mapping risks misrepresenting the
+  user's plan as more complete than what they entered. Until then the entry's copy must NOT
+  imply that the just-entered numbers carry over ("med egne tal og indstillinger").
 
 ---
 

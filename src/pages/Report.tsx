@@ -186,7 +186,7 @@ export default function Report() {
     >
       {/* Top action bar — skjules altid i print */}
       <div className="flex items-center justify-between mb-6 print:hidden" data-testid="report-actions">
-        <Link to="/" className="text-sm text-muted-foreground hover:underline">← Tilbage til dashboard</Link>
+        <Link to="/dashboard" className="text-sm text-muted-foreground hover:underline">← Tilbage til dashboard</Link>
         <div className="flex gap-2">
           {isSnapshotMode && (
             <Button variant="outline" size="sm" onClick={() => setSearchParams({})}>
