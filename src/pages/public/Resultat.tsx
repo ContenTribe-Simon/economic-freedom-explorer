@@ -6,7 +6,7 @@ import { PublicHeader } from "@/components/public/PublicHeader";
 import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
-import { formatKr } from "@/lib/publicFormat";
+import { formatKr, freedomAgeForDisplay } from "@/lib/publicFormat";
 import { decodeShareInputs } from "@/lib/publicShare";
 import "./start.css";
 import "./resultat.css";
@@ -129,11 +129,9 @@ export default function Resultat() {
   const kind = result.status.kind;
   const plan = result.desiredStopAge;
   const horizonEnd = result.lifeExpectancy;
-  // Never claim a "tidligst" ABOVE a plan that demonstrably holds: the engine's FI search has a
-  // floor of age 40, so for an on-track plan below 40 the KPI can report an "earliest" later
-  // than the working plan itself. On track means the plan holds, so the true earliest is <= plan;
-  // min() keeps the headline truthful without touching the engine. (Off track uses its own path.)
-  const freedom = Math.min(result.earliestSustainableStopAge ?? plan, plan);
+  // The corrected on-track/tight display age (engine search-floor/ceiling artifacts handled) —
+  // the SAME helper the save/PDF summary uses, so the two surfaces can never disagree.
+  const freedom = freedomAgeForDisplay(result.earliestSustainableStopAge, plan);
   const capitalAtStop = formatKr(result.capitalAtStopAge);
   const hasGoal = (inputs.fiTargetMinNetWorth ?? 0) > 0;
 
@@ -186,12 +184,23 @@ export default function Resultat() {
     const shortfallAge = bn.kind === "shortfall" ? bn.firstShortfallAge : lastsTo;
     const monthlyGap = bn.kind === "shortfall" ? bn.monthlyGap : 0;
 
-    headline = (
+    // A shortfall BEFORE the planned stop age is a current-budget problem (spending exceeds
+    // what income and savings cover while still working), not a retirement-date problem —
+    // framing it as "Stopper du ved {plan}" and suggesting to work longer would point at the
+    // wrong lever. Branch the copy on where the failure actually happens.
+    const failsBeforeStop = lastsTo < plan;
+    headline = failsBeforeStop ? (
+      <>
+        Allerede ved <Age>alder {lastsTo}</Age> slipper pengene op.
+      </>
+    ) : (
       <>
         Stopper du ved {plan}, rækker pengene til <Age>alder {lastsTo}</Age>.
       </>
     );
-    takeaway = `Det er ${shortYears} år for kort. Du kan lukke hullet ved at arbejde lidt længere, spare mere op eller justere dit forbrug.`;
+    takeaway = failsBeforeStop
+      ? `Det sker før din planlagte stop-alder på ${plan}, så det er ikke stop-alderen, der er problemet. Justér dit forbrug eller din opsparing, så tallene hænger sammen.`
+      : `Det er ${shortYears} år for kort. Du kan lukke hullet ved at arbejde lidt længere, spare mere op eller justere dit forbrug.`;
     // Off track can still have a real freedom point (a later stop age that WOULD hold — the
     // Frihedspunkt card shows it). The chart and the aria text follow the adapter: marker and
     // "Frihedspunktet …" sentence when earliestSustainableStopAge exists, and the reference's

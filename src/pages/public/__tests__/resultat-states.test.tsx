@@ -118,6 +118,34 @@ describe("Result screen states (real PublicResult data)", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("alder 38");
   });
 
+  it("a shortfall BEFORE the planned stop age gets current-budget copy, not work-longer advice", () => {
+    // Spending exceeds what income and savings cover while still working: the money runs out at
+    // 36, long before the planned stop at 50 (verified through the real pipeline). Framing that
+    // as "Stopper du ved 50" and suggesting to work longer would blame the wrong lever.
+    const brokeNow: SimplePublicInputs = {
+      ...DEFAULT_SIMPLE_INPUTS,
+      monthlySpending: 40_000,
+      desiredStopAge: 50,
+      monthlySavings: 2_000,
+    };
+    const r = computePublicResult(brokeNow);
+    expect(r.status.kind).toBe("off_track");
+    expect(r.moneyLastsToAge).toBeLessThan(r.desiredStopAge); // the pre-stop failure this covers
+    const { unmount: u1 } = renderWith(brokeNow);
+    const h1 = screen.getByRole("heading", { level: 1 }).textContent ?? "";
+    expect(h1).toContain(`Allerede ved alder ${r.moneyLastsToAge}`);
+    expect(h1).not.toContain("Stopper du ved");
+    const takeaway = screen.getByText(/det er ikke stop-alderen, der er problemet/);
+    expect(takeaway.textContent).toContain("Justér dit forbrug eller din opsparing");
+    expect(takeaway.textContent).not.toContain("arbejde lidt længere");
+    u1();
+    // The ordinary post-stop off-track copy is untouched (default persona: lasts to 86 > plan 60).
+    const { unmount: u2 } = renderWith(OFF_TRACK);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Stopper du ved");
+    expect(screen.getByText(/arbejde lidt længere/)).toBeTruthy();
+    u2();
+  });
+
   it("on track with a plan beyond the FI search window: no 'tidligst' claim, plan reported honestly", () => {
     // The engine's earliest-FI search stops at min(lifeExpectancy, 75). A plan at 82 that holds
     // (verified through the real pipeline: on_track, earliest null) must NOT be rewritten to 75

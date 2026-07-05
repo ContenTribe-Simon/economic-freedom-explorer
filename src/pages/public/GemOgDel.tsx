@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
-import { formatDaLongDate, formatKr } from "@/lib/publicFormat";
+import { formatDaLongDate, formatKr, freedomAgeForDisplay } from "@/lib/publicFormat";
 import { shareUrlFor } from "@/lib/publicShare";
 import "./start.css";
 
@@ -65,9 +65,16 @@ export default function GemOgDel() {
 
   // Summary-preview copy from the real result (exact figures).
   const onOrTight = result.status.kind !== "off_track";
+  // Same corrected display age as the Result headline (freedomAgeForDisplay handles the engine
+  // search-floor/ceiling artifacts), so the saved/printed summary can never disagree with the
+  // result page the user just read.
   const previewHeadline = onOrTight ? (
     <>
-      Du kan stoppe ved <span className="italic text-[color:var(--fjord)]">alder {result.earliestSustainableStopAge ?? result.desiredStopAge}</span>.
+      Du kan stoppe ved{" "}
+      <span className="italic text-[color:var(--fjord)]">
+        alder {freedomAgeForDisplay(result.earliestSustainableStopAge, result.desiredStopAge)}
+      </span>
+      .
     </>
   ) : (
     <>
