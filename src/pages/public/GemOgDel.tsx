@@ -367,7 +367,7 @@ export default function GemOgDel() {
 
         <nav
           aria-label="Videre"
-          className="fm-rise mt-[clamp(26px,4vw,36px)] flex flex-wrap gap-[22px] border-t border-border pt-5"
+          className="fm-rise mb-14 mt-[clamp(26px,4vw,36px)] flex flex-wrap gap-[22px] border-t border-border pt-5"
           style={{ animationDelay: "0.2s" }}
         >
           <Link
@@ -388,24 +388,10 @@ export default function GemOgDel() {
           </Link>
         </nav>
 
-        {/* The data contract's single low-emphasis entry to the advanced surface ("The Advanced
-            door: present as a link only"). Deliberately quiet: muted, small, no icon, placed
-            after the screen's own actions. It links to /dashboard and therefore goes through
-            the Advanced door like any other advanced URL — on a fresh device the link lands on
-            the door page, never past it. The wording ("med egne tal og indstillinger") is an
-            invitation to the full tool and deliberately does NOT promise that the numbers
-            entered here carry over: /dashboard reads useFinanceStore, not usePublicStore, and
-            pre-filling it from the public flow is a considered, deferred idea (see the spec
-            doc's Advanced-door section). */}
-        <p className="mb-14 mt-4 text-[13px] leading-[1.5] text-[color:var(--ink-soft)]">
-          Der findes også en avanceret udgave af værktøjet, med egne tal og indstillinger.{" "}
-          <Link
-            to="/dashboard"
-            className="underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Avanceret
-          </Link>
-        </p>
+        {/* The advanced access point moved to the shared corner button in PublicHeader
+            (product decision 2026-07-05: one consistent treatment on every public screen, no
+            special case here). The no-carry-over clarification ("egne tal og indstillinger")
+            lives on the door page every entry passes through. */}
       </div>
     </div>
   );

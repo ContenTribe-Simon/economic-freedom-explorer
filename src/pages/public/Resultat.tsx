@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Check, Minus, Share2, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
+import { Check, Layers, Minus, Share2, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { HorizonChart } from "@/components/public/HorizonChart";
@@ -459,6 +459,15 @@ export default function Resultat() {
             <Link to="/gem-og-del">
               <Share2 aria-hidden="true" />
               Gem eller del
+            </Link>
+          </Button>
+          {/* Third action (product decision 2026-07-05): the advanced app surfaced in the
+              action row itself, alongside the corner button the header already carries.
+              Goes through the AdvancedGate door like every advanced URL. */}
+          <Button asChild variant="outline" size="lg" className="h-12 bg-card px-7 text-[15px] [&_svg]:size-[18px]">
+            <Link to="/dashboard">
+              <Layers aria-hidden="true" />
+              Avanceret model
             </Link>
           </Button>
         </div>

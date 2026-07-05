@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Compass, ShieldCheck, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AdvancedAccessButton } from "@/components/public/AdvancedAccessButton";
 import "./start.css";
 
 /**
@@ -94,6 +95,8 @@ export default function Start() {
             Frihedsmodel
           </span>
         </div>
+        {/* Same corner button as PublicHeader renders on the other three public screens. */}
+        <AdvancedAccessButton />
       </header>
 
       <main className="relative z-[2] flex flex-1 flex-col items-center justify-center px-[clamp(18px,5vw,40px)] pb-[clamp(48px,9vh,110px)] pt-[clamp(40px,8vh,96px)] text-center">

@@ -38,21 +38,18 @@ export function AdvancedGate({ children }: { children: ReactNode }) {
 function DoorPage({ onOpen }: { onOpen: () => void }) {
   const location = useLocation();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
-      <div className="w-full max-w-[540px]">
+    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12 text-foreground">
+      <div className="w-full max-w-[640px]">
         <p className="m-0 text-[12.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Frihedsmodel
         </p>
         <h1 className="mb-4 mt-2 font-display text-[clamp(30px,5vw,42px)] font-light leading-[1.12] tracking-[-0.01em]">
           Du er på vej ind i den avancerede model.
         </h1>
-        <p className="mb-3 text-[16px] leading-[1.6] text-muted-foreground">
-          Den bruger samme beregningsmodel som den enkle udgave, men viser alle detaljer og
-          indstillinger, blandt andet skat, pension i flere lag, gæld og stress-tests. Den er
-          bygget til dyb gennemgang, ikke til et hurtigt overblik.
-        </p>
-        <p className="mb-8 text-[14px] leading-[1.6] text-muted-foreground">
-          Dit valg huskes på denne enhed, så du lander direkte her næste gang.
+        <p className="mb-8 text-[16px] leading-[1.6] text-muted-foreground">
+          Samme beregningsmodel som den enkle udgave, men med alle detaljer og indstillinger,
+          og med egne tal: den starter ikke med tallene fra den enkle beregning. Den er bygget
+          til dyb gennemgang, ikke til et hurtigt overblik.
         </p>
         <div className="flex flex-wrap items-center gap-4">
           <Button size="lg" className="h-12 px-7 text-[15px] [&_svg]:size-[18px]" onClick={onOpen} data-testid="open-advanced-door">
@@ -66,8 +63,27 @@ function DoorPage({ onOpen }: { onOpen: () => void }) {
             </Link>
           </Button>
         </div>
+        <p className="mb-3 mt-8 text-[13px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Det finder du derinde
+        </p>
+        <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+          {[
+            ["Scenarier og stress-tests", "Sammenlign flere planer side om side, og se hvad der sker, hvis afkastet skuffer, eller forbruget stiger."],
+            ["Livsfaser", "Læg større hændelser ind år for år, for eksempel huskøb, deltid eller arv."],
+            ["FIRE-benchmarks", "Mål din plan mod kendte niveauer for økonomisk uafhængighed."],
+            ["Snapshots", "Frys en beregning som dokumentation, og sammenlign den med senere versioner."],
+            ["Landeanalyse", "Se hvad planen ville betyde, hvis du boede i et andet land."],
+            ["År-for-år-tabeller og rapport", "Alle tal bag kurverne, år for år, og en samlet rapport klar til print."],
+          ].map(([title, body]) => (
+            <div key={title}>
+              <dt className="text-[14px] font-semibold text-foreground">{title}</dt>
+              <dd className="m-0 mt-1 text-[13.5px] leading-[1.55] text-muted-foreground">{body}</dd>
+            </div>
+          ))}
+        </dl>
         <p className="mt-8 border-t border-border pt-4 text-[12.5px] text-muted-foreground">
-          Du bad om siden {location.pathname}. Den åbner, når du fortsætter.
+          Dit valg huskes på denne enhed, så du lander direkte derinde næste gang. Du bad om
+          siden {location.pathname}. Den åbner, når du fortsætter.
         </p>
       </div>
     </div>

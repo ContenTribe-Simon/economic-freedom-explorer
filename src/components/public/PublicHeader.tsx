@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import { AdvancedAccessButton } from "./AdvancedAccessButton";
 
 /**
  * Shared header for the public Frihedsmodel screens: brand mark + wordmark on the left,
- * an optional action (ghost link/button) on the right. Ported from the design references'
- * `.top` / `.brand` header.
+ * an optional action (ghost link/button) plus the persistent small "Avanceret" corner button
+ * on the right (product decision 2026-07-05: the advanced access point lives in the same
+ * corner on every public screen). Ported from the design references' `.top` / `.brand` header.
  */
 export function PublicHeader({ action }: { action?: ReactNode }) {
   return (
@@ -17,7 +19,10 @@ export function PublicHeader({ action }: { action?: ReactNode }) {
           Frihedsmodel
         </span>
       </div>
-      {action}
+      <div className="flex items-center gap-1.5">
+        {action}
+        <AdvancedAccessButton />
+      </div>
     </header>
   );
 }

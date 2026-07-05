@@ -136,16 +136,26 @@ is hidden/deferred. This is what a designer builds from. Copy shown is indicativ
 - **Cloud (optional) card:** "Gem i skyen" → login (Supabase). Clearly secondary; never required.
 - *Hidden/deferred:* snapshot history + comparison UI, share links, accounts-first flows.
 
-### The Advanced door (out of MVP scope, present as a link only)
-- A single low-emphasis entry ("Avanceret") that leads to the existing advanced surface
-  (scenarios, snapshots, life events, FIRE, countries, full tables). Not designed in this
-  spec — it reuses the current advanced pages until a later phase.
+### The Advanced door (access points + intro page)
+- **Decision 2026-07-05 (supersedes the earlier "single low-emphasis link on Save/Share"):**
+  the advanced surface has a persistent, small, low-key access point on EVERY public screen —
+  the same corner button ("Avanceret", ghost style, top right in the shared header) on Start,
+  Simple Inputs, Resultat and Save/Share; no special-case placement on any one screen. On
+  Resultat it is ADDITIONALLY surfaced as a third button in the bottom action row ("Avanceret
+  model", same outline style as "Gem eller del"). Discoverability only: every access point
+  links to /dashboard and passes through the AdvancedGate door exactly as any advanced URL.
+- The door page itself is a proper intro, not just consent copy: it names the advanced
+  features (scenarios/stress-tests, life events, FIRE benchmarks, snapshots, country
+  analysis, year-by-year tables + report) with one plain-Danish line each, keeps the enter
+  action unburied, and carries the no-carry-over clarification ("med egne tal", see below).
+  The advanced pages themselves reuse the current advanced surface until a later phase.
 - **Deferred (considered, not forgotten):** pre-filling the advanced app from the public flow
   — mapping the overlapping Simple Inputs fields (age, income, spending, savings, stop age,
   pension) into `useFinanceStore` before navigating. Deliberately out of MVP scope: the
   advanced model's field set is much larger, so a partial mapping risks misrepresenting the
-  user's plan as more complete than what they entered. Until then the entry's copy must NOT
-  imply that the just-entered numbers carry over ("med egne tal og indstillinger").
+  user's plan as more complete than what they entered. Until then the DOOR PAGE's copy must
+  NOT imply that the just-entered numbers carry over (it states "med egne tal: den starter
+  ikke med tallene fra den enkle beregning").
 
 ---
 
