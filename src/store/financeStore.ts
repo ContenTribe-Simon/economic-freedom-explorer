@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 import { Assumptions, LifeEvent, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
 import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
-import { buildSnapshot } from "@/lib/finance/snapshots";
+import { buildSnapshot, normalizeSnapshotEndAnchors } from "@/lib/finance/snapshots";
 import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
 import {
   CountryProfile,
@@ -202,7 +202,13 @@ export const useFinanceStore = create<FinanceState>()(
           const cls = classifyLegacyScenario(withEvents, baseScenario);
           return { ...withEvents, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
-        const importedSnapshots = Array.isArray((parsed as any).snapshots) ? ((parsed as any).snapshots as Snapshot[]) : [];
+        // Samme slut-anker-normalisering som persist-migrationen (v17): importJson er OGSÅ
+        // cloud-`loadModel()`s vej ind, og den rammer aldrig persist-migrate — uden dette ville
+        // et cloud-gemt præ-fix snapshot (lifeExpectancy > 95) fortsat vise alder-95-værdien
+        // under slutalder-labelen.
+        const importedSnapshots = Array.isArray((parsed as any).snapshots)
+          ? ((parsed as any).snapshots as Snapshot[]).map((snap) => normalizeSnapshotEndAnchors(snap))
+          : [];
         const importedCountriesRaw = Array.isArray((parsed as any).countryProfiles)
           ? (parsed as any).countryProfiles
           : null;
@@ -414,7 +420,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 16,
+      version: 17,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -594,6 +600,12 @@ export const useFinanceStore = create<FinanceState>()(
         }
         // v16: countryAnalysisSettings (analysealder/flyttetidspunkt)
         state.countryAnalysisSettings = normalizeCountryAnalysisSettings(state.countryAnalysisSettings);
+        // v17: motor-anker-fixet — gemte snapshots med lifeExpectancy > 95 har alder-95-værdien
+        // liggende under capitalAt95; omforankr slut-felterne fra snapshottets egne frosne
+        // YearRows, så gamle og nye snapshots betyder det samme under samme label.
+        if (Array.isArray(state.snapshots)) {
+          state.snapshots = state.snapshots.map((snap: Snapshot) => normalizeSnapshotEndAnchors(snap));
+        }
         return state;
       },
     },
