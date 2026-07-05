@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
-import { formatDaLongDate, formatKr, stopAgeForDisplay } from "@/lib/publicFormat";
+import { formatDaLongDate, formatKr, headlineStopAge } from "@/lib/publicFormat";
 import { shareUrlFor } from "@/lib/publicShare";
 import "./start.css";
 
@@ -65,15 +65,16 @@ export default function GemOgDel() {
 
   // Summary-preview copy from the real result (exact figures).
   const onOrTight = result.status.kind !== "off_track";
-  // Same corrected "Du kan stoppe ved" age as the Result headline (stopAgeForDisplay handles
-  // the engine search-floor/ceiling artifacts; on a tight result it is the plan, which holds —
-  // only the end target is missed), so the saved/printed summary can never disagree with the
-  // result page the user just read.
+  // Same "Du kan stoppe ved" age as the Result headline — the shared status-aware helper (the
+  // plan on tight, the corrected earliest on track), so the saved/printed summary can never
+  // disagree with the result page the user just read. A status-blind min() here once diverged:
+  // a tight plan whose goal-reaching age lay BELOW the plan printed that lower age while the
+  // Result page said the plan (CI counterexample, earliest 40 vs plan 51).
   const previewHeadline = onOrTight ? (
     <>
       Du kan stoppe ved{" "}
       <span className="italic text-[color:var(--fjord)]">
-        alder {stopAgeForDisplay(result.earliestSustainableStopAge, result.desiredStopAge)}
+        alder {headlineStopAge(result.status.kind, result.earliestSustainableStopAge, result.desiredStopAge)}
       </span>
       .
     </>

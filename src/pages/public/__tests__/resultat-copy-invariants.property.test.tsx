@@ -23,7 +23,7 @@ import Resultat from "../Resultat";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, DEFAULT_SIMPLE_INPUTS, type PublicResult, type SimplePublicInputs } from "@/lib/finance/public";
 import { sanitizeSimpleInputs } from "@/lib/publicInputs";
-import { formatKr, stopAgeForDisplay } from "@/lib/publicFormat";
+import { formatKr, headlineStopAge } from "@/lib/publicFormat";
 
 // ---------------------------------------------------------------------------
 // Generator: the reachable input space. Raw values span the §4.1 ranges (and a
@@ -46,8 +46,32 @@ const arbInputs: fc.Arbitrary<SimplePublicInputs> = fc
   })
   .map((raw) => sanitizeSimpleInputs(raw));
 
+/**
+ * CI counterexample (GitHub Actions run 28743960066 on main, fast-check seed -1890050878,
+ * shrunk): tight with the goal-reaching earliest age (40) BELOW the plan (51). Zero income,
+ * spending and savings; a 27 kr pension against a 130 kr goal. Stopping earlier ends ABOVE the
+ * goal while the plan misses it, because forced taxed pension payouts make end wealth
+ * path-dependent — "stop later = richer at the end" is NOT an engine invariant. This broke the
+ * original status-blind headline invariant and exposed a real Result-vs-summary divergence,
+ * both fixed via the shared status-aware headlineStopAge.
+ */
+const CI_TIGHT_EARLIEST_BELOW_PLAN: SimplePublicInputs = sanitizeSimpleInputs({
+  currentAge: 18,
+  lifeExpectancy: 51,
+  annualIncome: 0,
+  monthlySpending: 0,
+  currentInvestments: 0,
+  monthlySavings: 0,
+  pensionBalance: 27,
+  pensionAccessAge: 50,
+  expectedRealReturn: 0.05,
+  desiredStopAge: 51,
+  fiTargetMinNetWorth: 130,
+});
+
 // Historical Codex findings from PR #23, forced through every property on every run.
 const REGRESSION_EXAMPLES: SimplePublicInputs[] = [
+  CI_TIGHT_EARLIEST_BELOW_PLAN,
   // tight, earliest 65 > plan 64: the clamp bug (card said 64, adapter said 65).
   sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, desiredStopAge: 64, fiTargetMinNetWorth: 3_000_000 }),
   // tight, earliest null (search capped at 75): no "tidligst"/freedom-point claim allowed.
@@ -142,6 +166,7 @@ const REQUIRED_COMBOS = [
   "on_track|earliest:afterPlan|shortfall:none", // search-floor artifact (rich plan stopping at 38)
   "on_track|earliest:null|shortfall:none", // search-ceiling artifact (plan beyond 75)
   "tight|earliest:afterPlan|shortfall:none", // the 64-vs-65 clamp bug's combination
+  "tight|earliest:beforePlan|shortfall:none", // the CI counterexample's combination (path-dependent payouts)
   "tight|earliest:null|shortfall:none",
   "on_track|earliest:atPlan|shortfall:none",
   "off_track|earliest:afterPlan|shortfall:atOrAfterStop",
@@ -231,12 +256,16 @@ describe("Result screen copy invariants (property-based, real pipeline)", () => 
           if (ariaFreedom && cardAge != null) expect(Number(ariaFreedom[1])).toBe(cardAge);
 
           // ---- Headline stop-age claims ("Du kan (tidligst) stoppe …") are the shared,
-          // provable stop age — identical to what the save/PDF summary derives. ----
+          // STATUS-AWARE stop age — identical to what the save/PDF summary derives. (The
+          // original status-blind invariant expected min(earliest, plan) on tight results too;
+          // the CI counterexample — tight with earliest 40 BELOW plan 51, reachable because
+          // forced taxed pension payouts make end wealth path-dependent — showed the tight
+          // headline must claim the plan, which is what the screen deliberately does.) ----
           const h1 = container.querySelector("h1")?.textContent ?? "";
           if (r.status.kind !== "off_track") {
             const claimed = /alder (\d+)/.exec(h1);
             expect(claimed).not.toBeNull();
-            expect(Number(claimed![1])).toBe(stopAgeForDisplay(raw, plan));
+            expect(Number(claimed![1])).toBe(headlineStopAge(r.status.kind, raw, plan));
           } else {
             // Off track: the headline age is where the money runs out.
             expect(h1).toContain(`alder ${r.moneyLastsToAge}`);
@@ -328,6 +357,7 @@ describe("Result screen copy invariants (property-based, real pipeline)", () => 
         examples: [
           [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, desiredStopAge: 64, fiTargetMinNetWorth: 3_000_000 })],
           [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, desiredStopAge: 65, monthlySavings: 12_000, fiTargetMinNetWorth: 50_000_000 })],
+          [CI_TIGHT_EARLIEST_BELOW_PLAN],
         ],
       },
     );

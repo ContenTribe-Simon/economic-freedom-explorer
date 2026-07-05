@@ -6,7 +6,7 @@ import { PublicHeader } from "@/components/public/PublicHeader";
 import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
-import { formatKr, stopAgeForDisplay } from "@/lib/publicFormat";
+import { formatKr, headlineStopAge } from "@/lib/publicFormat";
 import { decodeShareInputs } from "@/lib/publicShare";
 import "./start.css";
 import "./resultat.css";
@@ -129,11 +129,11 @@ export default function Resultat() {
   const kind = result.status.kind;
   const plan = result.desiredStopAge;
   const horizonEnd = result.lifeExpectancy;
-  // The corrected "Du kan stoppe ved" headline age (engine search-floor/ceiling artifacts
-  // handled) — the SAME helper the save/PDF summary uses, so the two surfaces can never
-  // disagree. Frihedspunkt cards/markers never use this: they show the raw earliest, which on
-  // tight and off-track results is legitimately later than the plan.
-  const freedom = stopAgeForDisplay(result.earliestSustainableStopAge, plan);
+  // The "Du kan stoppe ved" headline age (status-aware: the plan on tight, the corrected
+  // earliest on track) — the SAME helper the save/PDF summary uses, so the two surfaces can
+  // never disagree. Frihedspunkt cards/markers never use this: they show the raw earliest,
+  // wherever it lies relative to the plan.
+  const freedom = headlineStopAge(kind, result.earliestSustainableStopAge, plan);
   // Every adapter value that feeds MORE than one rendered location (headline, card, chart
   // marker, aria) is computed and formatted exactly once here, and every consumer reads the
   // same constant. Re-deriving or re-formatting the same figure per location is what let the
@@ -250,11 +250,13 @@ export default function Resultat() {
     );
   } else if (kind === "tight") {
     // Tight means the plan itself HOLDS (money lasts the whole horizon) but ends under the
-    // goal, so a non-null earliestSustainableStopAge is the LATER age at which the goal is
-    // also reached — it must be shown raw, never clamped down to the plan. The headline claims
-    // the plan (the provable stop age); the Frihedspunkt card and marker show the raw later
-    // age. When the search (capped at 75) finds no such age, the freedom point is unknowable
-    // and no claim is made — the card then simply names the user's own chosen stop age.
+    // goal. A non-null earliestSustainableStopAge is then the age at which the goal IS reached
+    // — usually later than the plan, but forced taxed pension payouts make end wealth
+    // path-dependent, so it can genuinely be EARLIER too (CI counterexample: earliest 40, plan
+    // 51). Either way it is shown raw, never clamped toward the plan. The headline claims the
+    // plan (the stop age the user chose, which holds); the Frihedspunkt card and marker show
+    // the raw age. When the search (capped at 75) finds no goal-reaching age, the freedom
+    // point is unknowable and no claim is made — the card names the user's own chosen age.
     const goalAge = result.earliestSustainableStopAge;
     const markerAge = goalAge ?? plan;
     headline = (
