@@ -265,7 +265,7 @@ export default function Report() {
               ["Tidligste bæredygtige stop", kpis.earliestSustainableStopAge ? `${kpis.earliestSustainableStopAge} år` : "—"],
               ["Kapital v. stop", formatDKK(kpis.capitalAtStopAge, { compact: true })],
               ["Kapital v. 65", formatDKK(kpis.capitalAt65, { compact: true })],
-              ["Kapital v. 95", formatDKK(kpis.capitalAt95, { compact: true })],
+              ["Kapital v. slutalder", formatDKK(kpis.capitalAt95, { compact: true })],
               ["Minimumsmål v. slutalder", formatDKK(kpis.minNetWorthAtEnd, { compact: true })],
               ["Første privat cashflow-shortfall", kpis.firstShortfallAge ? `Alder ${kpis.firstShortfallAge}` : "Ingen"],
               ["Første finansieringsproblem", kpis.firstFinancingIssueAge ? `${kpis.firstFinancingIssueKind} fra alder ${kpis.firstFinancingIssueAge}` : "Ingen"],

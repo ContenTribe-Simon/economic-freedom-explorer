@@ -69,10 +69,20 @@ export default function Scenarios() {
       scenarios.map((s) => {
         const resolved = resolveScenario(s, scenarios);
         const years = project(resolved, assumptions);
-        return { scenario: s, resolved, kpis: deriveKPIs(resolved, years, assumptions) };
+        return {
+          scenario: s,
+          resolved,
+          kpis: deriveKPIs(resolved, years, assumptions),
+          lifeExpectancy: resolved.inputs.person.lifeExpectancy,
+        };
       }),
     [scenarios, assumptions],
   );
+
+  // capitalAt95 er kapital ved SCENARIETS EGEN slutalder. Når de sammenlignede scenarier har
+  // forskellige slutaldre, rangerer "bedste værdi" forskellige aldre mod hinanden — så vises
+  // alderen i cellen, og fremhævningen droppes for netop den række.
+  const sharedHorizon = new Set(rows.map((r) => r.lifeExpectancy)).size <= 1;
 
   type Metric = {
     key: string;
@@ -80,6 +90,8 @@ export default function Scenarios() {
     fmt: (v: any, k?: any) => string;
     better: "higher" | "lower";
     raw?: (k: any) => number;
+    /** Værdi målt ved scenariets egen slutalder — cellen viser alderen, og bedste-værdi-fremhævningen kræver ens slutaldre. */
+    horizonAware?: boolean;
   };
   const metrics: Metric[] = [
     {
@@ -102,7 +114,7 @@ export default function Scenarios() {
     { key: "earliestSustainableStopAge", label: "Tidligste bæredygtige stop", fmt: (v) => (v ? `${v} år` : "—"), better: "lower" },
     { key: "capitalAtStopAge", label: "Kapital v. stop", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
     { key: "capitalAt65", label: "Kapital v. 65", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
-    { key: "capitalAt95", label: "Kapital v. 95", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
+    { key: "capitalAt95", label: "Kapital v. slutalder", fmt: (v) => formatDKK(v, { compact: true }), better: "higher", horizonAware: true },
     {
       key: "cashflowShortfall",
       label: "Første privat cashflow-shortfall",
@@ -236,18 +248,29 @@ export default function Scenarios() {
             <tbody>
               {metrics.map((m) => {
                 const bestVal = best(m);
+                // En horizon-aware række sammenligner kun æbler med æbler: ved forskellige
+                // slutaldre fremhæves ingen "bedste" værdi (tallene måler forskellige aldre).
+                const comparable = !m.horizonAware || sharedHorizon;
                 return (
                   <tr key={m.key}>
-                    <td className="p-4 text-muted-foreground sticky left-0 bg-card z-10 border-t border-border">{m.label}</td>
-                    {rows.map(({ scenario, kpis }) => {
+                    <td className="p-4 text-muted-foreground sticky left-0 bg-card z-10 border-t border-border">
+                      {m.label}
+                      {m.horizonAware && !sharedHorizon && (
+                        <div className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+                          Forskellige slutaldre – bedste værdi fremhæves ikke
+                        </div>
+                      )}
+                    </td>
+                    {rows.map(({ scenario, kpis, lifeExpectancy }) => {
                       const rawVal = m.raw ? m.raw(kpis) : (kpis as any)[m.key];
-                      const isBest = bestVal !== null && rawVal === bestVal && rows.length > 1;
+                      const isBest = comparable && bestVal !== null && rawVal === bestVal && rows.length > 1;
                       return (
                         <td
                           key={scenario.id}
                           className={`p-4 text-right num border-t border-border ${isBest ? "text-accent font-semibold" : ""} ${scenario.id === activeId ? "bg-accent/5" : ""}`}
                         >
                           {m.fmt((kpis as any)[m.key], kpis)}
+                          {m.horizonAware ? ` (alder ${lifeExpectancy})` : ""}
                         </td>
                       );
                     })}

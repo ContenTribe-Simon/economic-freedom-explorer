@@ -27,12 +27,13 @@ function clamp100(n: number): number {
 /**
  * `financialRobustness` (0–100) → public score + Danish band ("Lav/Middel/Høj robusthed").
  *
- * The public score is the engine score CAPPED to the public horizon. `deriveKPIs` folds an
- * end-margin component computed from the FIXED age 95 (`yAt95`) into `financialRobustness`, which
- * can over-read for `lifeExpectancy > 95`. The shared end-of-horizon margin verdict (from the
- * LAST YearRow — the same one the status and the end-margin driver use) caps the public score:
- * `thin` stays below the top/"strong" band; `missed` caps into the "Lav" band (see
- * MISSED_ROBUSTNESS_CAP). No engine fork — a consistency cap at the public boundary.
+ * The public score is the engine score CAPPED by the shared end-of-horizon margin verdict (the
+ * same one the status and the end-margin driver use), so the band can never contradict the
+ * status story. Since the engine anchor fix, `deriveKPIs` measures the end margin at the LAST
+ * projected YearRow too (no more fixed-age-95 over-read) — the caps remain as PUBLIC BAND
+ * calibration, not as a horizon correction: the engine's own target-miss cap is <= 40, which
+ * sits in the public "Middel" band, so `missed` still needs the 39 cap to read "Lav"; `thin`
+ * stays below the top/"strong" band. No engine fork — a consistency cap at the public boundary.
  */
 export function toRobustnessScore(financialRobustness: number, endMarginVerdict?: EndMarginVerdict): PublicScore {
   let score = clamp100(financialRobustness);

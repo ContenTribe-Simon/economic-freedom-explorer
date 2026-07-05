@@ -190,14 +190,14 @@ export default function Dashboard() {
         <KPI
           label="Tidligste bæredygtige stop"
           value={kpis.earliestSustainableStopAge ? `${kpis.earliestSustainableStopAge} år` : "—"}
-          sub={`Min ved 95: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}`}
+          sub={`Min ved slutalder: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}`}
           tooltip="Tidligste alder hvor scenariet holder uden shortfall og slutter med mindst minimumsformuen."
           tone={kpis.earliestSustainableStopAge && kpis.earliestSustainableStopAge <= kpis.plannedStopAge ? "good" : "warn"}
         />
         <KPI label="Kapital v. stop" value={formatDKK(kpis.capitalAtStopAge, { compact: true })} sub={`Alder ${scenario.inputs.stopAge}`} />
         <KPI label="Kapital v. 65" value={formatDKK(kpis.capitalAt65, { compact: true })} />
         <KPI
-          label="Kapital v. 95"
+          label="Kapital v. slutalder"
           value={formatDKK(kpis.capitalAt95, { compact: true })}
           sub={`Mål: ${formatDKK(kpis.minNetWorthAtEnd, { compact: true })}${targetMissed ? ` — mangler ${formatDKK(kpis.endShortfallVsTarget, { compact: true })} ved slutalder` : " ✓"}`}
           tone={kpis.capitalAt95 > 0 && !targetMissed ? "good" : "bad"}
