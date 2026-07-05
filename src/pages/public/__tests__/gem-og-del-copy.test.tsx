@@ -9,7 +9,7 @@ import { MemoryRouter } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import GemOgDel from "../GemOgDel";
 import { usePublicStore } from "@/store/publicStore";
-import { DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
+import { computePublicResult, DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
 
 function renderScreen() {
   return render(
@@ -74,7 +74,7 @@ describe("share-link copy state", () => {
 describe("summary preview freedom age", () => {
   it("REGRESSION: the preview uses the corrected display age, matching the Result headline", () => {
     // Search-floor artifact: a rich plan stopping at 38 holds, but the raw KPI earliest is 40.
-    // The Result page displays 38 (stopAgeForDisplay); the save/PDF summary must say the
+    // The Result page displays 38 (headlineStopAge); the save/PDF summary must say the
     // same, never the raw 40.
     const rich38 = { ...DEFAULT_SIMPLE_INPUTS, currentInvestments: 10_000_000, desiredStopAge: 38 };
     usePublicStore.setState({ inputs: rich38 });
@@ -83,6 +83,41 @@ describe("summary preview freedom age", () => {
     expect(previews.length).toBeGreaterThan(0);
     for (const p of previews) {
       expect(p.textContent).toContain("alder 38");
+      expect(p.textContent).not.toContain("alder 40");
+    }
+  });
+
+  it("REGRESSION (CI counterexample): a tight plan with a goal-reaching age BELOW the plan previews the PLAN", () => {
+    // fast-check seed -1890050878 (GitHub Actions run on main after PR #24): tight, plan 51,
+    // goal-reaching earliest 40 (forced taxed pension payouts make end wealth path-dependent).
+    // The Result headline says "Du kan stoppe ved alder 51, men det er stramt"; a status-blind
+    // min() in the preview printed "alder 40" here — the exact cross-surface divergence the
+    // shared status-aware helper now prevents.
+    const ciTight = {
+      ...DEFAULT_SIMPLE_INPUTS,
+      currentAge: 18,
+      lifeExpectancy: 51,
+      annualIncome: 0,
+      monthlySpending: 0,
+      currentInvestments: 0,
+      monthlySavings: 0,
+      pensionBalance: 27,
+      pensionAccessAge: 50,
+      expectedRealReturn: 0.05,
+      desiredStopAge: 51,
+      fiTargetMinNetWorth: 130,
+    };
+    // Pin the premise through the real pipeline: tight, with the earliest BELOW the plan.
+    const r = computePublicResult(ciTight);
+    expect(r.status.kind).toBe("tight");
+    expect(r.earliestSustainableStopAge).toBe(40);
+    expect(r.desiredStopAge).toBe(51);
+    usePublicStore.setState({ inputs: ciTight });
+    renderScreen();
+    const previews = screen.getAllByText(/Du kan stoppe ved/);
+    expect(previews.length).toBeGreaterThan(0);
+    for (const p of previews) {
+      expect(p.textContent).toContain("alder 51");
       expect(p.textContent).not.toContain("alder 40");
     }
   });
