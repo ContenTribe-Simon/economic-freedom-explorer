@@ -70,3 +70,19 @@ describe("share-link copy state", () => {
     expect(screen.queryByText("Linket er kopieret")).toBeNull();
   });
 });
+
+describe("start a new calculation", () => {
+  it("REGRESSION: 'Start en ny beregning' resets the active inputs to the defaults, keeping saved entries", () => {
+    const custom = { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 777_000, desiredStopAge: 55 };
+    usePublicStore.setState({ inputs: custom });
+    usePublicStore.getState().saveCalculation("Behold mig");
+    renderScreen();
+    fireEvent.click(screen.getByRole("link", { name: /Start en ny beregning/ }));
+    const s = usePublicStore.getState();
+    // A fresh plan, not the previous numbers…
+    expect(s.inputs).toEqual(DEFAULT_SIMPLE_INPUTS);
+    // …while the explicitly saved calculation survives with its own numbers.
+    expect(s.saved).toHaveLength(1);
+    expect(s.saved[0].inputs.annualIncome).toBe(777_000);
+  });
+});

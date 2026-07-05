@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { usePublicStore } from "@/store/publicStore";
-import { computePublicResult } from "@/lib/finance/public";
+import { computePublicResult, DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
 import { formatDaLongDate, formatKr } from "@/lib/publicFormat";
 import { shareUrlFor } from "@/lib/publicShare";
 import "./start.css";
@@ -25,6 +25,7 @@ export default function GemOgDel() {
   const saveCalculation = usePublicStore((s) => s.saveCalculation);
   const removeCalculation = usePublicStore((s) => s.removeCalculation);
   const loadCalculation = usePublicStore((s) => s.loadCalculation);
+  const replaceInputs = usePublicStore((s) => s.replaceInputs);
 
   const result = useMemo(() => computePublicResult(inputs), [inputs]);
   const shareUrl = useMemo(() => shareUrlFor(inputs), [inputs]);
@@ -288,6 +289,10 @@ export default function GemOgDel() {
           </Link>
           <Link
             to="/start"
+            // "Ny beregning" must mean a fresh plan: reset the active inputs to the defaults
+            // before navigating, or the intro's "Kom i gang" would reopen the previous numbers.
+            // Saved calculations are untouched (that is what "Gem" is for).
+            onClick={() => replaceInputs({ ...DEFAULT_SIMPLE_INPUTS })}
             className="inline-flex items-center gap-[7px] whitespace-nowrap rounded-lg px-0.5 py-1 font-sans text-[14.5px] font-semibold text-[color:var(--fjord)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Start en ny beregning <ArrowRight aria-hidden="true" className="h-4 w-4" />

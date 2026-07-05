@@ -106,6 +106,18 @@ describe("Result screen states (real PublicResult data)", () => {
     expect(screen.getByText(`Frihedspunkt ${r.earliestSustainableStopAge}`)).toBeTruthy();
   });
 
+  it("on track below the engine's search floor: the headline never claims 'tidligst' above a working plan", () => {
+    // The engine's FI search has a floor of age 40, so a rich plan stopping at 38 is on track
+    // while the KPI reports earliest 40 — the headline must show the working plan age, not a
+    // later "earliest" (verified against the real pipeline).
+    const rich38: SimplePublicInputs = { ...DEFAULT_SIMPLE_INPUTS, currentInvestments: 10_000_000, desiredStopAge: 38 };
+    const r = computePublicResult(rich38);
+    expect(r.status.kind).toBe("on_track");
+    expect(r.earliestSustainableStopAge).toBe(40); // the search-floor artifact this guards against
+    renderWith(rich38);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("alder 38");
+  });
+
   it("off track with NO sustainable stop age: marker omitted and aria says so", () => {
     const noFreedom: SimplePublicInputs = {
       ...DEFAULT_SIMPLE_INPUTS,

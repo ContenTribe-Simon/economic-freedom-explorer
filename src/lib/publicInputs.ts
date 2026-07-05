@@ -40,7 +40,13 @@ export function sanitizeSimpleInputs(raw: Partial<Record<keyof SimplePublicInput
     pensionBalance: num(raw.pensionBalance, d.pensionBalance, 0, 50_000_000),
     pensionAccessAge: Math.round(num(raw.pensionAccessAge, d.pensionAccessAge, 50, 80)),
     expectedRealReturn: num(raw.expectedRealReturn, d.expectedRealReturn, 0, 0.1),
-    desiredStopAge: Math.round(num(raw.desiredStopAge, d.desiredStopAge, currentAge, lifeExpectancy)),
+    // The stop-age ceiling is the ENGINE's FI-search ceiling, not the raw horizon: the
+    // earliest-sustainable-stop-age KPI only searches candidate stop ages up to
+    // min(lifeExpectancy, 75) (findEarliestSustainableStopAge), so accepting a later desired
+    // stop age would make the Frihedspunkt headline understate for stop ages 76+. Keep the
+    // public range aligned with what the engine can actually answer; if Phase 7 extends the
+    // engine's search window, lift this cap with it.
+    desiredStopAge: Math.round(num(raw.desiredStopAge, d.desiredStopAge, currentAge, Math.min(lifeExpectancy, 75))),
   };
   const goal = num(raw.fiTargetMinNetWorth, 0, 0, 50_000_000);
   if (goal > 0) out.fiTargetMinNetWorth = goal;

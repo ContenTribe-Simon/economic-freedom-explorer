@@ -129,7 +129,11 @@ export default function Resultat() {
   const kind = result.status.kind;
   const plan = result.desiredStopAge;
   const horizonEnd = result.lifeExpectancy;
-  const freedom = result.earliestSustainableStopAge ?? plan;
+  // Never claim a "tidligst" ABOVE a plan that demonstrably holds: the engine's FI search has a
+  // floor of age 40, so for an on-track plan below 40 the KPI can report an "earliest" later
+  // than the working plan itself. On track means the plan holds, so the true earliest is <= plan;
+  // min() keeps the headline truthful without touching the engine. (Off track uses its own path.)
+  const freedom = Math.min(result.earliestSustainableStopAge ?? plan, plan);
   const capitalAtStop = formatKr(result.capitalAtStopAge);
   const hasGoal = (inputs.fiTargetMinNetWorth ?? 0) > 0;
 
