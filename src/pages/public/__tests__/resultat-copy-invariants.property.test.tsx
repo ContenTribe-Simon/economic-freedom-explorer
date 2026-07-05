@@ -24,6 +24,7 @@ import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, DEFAULT_SIMPLE_INPUTS, type PublicResult, type SimplePublicInputs } from "@/lib/finance/public";
 import { sanitizeSimpleInputs } from "@/lib/publicInputs";
 import { formatKr, headlineStopAge } from "@/lib/publicFormat";
+import { deriveSavingsSensitivity, SAVINGS_SENSITIVITY_STEP } from "@/lib/publicSensitivity";
 
 // ---------------------------------------------------------------------------
 // Generator: the reachable input space. Raw values span the §4.1 ranges (and a
@@ -287,6 +288,15 @@ describe("Result screen copy invariants (property-based, real pipeline)", () => 
             expect(text).toContain(`Alder ${r.bottleneck.firstShortfallAge}`);
           }
 
+          // ---- Sensitivity helper: single-sourced from the derivation — the page shows
+          // exactly the derived sentence, or nothing when the derivation declines. ----
+          const sens = deriveSavingsSensitivity(inputs, r);
+          if (sens != null) {
+            expect(text).toContain(sens.text);
+          } else {
+            expect(text).not.toContain("Hvis du sparer 1.000 kr mere op om måneden");
+          }
+
           // ---- Copy rules hold for EVERY generated input, not just fixtures. ----
           expect(text).not.toMatch(/\bca\.\s/i);
           expect(text).not.toContain("—");
@@ -358,6 +368,107 @@ describe("Result screen copy invariants (property-based, real pipeline)", () => 
           [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, desiredStopAge: 64, fiTargetMinNetWorth: 3_000_000 })],
           [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, desiredStopAge: 65, monthlySavings: 12_000, fiTargetMinNetWorth: 50_000_000 })],
           [CI_TIGHT_EARLIEST_BELOW_PLAN],
+        ],
+      },
+    );
+  }, PROPERTY_TIMEOUT);
+
+  it("the sensitivity helper's claim is TRUE against an independent perturbed pipeline run", () => {
+    // The scope doc's medium-risk flag: sensitivity must reuse the engine, not approximate it.
+    // For every input, whatever sentence the helper produces is re-verified here against a
+    // FRESH computePublicResult of the perturbed inputs — the claim can never drift from what
+    // the engine actually says. When the helper declines (null), that must be for one of the
+    // documented reasons, never because a squarely claimable improvement was dropped.
+    const roomBase = { ...DEFAULT_SIMPLE_INPUTS, monthlySpending: 15_000, monthlySavings: 2_000, desiredStopAge: 67 };
+    fc.assert(
+      fc.property(arbInputs, (inputs) => {
+        const b = computePublicResult(inputs);
+        const s = deriveSavingsSensitivity(inputs, b);
+        const saturated = b.warnings.some((w) => w.id === "planned-over-cashflow");
+        const stepFits = inputs.monthlySavings + SAVINGS_SENSITIVITY_STEP <= 500_000;
+        if (s == null) {
+          if (!saturated && stepFits) {
+            // Only an unclaimable movement may be hidden: a downgrade, a worsening, or an
+            // earlier-stop that would rest on an unknowable earliest.
+            const fresh = computePublicResult(
+              sanitizeSimpleInputs({ ...inputs, monthlySavings: inputs.monthlySavings + SAVINGS_SENSITIVITY_STEP }),
+            );
+            const bAge = headlineStopAge(b.status.kind, b.earliestSustainableStopAge, b.desiredStopAge);
+            const fAge = headlineStopAge(fresh.status.kind, fresh.earliestSustainableStopAge, fresh.desiredStopAge);
+            const coveredFlip =
+              (b.status.kind === "off_track" && fresh.status.kind !== "off_track") ||
+              (b.status.kind === "tight" && fresh.status.kind === "on_track");
+            const weird =
+              (fresh.status.kind !== b.status.kind && !coveredFlip) ||
+              (b.status.kind === "off_track" && fresh.moneyLastsToAge < b.moneyLastsToAge) ||
+              (b.status.kind === "on_track" &&
+                fAge !== bAge &&
+                !(b.earliestSustainableStopAge != null && fresh.earliestSustainableStopAge != null && fAge < bAge)) ||
+              (b.status.kind === "on_track" &&
+                fAge < bAge &&
+                (b.earliestSustainableStopAge == null || fresh.earliestSustainableStopAge == null)) ||
+              (b.status.kind === "tight" &&
+                (Math.round(fresh.capitalAtEndOfHorizon - b.capitalAtEndOfHorizon) < 0 ||
+                  (Math.round(fresh.capitalAtEndOfHorizon - b.capitalAtEndOfHorizon) === 0 && fAge !== bAge)));
+            expect(weird, "helper hidden without a documented reason").toBe(true);
+          }
+          return;
+        }
+
+        const fresh = computePublicResult(
+          sanitizeSimpleInputs({ ...inputs, monthlySavings: inputs.monthlySavings + SAVINGS_SENSITIVITY_STEP }),
+        );
+        const t = s.text;
+        expect(t.startsWith("Hvis du sparer 1.000 kr mere op om måneden, ")).toBe(true);
+        expect(t).not.toMatch(/\bca\.\s/i);
+        expect(t).not.toContain("—");
+
+        const instead = /alder (\d+) i stedet for (\d+)/.exec(t);
+        if (t.includes("rækker pengene til alder")) {
+          expect(Number(instead![1])).toBe(fresh.moneyLastsToAge);
+          expect(Number(instead![2])).toBe(b.moneyLastsToAge);
+          expect(fresh.moneyLastsToAge).toBeGreaterThan(b.moneyLastsToAge);
+        } else if (t.includes("tidligst stoppe ved alder")) {
+          expect(Number(instead![1])).toBe(headlineStopAge(fresh.status.kind, fresh.earliestSustainableStopAge, fresh.desiredStopAge));
+          expect(Number(instead![2])).toBe(headlineStopAge(b.status.kind, b.earliestSustainableStopAge, b.desiredStopAge));
+          expect(Number(instead![1])).toBeLessThan(Number(instead![2]));
+        } else if (t.includes("hele vejen til")) {
+          expect(b.status.kind).toBe("off_track");
+          expect(fresh.moneyLastsToAge).toBe(fresh.lifeExpectancy);
+          expect(fresh.status.kind).toBe(t.includes("under dit mål") ? "tight" : "on_track");
+        } else if (t.includes("når du dit mål")) {
+          expect(b.status.kind).toBe("tight");
+          expect(fresh.status.kind).toBe("on_track");
+          expect(t).toContain(formatKr(inputs.fiTargetMinNetWorth ?? 0));
+        } else if (t.includes("tættere på dit mål")) {
+          expect(b.status.kind).toBe("tight");
+          expect(fresh.status.kind).toBe("tight");
+          expect(t).toContain(formatKr(Math.round(fresh.capitalAtEndOfHorizon - b.capitalAtEndOfHorizon)));
+        } else {
+          expect(t).toContain("ændrer det ikke svaret her.");
+          expect(fresh.status.kind).toBe(b.status.kind);
+          if (b.status.kind === "off_track") {
+            expect(fresh.moneyLastsToAge).toBe(b.moneyLastsToAge);
+          } else {
+            expect(headlineStopAge(fresh.status.kind, fresh.earliestSustainableStopAge, fresh.desiredStopAge)).toBe(
+              headlineStopAge(b.status.kind, b.earliestSustainableStopAge, b.desiredStopAge),
+            );
+          }
+        }
+      }),
+      {
+        numRuns: 80,
+        examples: [
+          // Every claim branch exercised deterministically (fixtures verified in
+          // public-sensitivity.test.tsx): off improvement, off->on flip, on earlier stop,
+          // tight gain, tight->on flip, saturated default (hidden), step-does-not-fit (hidden).
+          [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, monthlySpending: 18_000, monthlySavings: 2_000 })],
+          [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, monthlySpending: 17_500, monthlySavings: 2_000, desiredStopAge: 66 })],
+          [sanitizeSimpleInputs(roomBase)],
+          [sanitizeSimpleInputs({ ...roomBase, fiTargetMinNetWorth: 30_000_000 })],
+          [sanitizeSimpleInputs({ ...roomBase, fiTargetMinNetWorth: 162_425 })],
+          [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS })],
+          [sanitizeSimpleInputs({ ...roomBase, monthlySavings: 499_500 })],
         ],
       },
     );
