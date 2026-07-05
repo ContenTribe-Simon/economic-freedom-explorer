@@ -388,11 +388,14 @@ describe("Result screen copy invariants (property-based, real pipeline)", () => 
         const stepFits = inputs.monthlySavings + SAVINGS_SENSITIVITY_STEP <= 500_000;
         if (s == null) {
           if (!saturated && stepFits) {
-            // Only an unclaimable movement may be hidden: a downgrade, a worsening, or an
-            // earlier-stop that would rest on an unknowable earliest.
+            // Only an unclaimable movement may be hidden: the PERTURBED run crossing the
+            // cashflow ceiling (the engine then applies less than the stated step — Codex
+            // finding), a downgrade, a worsening, or an earlier-stop that would rest on an
+            // unknowable earliest.
             const fresh = computePublicResult(
               sanitizeSimpleInputs({ ...inputs, monthlySavings: inputs.monthlySavings + SAVINGS_SENSITIVITY_STEP }),
             );
+            if (fresh.warnings.some((w) => w.id === "planned-over-cashflow")) return;
             const bAge = headlineStopAge(b.status.kind, b.earliestSustainableStopAge, b.desiredStopAge);
             const fAge = headlineStopAge(fresh.status.kind, fresh.earliestSustainableStopAge, fresh.desiredStopAge);
             const coveredFlip =
@@ -469,6 +472,8 @@ describe("Result screen copy invariants (property-based, real pipeline)", () => 
           [sanitizeSimpleInputs({ ...roomBase, fiTargetMinNetWorth: 162_425 })],
           [sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS })],
           [sanitizeSimpleInputs({ ...roomBase, monthlySavings: 499_500 })],
+          // Baseline fits, +1.000 crosses the cashflow ceiling (hidden — Codex regression).
+          [sanitizeSimpleInputs({ ...roomBase, monthlySavings: 10_500 })],
         ],
       },
     );

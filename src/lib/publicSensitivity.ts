@@ -21,6 +21,9 @@ import { formatKr, headlineStopAge } from "@/lib/publicFormat";
  *    inert (the model already cannot fit the PLANNED savings), and that warning owns the
  *    story — "1.000 kr more changes nothing" next to it would invite the misreading that
  *    saving is pointless;
+ *  - when the PERTURBED run carries that warning: the current savings fit, but +1.000 crosses
+ *    the modeled cashflow ceiling, so the engine caps the actually-invested amount below the
+ *    full step — no sentence about "1.000 kr mere" would describe what was modeled;
  *  - when the +1.000 step does not fit inside the input range (monthlySavings near the
  *    500.000 cap): the sanitized perturbation would test a smaller step than the sentence
  *    claims;
@@ -45,6 +48,11 @@ export function deriveSavingsSensitivity(inputs: SimplePublicInputs, baseline: P
   const perturbed = computePublicResult(
     sanitizeSimpleInputs({ ...inputs, monthlySavings: inputs.monthlySavings + SAVINGS_SENSITIVITY_STEP }),
   );
+  // The PERTURBED run must fit inside the modeled cashflow too: if adding the 1.000 kr pushes
+  // the plan over the ceiling, the model caps what is actually invested below the full step —
+  // the sentence would then claim a lever the engine never applied. Same reasoning as the
+  // baseline check above (Codex finding).
+  if (perturbed.warnings.some((w) => w.id === "planned-over-cashflow")) return null;
   const prefix = "Hvis du sparer 1.000 kr mere op om måneden, ";
   const b = baseline;
   const p = perturbed;

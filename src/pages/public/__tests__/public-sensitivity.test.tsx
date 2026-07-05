@@ -67,6 +67,19 @@ describe("deriveSavingsSensitivity claims (real pipeline, exact sentences)", () 
     expect(claim).toBeNull();
   });
 
+  it("REGRESSION: HIDDEN when the CURRENT savings fit but +1.000 crosses the cashflow ceiling", () => {
+    // Codex: only the baseline was checked. Probed ceiling for this persona: 10.500 fits,
+    // 11.000 is over — so baseline 10.500 is warning-free while the perturbed 11.500 carries
+    // planned-over-cashflow, meaning the engine capped the applied step below 1.000 kr. Any
+    // sentence claiming the full lever would describe a run the model never made.
+    const raw = { ...ROOM, monthlySavings: 10_500 };
+    const { baseline, claim } = derive(raw);
+    expect(baseline.warnings.some((w) => w.id === "planned-over-cashflow")).toBe(false); // fits today
+    const perturbed = computePublicResult(sanitizeSimpleInputs({ ...raw, monthlySavings: 11_500 }));
+    expect(perturbed.warnings.some((w) => w.id === "planned-over-cashflow")).toBe(true); // +1.000 crosses
+    expect(claim).toBeNull();
+  });
+
   it("copy rules hold: no 'ca.', no em dashes, exact figures only", () => {
     for (const raw of [
       { ...DEFAULT_SIMPLE_INPUTS, monthlySpending: 18_000, monthlySavings: 2_000 },
