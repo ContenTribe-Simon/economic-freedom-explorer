@@ -790,6 +790,11 @@ export interface KPIs {
   earliestSustainableStopAge: number | null;
   capitalAtStopAge: number;
   capitalAt65: number;
+  /**
+   * Nettoformue ved SLUTALDEREN (sidste projicerede YearRow, alder = lifeExpectancy).
+   * Historisk feltnavn bevaret af hensyn til gemte snapshots; værdien har altid været sidste
+   * række for lifeExpectancy <= 95 og er nu også horizon-korrekt for lifeExpectancy > 95.
+   */
   capitalAt95: number;
   firstShortfallAge: number | null;
   monthlyGapAfterStop: number;

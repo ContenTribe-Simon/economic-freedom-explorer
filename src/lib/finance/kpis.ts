@@ -59,7 +59,13 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   const stopAge = scenario.inputs.stopAge;
   const yAtStop = years.find((y) => y.age === stopAge);
   const yAt65 = years.find((y) => y.age === 65);
-  const yAt95 = years.find((y) => y.age === 95) ?? years[years.length - 1];
+  // End-of-horizon anchor: the LAST projected YearRow, i.e. age === lifeExpectancy. This was
+  // previously `find(age === 95) ?? last`, which silently anchored every end-horizon figure
+  // (end margin, target check, holding share, capitalAt95) at the INTERIOR age 95 whenever
+  // lifeExpectancy > 95 — contradicting the real horizon the target is defined against
+  // ("Mindste nettoformue ved alder {lifeExpectancy}"). For lifeExpectancy <= 95 the old
+  // fallback already returned the last row, so those horizons are unchanged by this fix.
+  const yEnd = years[years.length - 1];
 
   const firstShort = years.find((y) => y.shortfall);
   const afterStopYears = years.filter((y) => y.age >= stopAge);
@@ -113,16 +119,16 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   cashflowScore = Math.max(0, cashflowScore);
 
   // 2) End margin vs minimum (25)
-  const endMargin = (yAt95.netWorth - minRequired) / Math.max(1, annualSpend * 5);
-  const targetMissedRatio = minRequired > 0 ? Math.max(0, minRequired - yAt95.netWorth) / minRequired : 0;
-  const targetMissed = yAt95.netWorth + 0.5 < minRequired;
+  const endMargin = (yEnd.netWorth - minRequired) / Math.max(1, annualSpend * 5);
+  const targetMissedRatio = minRequired > 0 ? Math.max(0, minRequired - yEnd.netWorth) / minRequired : 0;
+  const targetMissed = yEnd.netWorth + 0.5 < minRequired;
   let endScore: number;
   if (targetMissed) {
     endScore = 0;
-    const missing = Math.max(0, minRequired - yAt95.netWorth);
+    const missing = Math.max(0, minRequired - yEnd.netWorth);
     criticalFactors.push({
       label: `Minimumsmål ikke opfyldt – mangler ${Math.round(missing).toLocaleString("da-DK")} kr`,
-      detail: `Slutformue ved alder 95 ligger ${Math.round(targetMissedRatio * 100)} % under minimumsmålet. Kritisk negativ effekt.`,
+      detail: `Slutformue ved alder ${yEnd.age} ligger ${Math.round(targetMissedRatio * 100)} % under minimumsmålet. Kritisk negativ effekt.`,
       impact: "negative",
       magnitude: "critical",
     });
@@ -145,8 +151,8 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   }
 
   // 3) Stress / sårbarhed (20)
-  const totalEnd = Math.max(1, yAt95.closing.free + yAt95.closing.pension + yAt95.closing.holding);
-  const holdingShare = yAt95.closing.holding / totalEnd;
+  const totalEnd = Math.max(1, yEnd.closing.free + yEnd.closing.pension + yEnd.closing.holding);
+  const holdingShare = yEnd.closing.holding / totalEnd;
   let stressScore = 100 - holdingShare * 60;
   const stressLabel = holdingShare > 0.4
     ? "Høj afhængighed af holdingværdi"
@@ -300,7 +306,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     return `Scenariet afhænger især af ${worst.label.toLowerCase()} (${LEVEL_LABELS[worst.level].toLowerCase()}).`;
   })();
 
-  const endShortfallVsTarget = Math.max(0, minRequired - yAt95.netWorth);
+  const endShortfallVsTarget = Math.max(0, minRequired - yEnd.netWorth);
 
   // Holding finansiering
   let unfinancedHoldingDebt = 0;
@@ -354,7 +360,10 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
     earliestSustainableStopAge: earliest,
     capitalAtStopAge: yAtStop?.netWorth ?? 0,
     capitalAt65: yAt65?.netWorth ?? 0,
-    capitalAt95: yAt95.netWorth,
+    // Historical field name kept for persisted-snapshot compatibility; the VALUE is the net
+    // worth at the end of the projected horizon (the last YearRow), which for
+    // lifeExpectancy <= 95 is exactly what the old fallback produced.
+    capitalAt95: yEnd.netWorth,
     firstShortfallAge: firstShort?.age ?? null,
     monthlyGapAfterStop: avgGap,
     financialRobustness: financial,
