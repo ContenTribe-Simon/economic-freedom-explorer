@@ -463,9 +463,12 @@ export default function Resultat() {
           </Button>
         </div>
 
+        {/* Share-link recipients land HERE first (never Start/Simple Inputs), so the footer
+            carries the real-terms note alongside the canonical disclaimer, same combined
+            pattern as GemOgDel's. */}
         <p className="mb-14 mt-4 max-w-[58em] border-t border-border pt-[18px] text-[13px] leading-[1.55] text-[color:var(--ink-soft)]">
           En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret
-          billede, ikke en garanti, og ikke som økonomisk rådgivning.
+          billede, ikke en garanti, og ikke som økonomisk rådgivning. Alle beløb er i nutidskroner.
         </p>
       </div>
     </div>

@@ -24,7 +24,9 @@ const POINTS = [
   {
     icon: ShieldCheck,
     title: "Ikke rådgivning",
-    help: "Et kvalificeret billede, ikke økonomisk rådgivning.",
+    // No paraphrase of the canonical disclaimer here: the trust strip below carries the exact
+    // global text (spec Screen A), and near-variants of it are what the copy rule forbids.
+    help: "Værktøjet regner på dine tal. Beslutningerne er dine.",
   },
 ] as const;
 
@@ -144,6 +146,17 @@ export default function Start() {
           </div>
         </div>
       </main>
+
+      {/* Trust strip (persistent, spec Screen A): the single global disclaimer VERBATIM plus
+          the real-terms note — same canonical text as Simple Inputs, Resultat and GemOgDel,
+          never a paraphrase, and never buried in a tooltip. */}
+      <footer className="relative z-[2] px-[clamp(18px,5vw,40px)] pb-6">
+        <p className="mx-auto m-0 max-w-[58em] border-t border-border pt-[14px] text-center text-[13px] leading-[1.55] text-[color:var(--ink-soft)]">
+          En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et
+          kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning. Alle beløb er
+          i nutidskroner.
+        </p>
+      </footer>
     </div>
   );
 }
