@@ -186,6 +186,12 @@ describe("the low-emphasis 'Avanceret' entry (data contract: The Advanced door, 
     // Links to an advanced URL: the route sits behind the AdvancedGate, so on a fresh device
     // this lands on the door page (covered end-to-end in e2e/smoke.spec.ts).
     expect(link.getAttribute("href")).toBe("/dashboard");
+    // The copy is an invitation to the SEPARATE full tool ("med egne tal og indstillinger")
+    // and must not promise that the just-entered numbers carry over — /dashboard reads
+    // useFinanceStore, not usePublicStore (Codex finding; mapping deferred, see the spec
+    // doc's Advanced-door section).
+    expect(link.parentElement?.textContent).toContain("med egne tal og indstillinger");
+    expect(link.parentElement?.textContent).not.toContain("dine tal");
     // Low-emphasis: part of the on-screen chrome (print-hidden), not the printed summary.
     const chrome = container.querySelector(".print\\:hidden");
     expect(chrome?.contains(link)).toBe(true);

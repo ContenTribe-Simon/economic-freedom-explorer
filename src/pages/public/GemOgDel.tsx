@@ -392,9 +392,13 @@ export default function GemOgDel() {
             door: present as a link only"). Deliberately quiet: muted, small, no icon, placed
             after the screen's own actions. It links to /dashboard and therefore goes through
             the Advanced door like any other advanced URL — on a fresh device the link lands on
-            the door page, never past it. */}
+            the door page, never past it. The wording ("med egne tal og indstillinger") is an
+            invitation to the full tool and deliberately does NOT promise that the numbers
+            entered here carry over: /dashboard reads useFinanceStore, not usePublicStore, and
+            pre-filling it from the public flow is a considered, deferred idea (see the spec
+            doc's Advanced-door section). */}
         <p className="mb-14 mt-4 text-[13px] leading-[1.5] text-[color:var(--ink-soft)]">
-          Vil du arbejde med alle detaljer og indstillinger?{" "}
+          Der findes også en avanceret udgave af værktøjet, med egne tal og indstillinger.{" "}
           <Link
             to="/dashboard"
             className="underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
