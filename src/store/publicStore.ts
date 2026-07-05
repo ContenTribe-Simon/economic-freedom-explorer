@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { DEFAULT_SIMPLE_INPUTS, type SimplePublicInputs } from "@/lib/finance/public";
+import { sanitizeSimpleInputs } from "@/lib/publicInputs";
 
 /**
  * State for the public Frihedsmodel flow (Simple Inputs → Result → Save/Share).
@@ -45,8 +46,11 @@ export const usePublicStore = create<PublicState>()(
   persist(
     (set, get) => ({
       inputs: { ...DEFAULT_SIMPLE_INPUTS },
-      setInputs: (patch) => set((s) => ({ inputs: { ...s.inputs, ...patch } })),
-      replaceInputs: (inputs) => set({ inputs: { ...inputs } }),
+      // Every write is sanitized (spec §4.1 ranges + cross-field rules): a patch that moves
+      // currentAge past the stored horizon re-clamps lifeExpectancy/desiredStopAge too, and
+      // out-of-range or non-finite values (negative paste, NaN) never reach the store.
+      setInputs: (patch) => set((s) => ({ inputs: sanitizeSimpleInputs({ ...s.inputs, ...patch }) })),
+      replaceInputs: (inputs) => set({ inputs: sanitizeSimpleInputs({ ...inputs }) }),
       saved: [],
       saveCalculation: (name) => {
         const clean = name.trim() || "Min plan";
@@ -63,10 +67,23 @@ export const usePublicStore = create<PublicState>()(
       loadCalculation: (id) => {
         const entry = get().saved.find((c) => c.id === id);
         if (!entry) return false;
-        set({ inputs: { ...entry.inputs } });
+        set({ inputs: sanitizeSimpleInputs({ ...entry.inputs }) });
         return true;
       },
     }),
-    { name: "frihedsmodel-public.v1" },
+    {
+      name: "frihedsmodel-public.v1",
+      // Rehydration is a write path too: legacy/hand-edited localStorage must not smuggle an
+      // invalid input set past the sanitizer.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<PublicState>;
+        return {
+          ...current,
+          ...p,
+          inputs: sanitizeSimpleInputs({ ...(p.inputs ?? current.inputs) }),
+          saved: Array.isArray(p.saved) ? p.saved : current.saved,
+        };
+      },
+    },
   ),
 );

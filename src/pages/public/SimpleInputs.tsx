@@ -89,8 +89,12 @@ function NumField({
           min={0}
           value={value}
           onChange={(e) => {
+            // Clamp in the handler itself: `min={0}` on a native number input is cosmetic
+            // (marks :invalid, never blocks the value), and the CTA is a Link, so constraint
+            // validation would never fire. NaN (cleared field / bad paste) becomes 0. The
+            // store sanitizer re-clamps to the spec §4.1 maxima as the hard boundary.
             const n = e.target.valueAsNumber;
-            onChange(Number.isFinite(n) ? n : 0);
+            onChange(Number.isFinite(n) ? Math.max(0, n) : 0);
           }}
           className="bg-white pr-12 text-[15px]"
         />
@@ -234,7 +238,9 @@ export default function SimpleInputs() {
               tip="Den alder planen skal nå. Vælg gerne lidt højt, så pengene rækker hele livet."
               help="Mange regner med 90."
               value={inputs.lifeExpectancy}
-              min={70}
+              // The horizon must stay beyond the current age (a shorter horizon would leave the
+              // projection empty); the store sanitizer enforces the same rule on every write.
+              min={Math.max(70, inputs.currentAge + 1)}
               max={105}
               step={1}
               onChange={(v) => set({ lifeExpectancy: v })}
@@ -314,7 +320,9 @@ export default function SimpleInputs() {
               label="Ønsket stop-alder"
               tip="Den alder, du gerne vil stoppe med at arbejde. Vi viser, om tallene rækker."
               value={inputs.desiredStopAge}
-              min={40}
+              // The stop age tracks the spec range currentAge–lifeExpectancy; the store
+              // sanitizer enforces the same rule on every write.
+              min={Math.max(40, inputs.currentAge)}
               max={75}
               step={1}
               onChange={(v) => set({ desiredStopAge: v })}

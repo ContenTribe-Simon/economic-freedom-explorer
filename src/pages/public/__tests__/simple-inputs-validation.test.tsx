@@ -1,0 +1,174 @@
+/**
+ * Simple Inputs validation — regression tests for two BUG CLASSES (Codex review, PR #23):
+ *
+ * Class 1 — cross-field range dependencies: fields whose valid range depends on another field's
+ * CURRENT value. Audited pairs: currentAge↔lifeExpectancy (crash when violated: zero YearRows →
+ * deriveKPIs dereference), currentAge/lifeExpectancy↔desiredStopAge (spec §4.1 range
+ * currentAge–lifeExpectancy). pensionAccessAge is deliberately fixed-range (50–80): out-of-horizon
+ * access ages are handled by the adapter (card omitted), no crash path.
+ *
+ * Class 2 — unclamped numeric writes: `min={0}` on a native number input is cosmetic (marks
+ * :invalid, never blocks), so every write path must clamp in code. All writes go through the
+ * store's sanitizer (setInputs / replaceInputs / loadCalculation / persist-rehydrate / share
+ * decode), plus the form clamps negatives in its own onChange.
+ */
+import { describe, expect, it, beforeEach } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import SimpleInputs from "../SimpleInputs";
+import { usePublicStore } from "@/store/publicStore";
+import { computePublicResult, DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
+import { sanitizeSimpleInputs } from "@/lib/publicInputs";
+import { decodeShareInputs, encodeShareInputs } from "@/lib/publicShare";
+
+const store = () => usePublicStore.getState();
+
+beforeEach(() => {
+  usePublicStore.setState({ inputs: { ...DEFAULT_SIMPLE_INPUTS }, saved: [] });
+});
+
+describe("class 1: cross-field range dependencies", () => {
+  it("REGRESSION (P1 crash): currentAge past lifeExpectancy can no longer reach the pipeline", () => {
+    // The raw invalid combination genuinely crashes the pipeline — pin the hazard itself…
+    expect(() => computePublicResult({ ...DEFAULT_SIMPLE_INPUTS, currentAge: 75, lifeExpectancy: 70 })).toThrow();
+    // …and the store now makes it unrepresentable, whichever side moves.
+    store().replaceInputs({ ...DEFAULT_SIMPLE_INPUTS, currentAge: 75, lifeExpectancy: 70 });
+    expect(store().inputs.lifeExpectancy).toBeGreaterThanOrEqual(store().inputs.currentAge + 1);
+    const result = computePublicResult(store().inputs);
+    expect(result.netWorthByAge.length).toBeGreaterThan(0);
+  });
+
+  it("lifeExpectancy clamps against currentAge when the horizon itself changes", () => {
+    store().setInputs({ currentAge: 65 });
+    store().setInputs({ lifeExpectancy: 60 });
+    expect(store().inputs.lifeExpectancy).toBe(66);
+  });
+
+  it("lifeExpectancy re-clamps when currentAge moves out from under a previously valid value", () => {
+    store().setInputs({ lifeExpectancy: 70 }); // valid while currentAge is 35
+    expect(store().inputs.lifeExpectancy).toBe(70);
+    store().setInputs({ currentAge: 75 }); // horizon must follow
+    expect(store().inputs.currentAge).toBe(75);
+    expect(store().inputs.lifeExpectancy).toBeGreaterThanOrEqual(76);
+    expect(() => computePublicResult(store().inputs)).not.toThrow();
+  });
+
+  it("desiredStopAge stays within [currentAge, lifeExpectancy] from both directions", () => {
+    store().setInputs({ desiredStopAge: 40 }); // valid while currentAge is 35
+    store().setInputs({ currentAge: 70 }); // stop age must follow the current age up
+    expect(store().inputs.desiredStopAge).toBeGreaterThanOrEqual(70);
+    store().replaceInputs({ ...DEFAULT_SIMPLE_INPUTS, desiredStopAge: 100 }); // above the horizon
+    expect(store().inputs.desiredStopAge).toBeLessThanOrEqual(store().inputs.lifeExpectancy);
+  });
+
+  it("the two age sliders expose the dependent minimum to assistive tech", () => {
+    usePublicStore.setState({ inputs: sanitizeSimpleInputs({ ...DEFAULT_SIMPLE_INPUTS, currentAge: 75 }) });
+    render(
+      <TooltipProvider>
+        <MemoryRouter>
+          <SimpleInputs />
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    const mins = screen.getAllByRole("slider").map((el) => el.getAttribute("aria-valuemin"));
+    expect(mins).toContain("76"); // Planlæg til alder: min = currentAge + 1
+    expect(mins).toContain("75"); // Ønsket stop-alder: min = currentAge
+  });
+});
+
+describe("class 2: every numeric write is clamped in code (not just min= attributes)", () => {
+  // Field-by-field audit table: [field, negative probe, expected min, over-max probe, expected max]
+  const MONEY_FIELDS = [
+    ["annualIncome", -5_000, 0, 99_000_000, 5_000_000],
+    ["monthlySpending", -1, 0, 999_999, 200_000],
+    ["currentInvestments", -200_000, 0, 90_000_000, 50_000_000],
+    ["monthlySavings", -8_000, 0, 700_000, 500_000],
+    ["pensionBalance", -300_000, 0, 90_000_000, 50_000_000],
+  ] as const;
+
+  it.each(MONEY_FIELDS)("%s clamps negatives and the spec §4.1 maximum", (field, neg, min, big, max) => {
+    store().setInputs({ [field]: neg });
+    expect(store().inputs[field]).toBe(min);
+    store().setInputs({ [field]: big });
+    expect(store().inputs[field]).toBe(max);
+  });
+
+  it("age and rate fields clamp to their spec ranges", () => {
+    store().setInputs({ currentAge: -3 });
+    expect(store().inputs.currentAge).toBe(18);
+    store().setInputs({ currentAge: 120 });
+    expect(store().inputs.currentAge).toBe(75);
+    store().setInputs({ pensionAccessAge: 20 });
+    expect(store().inputs.pensionAccessAge).toBe(50);
+    store().setInputs({ pensionAccessAge: 95 });
+    expect(store().inputs.pensionAccessAge).toBe(80);
+    store().setInputs({ expectedRealReturn: -0.05 });
+    expect(store().inputs.expectedRealReturn).toBe(0);
+    store().setInputs({ expectedRealReturn: 0.5 });
+    expect(store().inputs.expectedRealReturn).toBe(0.1);
+  });
+
+  it("a negative FI target is dropped, not stored", () => {
+    store().setInputs({ fiTargetMinNetWorth: -1_000_000 });
+    expect(store().inputs.fiTargetMinNetWorth).toBeUndefined();
+    store().setInputs({ fiTargetMinNetWorth: 2_000_000 });
+    expect(store().inputs.fiTargetMinNetWorth).toBe(2_000_000);
+  });
+
+  it("NaN never reaches the store (bad paste / cleared field)", () => {
+    store().setInputs({ pensionBalance: Number.NaN });
+    expect(Number.isFinite(store().inputs.pensionBalance)).toBe(true);
+    store().setInputs({ currentAge: Number.POSITIVE_INFINITY });
+    expect(store().inputs.currentAge).toBeLessThanOrEqual(75);
+  });
+
+  it("typing a negative amount into the form writes 0 to the store (onChange clamp)", () => {
+    render(
+      <TooltipProvider>
+        <MemoryRouter>
+          <SimpleInputs />
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    fireEvent.change(screen.getByLabelText("Årlig indkomst før skat", { selector: "input" }), {
+      target: { value: "-5000" },
+    });
+    expect(store().inputs.annualIncome).toBe(0);
+    fireEvent.change(screen.getByLabelText("Pensionssaldo", { selector: "input" }), { target: { value: "-1" } });
+    expect(store().inputs.pensionBalance).toBe(0);
+  });
+
+  it("loadCalculation sanitizes saved entries (legacy/hand-edited persistence)", () => {
+    usePublicStore.setState({
+      saved: [
+        {
+          id: "legacy",
+          name: "Legacy",
+          savedAt: 0,
+          // deliberately invalid persisted data
+          inputs: { ...DEFAULT_SIMPLE_INPUTS, currentAge: 75, lifeExpectancy: 70, pensionBalance: -5 },
+        },
+      ],
+    });
+    expect(store().loadCalculation("legacy")).toBe(true);
+    expect(store().inputs.lifeExpectancy).toBeGreaterThanOrEqual(76);
+    expect(store().inputs.pensionBalance).toBe(0);
+    expect(() => computePublicResult(store().inputs)).not.toThrow();
+  });
+
+  it("share links cannot smuggle invalid values past the sanitizer", () => {
+    expect(decodeShareInputs("%%%not-base64%%%")).toBeNull();
+    const hostile = encodeShareInputs({
+      ...DEFAULT_SIMPLE_INPUTS,
+      currentAge: 75,
+      lifeExpectancy: 20,
+      currentInvestments: -1_000_000,
+    });
+    const decoded = decodeShareInputs(hostile);
+    expect(decoded).not.toBeNull();
+    expect(decoded!.lifeExpectancy).toBeGreaterThanOrEqual(76);
+    expect(decoded!.currentInvestments).toBe(0);
+    expect(() => computePublicResult(decoded!)).not.toThrow();
+  });
+});
