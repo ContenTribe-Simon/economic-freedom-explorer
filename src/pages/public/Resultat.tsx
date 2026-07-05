@@ -134,8 +134,15 @@ export default function Resultat() {
   // disagree. Frihedspunkt cards/markers never use this: they show the raw earliest, which on
   // tight and off-track results is legitimately later than the plan.
   const freedom = stopAgeForDisplay(result.earliestSustainableStopAge, plan);
+  // Every adapter value that feeds MORE than one rendered location (headline, card, chart
+  // marker, aria) is computed and formatted exactly once here, and every consumer reads the
+  // same constant. Re-deriving or re-formatting the same figure per location is what let the
+  // chart and a card drift out of sync in past review rounds.
   const capitalAtStop = formatKr(result.capitalAtStopAge);
-  const hasGoal = (inputs.fiTargetMinNetWorth ?? 0) > 0;
+  const capitalAtEnd = formatKr(result.capitalAtEndOfHorizon);
+  const goal = inputs.fiTargetMinNetWorth ?? 0;
+  const hasGoal = goal > 0;
+  const goalKr = formatKr(goal);
 
   const peakPoint = result.netWorthByAge.reduce(
     (a, b) => (b.netWorth > a.netWorth ? b : a),
@@ -164,13 +171,15 @@ export default function Resultat() {
         />
       )}
       {kind !== "tight" && (
-        <StatCard
-          label="Ved planens slutning"
-          value={formatKr(result.capitalAtEndOfHorizon)}
-          sub={`formue ved alder ${horizonEnd}`}
-        />
+        <StatCard label="Ved planens slutning" value={capitalAtEnd} sub={`formue ved alder ${horizonEnd}`} />
       )}
     </>
+  );
+
+  // The "Formue når du stopper" card is identical in all three states — one element, not three
+  // copies that could drift apart.
+  const stopCapitalCard = (
+    <StatCard label="Formue når du stopper" value={capitalAtStop} sub={`ved din planlagte stop-alder (${plan})`} />
   );
 
   // --- Per-state copy (ported from the three reference screens, parameterized) ---
@@ -225,15 +234,15 @@ export default function Resultat() {
     );
     cards = (
       <>
-        <StatCard label="Formue når du stopper" value={capitalAtStop} sub={`ved din planlagte stop-alder (${plan})`} />
+        {stopCapitalCard}
         <StatCard
           label="Flaskehals"
           value={`Alder ${shortfallAge}`}
           sub={`fra alder ${shortfallAge} mangler du ${formatKr(monthlyGap)} om måneden`}
           tone="risk"
         />
-        {result.earliestSustainableStopAge != null ? (
-          <StatCard label="Frihedspunkt" value={`alder ${result.earliestSustainableStopAge}`} sub="hvis pengene skal nå hele vejen" />
+        {offTrackFreedom != null ? (
+          <StatCard label="Frihedspunkt" value={`alder ${offTrackFreedom}`} sub="hvis pengene skal nå hele vejen" />
         ) : (
           <StatCard label="Frihedspunkt" value="Ikke fundet" sub="ingen stop-alder rækker hele vejen med dine tal" />
         )}
@@ -247,6 +256,7 @@ export default function Resultat() {
     // age. When the search (capped at 75) finds no such age, the freedom point is unknowable
     // and no claim is made — the card then simply names the user's own chosen stop age.
     const goalAge = result.earliestSustainableStopAge;
+    const markerAge = goalAge ?? plan;
     headline = (
       <>
         Du kan stoppe ved <Age>alder {plan}</Age>, men det er stramt.
@@ -258,9 +268,9 @@ export default function Resultat() {
     chart = (
       <HorizonChart
         points={result.netWorthByAge}
-        freedomAge={goalAge ?? plan}
+        freedomAge={markerAge}
         planAge={plan}
-        freedomOnPlan={(goalAge ?? plan) === plan}
+        freedomOnPlan={markerAge === plan}
         ariaLabel={`Din formue stiger til en top på ${peakKr} ved alder ${peakPoint.age}, og rækker til ${horizonEnd}, men slutter under dit mål. ${
           goalAge != null
             ? `Frihedspunktet, hvor du også når dit mål, er ved alder ${goalAge}.`
@@ -270,11 +280,11 @@ export default function Resultat() {
     );
     cards = (
       <>
-        <StatCard label="Formue når du stopper" value={capitalAtStop} sub={`ved din planlagte stop-alder (${plan})`} />
+        {stopCapitalCard}
         <StatCard
           label="Ved planens slutning"
-          value={formatKr(result.capitalAtEndOfHorizon)}
-          sub={hasGoal ? `under dit mål på ${formatKr(inputs.fiTargetMinNetWorth ?? 0)}` : `pengene rækker knap til ${horizonEnd}`}
+          value={capitalAtEnd}
+          sub={hasGoal ? `under dit mål på ${goalKr}` : `pengene rækker knap til ${horizonEnd}`}
           tone="accent"
         />
         {goalAge != null ? (
@@ -322,7 +332,7 @@ export default function Resultat() {
     );
     cards = (
       <>
-        <StatCard label="Formue når du stopper" value={capitalAtStop} sub={`ved din planlagte stop-alder (${plan})`} />
+        {stopCapitalCard}
         <StatCard label="Flaskehals" value="Ingen fundet" sub={`pengene rækker hele vejen til ${horizonEnd}`} tone="ok" />
         {earliestKnown ? (
           <StatCard label="Frihedspunkt" value={`alder ${freedom}`} sub="tidligst muligt med dine tal" />
