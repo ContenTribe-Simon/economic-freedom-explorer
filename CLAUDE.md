@@ -186,6 +186,18 @@ Security). The app runs without them — cloud save/login is simply disabled.
    questions, recommended next PR.
 8. Codex (and/or `@claude`) reviews the PR. CI must be green. **Simon merges.**
 
+**Public copy claims (mechanical check).** Every public-facing Danish sentence that
+states a computed figure (an age, a kroner amount) is a claim. Before committing new
+or changed copy of that kind: (a) name the exact `PublicResult`/input field(s) the
+sentence reads, (b) state the input domain where the claim is true, and (c) add a
+test that actively tries to falsify the claim through the real pipeline
+(`computePublicResult`, never a mocked result). If the claim cannot survive that test
+for every reachable input, branch or reword the copy — do not ship it. On the Result
+screen, compute/format each adapter value once per render and let every consumer
+(headline, card, chart marker, aria-label) read that single value; cross-surface
+claim invariants live in
+`src/pages/public/__tests__/resultat-copy-invariants.property.test.tsx`.
+
 ---
 
 ## 8. Definition of done
