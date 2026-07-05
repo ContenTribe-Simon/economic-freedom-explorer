@@ -9,7 +9,9 @@ import { AdvancedAccessButton } from "./AdvancedAccessButton";
  */
 export function PublicHeader({ action }: { action?: ReactNode }) {
   return (
-    <header className="flex items-center justify-between pt-[26px]">
+    // flex-wrap + shrinkable right group: on narrow phones the action row wraps under the
+    // brand instead of overflowing/clipping (the corner button also drops to icon-only there).
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 pt-[26px]">
       <div className="flex items-center gap-2.5">
         <span
           aria-hidden="true"
@@ -19,7 +21,7 @@ export function PublicHeader({ action }: { action?: ReactNode }) {
           Frihedsmodel
         </span>
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
         {action}
         <AdvancedAccessButton />
       </div>

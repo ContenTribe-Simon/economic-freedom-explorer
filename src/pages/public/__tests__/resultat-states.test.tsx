@@ -285,6 +285,21 @@ describe("Result screen states (real PublicResult data)", () => {
     u4();
   });
 
+  it("REGRESSION: the no-carry-over reminder sits by the 'Avanceret model' CTA regardless of door state", () => {
+    // A returning user whose Advanced door is already open never sees DoorPage's
+    // clarification again — the reminder next to the Resultat CTA must not depend on it.
+    const NOTE = "Den avancerede model har sine egne tal. Tallene fra beregningen her følger ikke med.";
+    localStorage.setItem("frihedsmodel-advanced-door.v1", "open");
+    const { unmount: u1 } = renderWith(ON_TRACK);
+    expect(screen.getByTestId("advanced-no-carryover-note").textContent).toContain(NOTE);
+    expect(screen.getByRole("link", { name: "Avanceret model" })).toBeTruthy();
+    u1();
+    localStorage.removeItem("frihedsmodel-advanced-door.v1");
+    const { unmount: u2 } = renderWith(ON_TRACK);
+    expect(screen.getByTestId("advanced-no-carryover-note").textContent).toContain(NOTE);
+    u2();
+  });
+
   it("no hedging or em dashes in rendered copy (copy rule)", () => {
     for (const fixture of [ON_TRACK, TIGHT, OFF_TRACK]) {
       const { container, unmount } = renderWith(fixture);

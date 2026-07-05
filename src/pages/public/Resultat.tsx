@@ -472,6 +472,13 @@ export default function Resultat() {
           </Button>
         </div>
 
+        {/* Local no-carry-over reminder for the CTA above, shown UNCONDITIONALLY: a returning
+            user whose door is already open never sees DoorPage's clarification again, and the
+            continuity expectation is highest right here, after adjusting a public plan. */}
+        <p className="mt-2.5 text-[13px] leading-[1.5] text-[color:var(--ink-soft)]" data-testid="advanced-no-carryover-note">
+          Den avancerede model har sine egne tal. Tallene fra beregningen her følger ikke med.
+        </p>
+
         {/* Share-link recipients land HERE first (never Start/Simple Inputs), so the footer
             carries the real-terms note alongside the canonical disclaimer, same combined
             pattern as GemOgDel's. */}

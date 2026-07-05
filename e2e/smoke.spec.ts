@@ -257,6 +257,23 @@ test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
     await expectNotBlank(page);
   });
 
+  test("the public header fits narrow phones without horizontal overflow", async ({ page }) => {
+    // Codex: the header's right-side group (page action + corner button) had no responsive
+    // wrapping. Verify the tightest screens at common phone widths: buttons visible, no
+    // horizontal scroll.
+    for (const width of [360, 390]) {
+      await page.setViewportSize({ width, height: 740 });
+      for (const path of ["/resultat", "/gem-og-del"]) {
+        await page.goto(path);
+        await expect(page.getByRole("link", { name: "Avanceret", exact: true }), `${path}@${width}`).toBeVisible();
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow, `${path}@${width} horizontal overflow px`).toBeLessThanOrEqual(0);
+      }
+    }
+  });
+
   test("the corner 'Avanceret' button is on every public screen and hits the door on a fresh device", async ({ page }) => {
     // Decision 2026-07-05: the same small corner access point on all four public screens
     // (plus a third action-row button on Resultat). Clicking any of them goes through the

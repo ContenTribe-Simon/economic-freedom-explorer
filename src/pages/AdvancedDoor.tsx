@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isAdvancedDoorOpen, openAdvancedDoor } from "@/lib/advancedDoor";
+import { DOOR_FEATURES, DOOR_LEAD, DOOR_REMEMBER_NOTE } from "./advancedDoorCopy";
 
 /**
  * The "Advanced door" — the deliberate routing boundary between the public Frihedsmodel flow
@@ -46,11 +47,7 @@ function DoorPage({ onOpen }: { onOpen: () => void }) {
         <h1 className="mb-4 mt-2 font-display text-[clamp(30px,5vw,42px)] font-light leading-[1.12] tracking-[-0.01em]">
           Du er på vej ind i den avancerede model.
         </h1>
-        <p className="mb-8 text-[16px] leading-[1.6] text-muted-foreground">
-          Samme beregningsmodel som den enkle udgave, men med alle detaljer og indstillinger,
-          og med egne tal: den starter ikke med tallene fra den enkle beregning. Den er bygget
-          til dyb gennemgang, ikke til et hurtigt overblik.
-        </p>
+        <p className="mb-8 text-[16px] leading-[1.6] text-muted-foreground">{DOOR_LEAD}</p>
         <div className="flex flex-wrap items-center gap-4">
           <Button size="lg" className="h-12 px-7 text-[15px] [&_svg]:size-[18px]" onClick={onOpen} data-testid="open-advanced-door">
             Åbn den avancerede model
@@ -67,14 +64,7 @@ function DoorPage({ onOpen }: { onOpen: () => void }) {
           Det finder du derinde
         </p>
         <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-          {[
-            ["Scenarier og stress-tests", "Sammenlign flere planer side om side, og se hvad der sker, hvis afkastet skuffer, eller forbruget stiger."],
-            ["Livsfaser", "Læg større hændelser ind år for år, for eksempel huskøb, deltid eller arv."],
-            ["FIRE-benchmarks", "Mål din plan mod kendte niveauer for økonomisk uafhængighed."],
-            ["Snapshots", "Frys en beregning som dokumentation, og sammenlign den med senere versioner."],
-            ["Landeanalyse", "Se hvad planen ville betyde, hvis du boede i et andet land."],
-            ["År-for-år-tabeller og rapport", "Alle tal bag kurverne, år for år, og en samlet rapport klar til print."],
-          ].map(([title, body]) => (
+          {DOOR_FEATURES.map(([title, body]) => (
             <div key={title}>
               <dt className="text-[14px] font-semibold text-foreground">{title}</dt>
               <dd className="m-0 mt-1 text-[13.5px] leading-[1.55] text-muted-foreground">{body}</dd>
@@ -82,8 +72,7 @@ function DoorPage({ onOpen }: { onOpen: () => void }) {
           ))}
         </dl>
         <p className="mt-8 border-t border-border pt-4 text-[12.5px] text-muted-foreground">
-          Dit valg huskes på denne enhed, så du lander direkte derinde næste gang. Du bad om
-          siden {location.pathname}. Den åbner, når du fortsætter.
+          {DOOR_REMEMBER_NOTE} Du bad om siden {location.pathname}. Den åbner, når du fortsætter.
         </p>
       </div>
     </div>

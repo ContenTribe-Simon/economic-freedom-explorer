@@ -19,7 +19,9 @@ export function AdvancedAccessButton() {
     >
       <Link to="/dashboard">
         <Layers aria-hidden="true" />
-        Avanceret
+        {/* Icon-only on narrow phones (the header's tightest case); sr-only keeps the
+            accessible name "Avanceret" identical across breakpoints. */}
+        <span className="max-sm:sr-only">Avanceret</span>
       </Link>
     </Button>
   );
