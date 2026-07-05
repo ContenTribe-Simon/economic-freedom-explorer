@@ -202,4 +202,15 @@ test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
     await expect(page).toHaveURL(/\/start$/);
     await expectNotBlank(page);
   });
+
+  test("the public flow's quiet 'Avanceret' entry hits the door on a fresh device", async ({ page }) => {
+    // The data contract's single low-emphasis entry lives on the Save/Share screen. Clicking
+    // it goes through the Advanced door like any other advanced URL — it must never bypass it.
+    await page.goto("/gem-og-del");
+    await page.getByRole("link", { name: "Avanceret" }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByText("Du er på vej ind i den avancerede model.")).toBeVisible();
+    await expect(page.getByText("Kapitaludvikling")).not.toBeVisible();
+    await expectNotBlank(page);
+  });
 });

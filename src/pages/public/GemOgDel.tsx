@@ -367,7 +367,7 @@ export default function GemOgDel() {
 
         <nav
           aria-label="Videre"
-          className="fm-rise mb-14 mt-[clamp(26px,4vw,36px)] flex flex-wrap gap-[22px] border-t border-border pt-5"
+          className="fm-rise mt-[clamp(26px,4vw,36px)] flex flex-wrap gap-[22px] border-t border-border pt-5"
           style={{ animationDelay: "0.2s" }}
         >
           <Link
@@ -387,6 +387,21 @@ export default function GemOgDel() {
             Start en ny beregning <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </Link>
         </nav>
+
+        {/* The data contract's single low-emphasis entry to the advanced surface ("The Advanced
+            door: present as a link only"). Deliberately quiet: muted, small, no icon, placed
+            after the screen's own actions. It links to /dashboard and therefore goes through
+            the Advanced door like any other advanced URL — on a fresh device the link lands on
+            the door page, never past it. */}
+        <p className="mb-14 mt-4 text-[13px] leading-[1.5] text-[color:var(--ink-soft)]">
+          Vil du arbejde med alle detaljer og indstillinger?{" "}
+          <Link
+            to="/dashboard"
+            className="underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Avanceret
+          </Link>
+        </p>
       </div>
     </div>
   );

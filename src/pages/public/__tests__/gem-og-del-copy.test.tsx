@@ -179,6 +179,21 @@ describe("rehydrated saved list", () => {
   });
 });
 
+describe("the low-emphasis 'Avanceret' entry (data contract: The Advanced door, link only)", () => {
+  it("exists in the public flow and links to an advanced route (through the door, never past it)", () => {
+    const { container } = renderScreen();
+    const link = screen.getByRole("link", { name: "Avanceret" });
+    // Links to an advanced URL: the route sits behind the AdvancedGate, so on a fresh device
+    // this lands on the door page (covered end-to-end in e2e/smoke.spec.ts).
+    expect(link.getAttribute("href")).toBe("/dashboard");
+    // Low-emphasis: part of the on-screen chrome (print-hidden), not the printed summary.
+    const chrome = container.querySelector(".print\\:hidden");
+    expect(chrome?.contains(link)).toBe(true);
+    const printSummary = container.querySelector("section.hidden.print\\:block");
+    expect(printSummary?.textContent ?? "").not.toContain("Avanceret");
+  });
+});
+
 describe("start a new calculation", () => {
   it("REGRESSION: 'Start en ny beregning' resets the active inputs to the defaults, keeping saved entries", () => {
     const custom = { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 777_000, desiredStopAge: 55 };
