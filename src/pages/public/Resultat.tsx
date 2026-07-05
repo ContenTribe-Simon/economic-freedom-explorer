@@ -6,7 +6,7 @@ import { PublicHeader } from "@/components/public/PublicHeader";
 import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
-import { formatKr, freedomAgeForDisplay } from "@/lib/publicFormat";
+import { formatKr, stopAgeForDisplay } from "@/lib/publicFormat";
 import { decodeShareInputs } from "@/lib/publicShare";
 import "./start.css";
 import "./resultat.css";
@@ -129,9 +129,11 @@ export default function Resultat() {
   const kind = result.status.kind;
   const plan = result.desiredStopAge;
   const horizonEnd = result.lifeExpectancy;
-  // The corrected on-track/tight display age (engine search-floor/ceiling artifacts handled) —
-  // the SAME helper the save/PDF summary uses, so the two surfaces can never disagree.
-  const freedom = freedomAgeForDisplay(result.earliestSustainableStopAge, plan);
+  // The corrected "Du kan stoppe ved" headline age (engine search-floor/ceiling artifacts
+  // handled) — the SAME helper the save/PDF summary uses, so the two surfaces can never
+  // disagree. Frihedspunkt cards/markers never use this: they show the raw earliest, which on
+  // tight and off-track results is legitimately later than the plan.
+  const freedom = stopAgeForDisplay(result.earliestSustainableStopAge, plan);
   const capitalAtStop = formatKr(result.capitalAtStopAge);
   const hasGoal = (inputs.fiTargetMinNetWorth ?? 0) > 0;
 
@@ -238,15 +240,16 @@ export default function Resultat() {
       </>
     );
   } else if (kind === "tight") {
-    const freedomOnPlan = freedom === plan;
-    // Same search-ceiling rule as the on-track branch below: when the engine's earliest-FI
-    // search (capped at 75) returns null, the earliest stop age is unknowable and the
-    // "ikke tidligere med dine tal" claim must not be made. The card then simply names the
-    // user's own chosen stop age, and the chart aria drops the "Frihedspunktet" sentence.
-    const earliestKnown = result.earliestSustainableStopAge != null;
+    // Tight means the plan itself HOLDS (money lasts the whole horizon) but ends under the
+    // goal, so a non-null earliestSustainableStopAge is the LATER age at which the goal is
+    // also reached — it must be shown raw, never clamped down to the plan. The headline claims
+    // the plan (the provable stop age); the Frihedspunkt card and marker show the raw later
+    // age. When the search (capped at 75) finds no such age, the freedom point is unknowable
+    // and no claim is made — the card then simply names the user's own chosen stop age.
+    const goalAge = result.earliestSustainableStopAge;
     headline = (
       <>
-        Du kan stoppe ved <Age>alder {freedom}</Age>, men det er stramt.
+        Du kan stoppe ved <Age>alder {plan}</Age>, men det er stramt.
       </>
     );
     takeaway = hasGoal
@@ -255,15 +258,13 @@ export default function Resultat() {
     chart = (
       <HorizonChart
         points={result.netWorthByAge}
-        freedomAge={freedom}
+        freedomAge={goalAge ?? plan}
         planAge={plan}
-        freedomOnPlan={freedomOnPlan}
+        freedomOnPlan={(goalAge ?? plan) === plan}
         ariaLabel={`Din formue stiger til en top på ${peakKr} ved alder ${peakPoint.age}, og rækker til ${horizonEnd}, men slutter under dit mål. ${
-          !earliestKnown
-            ? `Din plan holder ved alder ${plan}, men slutter under dit mål.`
-            : freedomOnPlan
-              ? `Frihedspunktet, hvor du tidligst kan stoppe, falder sammen med din plan ved alder ${freedom}.`
-              : `Frihedspunktet, hvor du tidligst kan stoppe, er ved alder ${freedom}.`
+          goalAge != null
+            ? `Frihedspunktet, hvor du også når dit mål, er ved alder ${goalAge}.`
+            : `Din plan holder ved alder ${plan}.`
         }`}
       />
     );
@@ -276,8 +277,8 @@ export default function Resultat() {
           sub={hasGoal ? `under dit mål på ${formatKr(inputs.fiTargetMinNetWorth ?? 0)}` : `pengene rækker knap til ${horizonEnd}`}
           tone="accent"
         />
-        {earliestKnown ? (
-          <StatCard label="Frihedspunkt" value={`alder ${freedom}`} sub="ikke tidligere med dine tal" />
+        {goalAge != null ? (
+          <StatCard label="Frihedspunkt" value={`alder ${goalAge}`} sub="hvis du også skal nå dit mål" />
         ) : (
           <StatCard label="Frihedspunkt" value={`alder ${plan}`} sub="din valgte stop-alder" />
         )}

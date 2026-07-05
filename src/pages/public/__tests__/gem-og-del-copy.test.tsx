@@ -74,7 +74,7 @@ describe("share-link copy state", () => {
 describe("summary preview freedom age", () => {
   it("REGRESSION: the preview uses the corrected display age, matching the Result headline", () => {
     // Search-floor artifact: a rich plan stopping at 38 holds, but the raw KPI earliest is 40.
-    // The Result page displays 38 (freedomAgeForDisplay); the save/PDF summary must say the
+    // The Result page displays 38 (stopAgeForDisplay); the save/PDF summary must say the
     // same, never the raw 40.
     const rich38 = { ...DEFAULT_SIMPLE_INPUTS, currentInvestments: 10_000_000, desiredStopAge: 38 };
     usePublicStore.setState({ inputs: rich38 });

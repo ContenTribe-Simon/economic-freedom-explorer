@@ -15,16 +15,21 @@ export function formatDaLongDate(ms: number): string {
 }
 
 /**
- * The freedom age to DISPLAY for an on-track/tight plan — the single corrected value every
- * public surface (Result headline, save/PDF summary) must share.
+ * The stop age for "Du kan stoppe ved alder X" claims on an on-track/tight plan — the earliest
+ * age the result PROVES the user can stop at. The single value the Result headline and the
+ * save/PDF summary share, so the two surfaces can never disagree.
  *
- * Two engine-search artifacts are corrected here, never in the engine:
- * - Search floor (age 40): a plan below 40 that holds can get a RAW earliest ABOVE the working
- *   plan; on track means the plan holds, so the true earliest is <= plan — min() keeps it honest.
- * - Search ceiling (75): a plan beyond it gets earliest null; fall back to the plan (callers
- *   drop the "tidligst" claim for that case).
- * Off-track surfaces use the raw earliest directly (there it is legitimately later than the plan).
+ * - On track: the plan holds, so the true earliest is <= plan; min() corrects the engine's
+ *   search-floor artifact (a plan below 40 that holds can get a RAW earliest of 40).
+ * - Tight: the plan holds too (only the end target is missed), so the provable stop age IS the
+ *   plan; a non-null earliest is then the later target-satisfying age and min() yields the plan.
+ * - Search ceiling (75): earliest comes back null; fall back to the plan (callers drop the
+ *   "tidligst" claim for that case).
+ *
+ * This is a HEADLINE stop age, never a Frihedspunkt value: freedom-point cards/markers show the
+ * raw earliestSustainableStopAge directly, which on tight and off-track results is legitimately
+ * LATER than the plan and must not be clamped down to it.
  */
-export function freedomAgeForDisplay(earliestSustainableStopAge: number | null, desiredStopAge: number): number {
+export function stopAgeForDisplay(earliestSustainableStopAge: number | null, desiredStopAge: number): number {
   return Math.min(earliestSustainableStopAge ?? desiredStopAge, desiredStopAge);
 }

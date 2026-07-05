@@ -195,10 +195,12 @@ describe("Result screen states (real PublicResult data)", () => {
     expect(aria).not.toContain("tidligst");
   });
 
-  it("tight with the earliest age KNOWN: the 'ikke tidligere' claim is kept", () => {
+  it("tight with the target-satisfying age KNOWN: shown RAW, never clamped to the plan", () => {
     // Verified through the real pipeline: stopping at 64 holds but ends under a 3M goal (tight),
-    // and the FI search finds the goal IS reachable by stopping at 65 — earliest is known
-    // (non-null), so "ikke tidligere med dine tal" is a provable claim and stays.
+    // and the FI search finds the goal IS reachable by stopping at 65. That later age is the
+    // freedom point and must be displayed raw — clamping it to 64 and labelling 64 as the
+    // freedom point would understate the target-satisfying age. The headline still claims the
+    // plan (64 holds, it is just tight).
     const tightKnown: SimplePublicInputs = {
       ...DEFAULT_SIMPLE_INPUTS,
       desiredStopAge: 64,
@@ -206,12 +208,18 @@ describe("Result screen states (real PublicResult data)", () => {
     };
     const r = computePublicResult(tightKnown);
     expect(r.status.kind).toBe("tight");
-    expect(r.earliestSustainableStopAge).toBe(65);
+    expect(r.earliestSustainableStopAge).toBe(65); // LATER than the plan — the case this guards
     renderWith(tightKnown);
-    expect(screen.getByText("ikke tidligere med dine tal")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("alder 64");
+    // The Frihedspunkt card carries the raw age 65 with the goal-conditional label:
+    const cardSub = screen.getByText("hvis du også skal nå dit mål");
+    expect(cardSub.parentElement?.textContent).toContain("alder 65");
     expect(screen.queryByText("din valgte stop-alder")).toBeNull();
+    expect(screen.queryByText("ikke tidligere med dine tal")).toBeNull();
+    // Chart marker and aria agree with the card, not the clamped plan age.
+    expect(screen.getByText("Frihedspunkt 65")).toBeTruthy();
     const aria = screen.getByRole("img").getAttribute("aria-label") ?? "";
-    expect(aria).toContain("Frihedspunktet, hvor du tidligst kan stoppe");
+    expect(aria).toContain("Frihedspunktet, hvor du også når dit mål, er ved alder 65");
   });
 
   it("off track with NO sustainable stop age: marker omitted and aria says so", () => {
