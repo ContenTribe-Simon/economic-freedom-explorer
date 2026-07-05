@@ -7,14 +7,14 @@
  * the holding-dependency factor (which deriveKPIs pushes unconditionally, even when holding = 0)
  * and the cash-buffer factor (the simple surface has no buffer input).
  *
- * The END-OF-HORIZON-MARGIN family is NOT translated from the engine factor. deriveKPIs computes
- * that factor from `yAt95` (a FIXED age 95), which is an interior point when lifeExpectancy > 95 —
- * so translating it would claim "margin ved planperiodens slutning" on a fixed-age-95 basis, the
- * exact fixed-age anchor the horizon-boundary rule (§4.0 R1) forbids for end-of-horizon outputs.
- * Instead the end-margin driver maps the SHARED end-of-horizon verdict (`classifyEndMargin`, the
- * same one the public status consumes — last YearRow vs fiTargetMinNetWorth), so it is
- * horizon-correct for every lifeExpectancy AND can never disagree with the status. We emit our own
- * fresh Danish copy and never pass raw engine label/detail through; the leak guard runs on the
+ * The END-OF-HORIZON-MARGIN family is NOT translated from the engine factor. (Historically the
+ * engine computed that factor from a FIXED age 95; since the engine anchor fix it uses the last
+ * projected YearRow too, and the two computations provably agree — see
+ * engine-horizon-anchor-v1.test.ts.) The driver still maps the SHARED end-of-horizon verdict
+ * (`classifyEndMargin`, the same one the public status consumes — last YearRow vs
+ * fiTargetMinNetWorth) rather than translating engine factor TEXT: the shared verdict is the
+ * public boundary's definition, can never disagree with the status, and lets us emit our own
+ * fresh Danish copy without passing raw engine label/detail through; the leak guard runs on the
  * copy we EMIT.
  */
 import type { ScoreFactor } from "../types";

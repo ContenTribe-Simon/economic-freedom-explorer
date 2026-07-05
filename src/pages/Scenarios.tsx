@@ -102,7 +102,7 @@ export default function Scenarios() {
     { key: "earliestSustainableStopAge", label: "Tidligste bæredygtige stop", fmt: (v) => (v ? `${v} år` : "—"), better: "lower" },
     { key: "capitalAtStopAge", label: "Kapital v. stop", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
     { key: "capitalAt65", label: "Kapital v. 65", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
-    { key: "capitalAt95", label: "Kapital v. 95", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
+    { key: "capitalAt95", label: "Kapital v. slutalder", fmt: (v) => formatDKK(v, { compact: true }), better: "higher" },
     {
       key: "cashflowShortfall",
       label: "Første privat cashflow-shortfall",

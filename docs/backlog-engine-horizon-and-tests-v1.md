@@ -2,6 +2,15 @@
 
 Logget fra review-loopet på feat/public-result-adapter (Codex og @claude), juni 2026.
 
+> **Status (juli 2026, fix/engine-horizon-anchor-yat95):** TODO 1 og TODO 2 er landet.
+> deriveKPIs forankrer nu alle slut-horisont-størrelser ved den sidste projicerede YearRow
+> (`yEnd`), og regressionssuiten ligger i
+> `src/lib/finance/__tests__/engine-horizon-anchor-v1.test.ts`. Adapterens fire workarounds er
+> gennemgået: alle fire er BEHOLDT, nu som den offentlige grænses definition frem for som
+> patches — end-margin-verdiktet og kapital-ankrene er provbart enige med motoren (agreement-
+> tests i samme suite), og robusthedscappet (39/69) består som ren offentlig bånd-kalibrering
+> (motorens eget miss-cap er ≤ 40, hvilket ligger i det offentlige "Middel"-bånd).
+
 ## Kontekst, hvorfor
 
 Det public-safe adapterlag gjorde det offentlige lag horizon-korrekt output for output og
