@@ -71,6 +71,37 @@ describe("share-link copy state", () => {
   });
 });
 
+describe("printed summary (Hent som PDF)", () => {
+  it("REGRESSION: a print-only summary delivers the answer and the entered numbers, with chrome print-hidden", () => {
+    const custom = { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 777_000, fiTargetMinNetWorth: 2_000_000 };
+    usePublicStore.setState({ inputs: custom });
+    const { container } = renderScreen();
+    // The interactive page is hidden in print…
+    const chrome = container.querySelector(".print\\:hidden");
+    expect(chrome).not.toBeNull();
+    expect(chrome!.textContent).toContain("Gem beregning");
+    // …and a print-only summary exists (hidden on screen, shown by the print stylesheet)…
+    const summary = container.querySelector("section.hidden.print\\:block");
+    expect(summary).not.toBeNull();
+    const text = summary!.textContent ?? "";
+    // …with the answer, the key figures and the user's OWN numbers, exactly as entered:
+    expect(text).toContain("Dit svar");
+    expect(text).toContain("Nøgletal");
+    expect(text).toContain("Dine tal");
+    expect(text).toContain("777.000 kr"); // annual income as entered
+    expect(text).toContain("2.000.000 kr"); // the FI target as entered
+    expect(text).toContain("Formue når du stopper");
+    expect(text).toContain("Ønsket stop-alder");
+    // The canonical disclaimer, verbatim.
+    expect(text).toContain(
+      "En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning.",
+    );
+    // No hedging, no em dashes in the printed copy either.
+    expect(text).not.toMatch(/\bca\.\s/i);
+    expect(text).not.toContain("—");
+  });
+});
+
 describe("start a new calculation", () => {
   it("REGRESSION: 'Start en ny beregning' resets the active inputs to the defaults, keeping saved entries", () => {
     const custom = { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 777_000, desiredStopAge: 55 };

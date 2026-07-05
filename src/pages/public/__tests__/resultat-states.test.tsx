@@ -118,6 +118,36 @@ describe("Result screen states (real PublicResult data)", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("alder 38");
   });
 
+  it("on track with a plan beyond the FI search window: no 'tidligst' claim, plan reported honestly", () => {
+    // The engine's earliest-FI search stops at min(lifeExpectancy, 75). A plan at 82 that holds
+    // (verified through the real pipeline: on_track, earliest null) must NOT be rewritten to 75
+    // (the plan is the user's) and must NOT claim "tidligst" — the earliest is unknowable.
+    const late82: SimplePublicInputs = {
+      ...DEFAULT_SIMPLE_INPUTS,
+      currentAge: 60,
+      lifeExpectancy: 100,
+      annualIncome: 800_000,
+      monthlySpending: 25_000,
+      currentInvestments: 100_000,
+      monthlySavings: 0,
+      pensionBalance: 8_000_000,
+      pensionAccessAge: 80,
+      desiredStopAge: 82,
+    };
+    const r = computePublicResult(late82);
+    expect(r.status.kind).toBe("on_track");
+    expect(r.earliestSustainableStopAge).toBeNull();
+    expect(r.desiredStopAge).toBe(82); // the plan survives sanitization untouched
+    renderWith(late82);
+    const h1 = screen.getByRole("heading", { level: 1 }).textContent ?? "";
+    expect(h1).toContain("alder 82");
+    expect(h1).not.toContain("tidligst");
+    expect(screen.getByText("din plan holder hele vejen")).toBeTruthy();
+    const aria = screen.getByRole("img").getAttribute("aria-label") ?? "";
+    expect(aria).toContain("Din plan holder ved alder 82");
+    expect(aria).not.toContain("tidligst");
+  });
+
   it("off track with NO sustainable stop age: marker omitted and aria says so", () => {
     const noFreedom: SimplePublicInputs = {
       ...DEFAULT_SIMPLE_INPUTS,

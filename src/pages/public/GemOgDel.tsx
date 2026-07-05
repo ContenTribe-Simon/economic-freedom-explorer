@@ -76,9 +76,89 @@ export default function GemOgDel() {
   );
   const previewNumbers = `Formue ved stop ${formatKr(result.capitalAtStopAge)} · pengene rækker til ${result.moneyLastsToAge}`;
 
+  // The percent shown in the printed summary (comma decimal, no hedging).
+  const returnPct = `${(inputs.expectedRealReturn * 100).toFixed(1).replace(".", ",")} %`;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-[720px] px-[clamp(18px,5vw,40px)]">
+      {/* Printed summary — what "Hent som PDF" actually delivers: the answer plus the numbers
+          the user typed in, nothing else. Screen-only chrome is print-hidden below. */}
+      <section className="hidden print:block">
+        <div className="mb-6 flex items-baseline justify-between border-b border-border pb-3">
+          <span className="font-display text-[21px] font-medium">Frihedsmodel</span>
+          <span className="text-[12px] text-[color:var(--ink-soft)]">{formatDaLongDate(Date.now())}</span>
+        </div>
+        <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
+          Dit svar · {result.status.label}
+        </p>
+        <h1 className="mb-1 mt-2 font-display text-[26px] font-light leading-tight">{previewHeadline}</h1>
+        <p className="m-0 text-[13px] text-[color:var(--ink-soft)]">{previewNumbers}</p>
+
+        <h2 className="mb-2 mt-6 font-display text-[17px] font-normal">Nøgletal</h2>
+        <table className="w-full border-collapse text-[13px]">
+          <tbody>
+            <tr>
+              <td className="py-1 pr-4 text-[color:var(--ink-soft)]">Formue når du stopper (alder {result.desiredStopAge})</td>
+              <td className="py-1 text-right num">{formatKr(result.capitalAtStopAge)}</td>
+            </tr>
+            {result.capitalAtPensionAccessAge != null && (
+              <tr>
+                <td className="py-1 pr-4 text-[color:var(--ink-soft)]">Når pensionen bliver tilgængelig (alder {inputs.pensionAccessAge})</td>
+                <td className="py-1 text-right num">{formatKr(result.capitalAtPensionAccessAge)}</td>
+              </tr>
+            )}
+            <tr>
+              <td className="py-1 pr-4 text-[color:var(--ink-soft)]">Ved planens slutning (alder {result.lifeExpectancy})</td>
+              <td className="py-1 text-right num">{formatKr(result.capitalAtEndOfHorizon)}</td>
+            </tr>
+            <tr>
+              <td className="py-1 pr-4 text-[color:var(--ink-soft)]">Pengene rækker til</td>
+              <td className="py-1 text-right num">alder {result.moneyLastsToAge}</td>
+            </tr>
+            {result.bottleneck.kind === "shortfall" && (
+              <tr>
+                <td className="py-1 pr-4 text-[color:var(--ink-soft)]">Flaskehals fra alder {result.bottleneck.firstShortfallAge}</td>
+                <td className="py-1 text-right num">{formatKr(result.bottleneck.monthlyGap)} om måneden mangler</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <h2 className="mb-2 mt-6 font-display text-[17px] font-normal">Dine tal</h2>
+        <table className="w-full border-collapse text-[13px]">
+          <tbody>
+            {(
+              [
+                ["Din alder", `${inputs.currentAge} år`],
+                ["Planlæg til alder", `${inputs.lifeExpectancy} år`],
+                ["Årlig indkomst før skat", formatKr(inputs.annualIncome)],
+                ["Månedligt forbrug", formatKr(inputs.monthlySpending)],
+                ["Investeringer og opsparing", formatKr(inputs.currentInvestments)],
+                ["Månedlig opsparing", formatKr(inputs.monthlySavings)],
+                ["Pensionssaldo", formatKr(inputs.pensionBalance)],
+                ["Pension tilgængelig fra alder", `${inputs.pensionAccessAge} år`],
+                ["Forventet årligt afkast", returnPct],
+                ["Ønsket stop-alder", `${inputs.desiredStopAge} år`],
+                ...((inputs.fiTargetMinNetWorth ?? 0) > 0
+                  ? [["Mål for mindste formue ved planens slutning", formatKr(inputs.fiTargetMinNetWorth ?? 0)] as [string, string]]
+                  : []),
+              ] as [string, string][]
+            ).map(([label, value]) => (
+              <tr key={label}>
+                <td className="py-1 pr-4 text-[color:var(--ink-soft)]">{label}</td>
+                <td className="py-1 text-right num">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p className="mt-6 border-t border-border pt-3 text-[11.5px] leading-[1.5] text-[color:var(--ink-soft)]">
+          Alle beløb er i nutidskroner. En forenklet beregning ud fra dine egne tal og antagelser.
+          Tag tallene som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning.
+        </p>
+      </section>
+
+      <div className="mx-auto max-w-[720px] px-[clamp(18px,5vw,40px)] print:hidden">
         <PublicHeader
           action={
             <Button asChild variant="ghost" size="sm">

@@ -326,12 +326,12 @@ export default function SimpleInputs() {
               label="Ønsket stop-alder"
               tip="Den alder, du gerne vil stoppe med at arbejde. Vi viser, om tallene rækker."
               value={inputs.desiredStopAge}
-              // UI bounds ARE the sanitizer's range, [currentAge, min(lifeExpectancy, 75)]. The
-              // 75 ceiling is the engine's FI-search ceiling (findEarliestSustainableStopAge):
-              // beyond it the Frihedspunkt answer would understate. Lift with Phase 7 if the
-              // engine's search window is extended.
+              // UI bounds ARE the sanitizer's range, [currentAge, lifeExpectancy] — the user's
+              // PLAN, which the projection accepts as-is. (Only the separate earliest-FI search
+              // is capped at 75 in the engine; the Result screen words its headline honestly
+              // when the earliest is unknowable, rather than restricting the plan here.)
               min={inputs.currentAge}
-              max={Math.min(inputs.lifeExpectancy, 75)}
+              max={inputs.lifeExpectancy}
               step={1}
               onChange={(v) => set({ desiredStopAge: v })}
               format={yr}

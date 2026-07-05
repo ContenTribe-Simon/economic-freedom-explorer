@@ -266,13 +266,24 @@ export default function Resultat() {
   } else {
     const yearsBefore = plan - freedom;
     const freedomOnPlan = freedom === plan;
-    headline = (
+    // The engine's earliest-FI search only covers stop ages up to min(lifeExpectancy, 75). For
+    // an on-track plan later than that (e.g. stop at 80), earliest comes back null even though
+    // the plan itself holds — the "tidligst" claim is then unknowable and must not be made.
+    // The plan is never restricted; only the headline wording changes. Phase 7 may extend the
+    // engine's search window, after which this branch disappears naturally.
+    const earliestKnown = result.earliestSustainableStopAge != null;
+    headline = earliestKnown ? (
       <>
         Du kan tidligst stoppe med at arbejde ved <Age>alder {freedom}</Age>.
       </>
+    ) : (
+      <>
+        Du kan stoppe med at arbejde ved <Age>alder {plan}</Age>.
+      </>
     );
-    takeaway =
-      yearsBefore > 0
+    takeaway = !earliestKnown
+      ? `Med dine nuværende tal rækker pengene hele vejen til ${horizonEnd} med din plan på ${plan}.`
+      : yearsBefore > 0
         ? `Med dine nuværende tal rækker pengene hele vejen til ${horizonEnd}. Du kan stoppe ${yearsBefore} år før din egen plan på ${plan}.`
         : `Med dine nuværende tal rækker pengene hele vejen til ${horizonEnd}. Det passer med din egen plan på ${plan}.`;
     chart = (
@@ -281,14 +292,22 @@ export default function Resultat() {
         freedomAge={freedom}
         planAge={plan}
         freedomOnPlan={freedomOnPlan}
-        ariaLabel={`Din formue stiger fra i dag til en top på ${peakKr} ved alder ${peakPoint.age}, og rækker hele vejen til ${horizonEnd}. Frihedspunktet, hvor du tidligst kan stoppe, er ved alder ${freedom}.`}
+        ariaLabel={`Din formue stiger fra i dag til en top på ${peakKr} ved alder ${peakPoint.age}, og rækker hele vejen til ${horizonEnd}. ${
+          earliestKnown
+            ? `Frihedspunktet, hvor du tidligst kan stoppe, er ved alder ${freedom}.`
+            : `Din plan holder ved alder ${plan}.`
+        }`}
       />
     );
     cards = (
       <>
         <StatCard label="Formue når du stopper" value={capitalAtStop} sub={`ved din planlagte stop-alder (${plan})`} />
         <StatCard label="Flaskehals" value="Ingen fundet" sub={`pengene rækker hele vejen til ${horizonEnd}`} tone="ok" />
-        <StatCard label="Frihedspunkt" value={`alder ${freedom}`} sub="tidligst muligt med dine tal" />
+        {earliestKnown ? (
+          <StatCard label="Frihedspunkt" value={`alder ${freedom}`} sub="tidligst muligt med dine tal" />
+        ) : (
+          <StatCard label="Frihedspunkt" value={`alder ${plan}`} sub="din plan holder hele vejen" />
+        )}
       </>
     );
   }

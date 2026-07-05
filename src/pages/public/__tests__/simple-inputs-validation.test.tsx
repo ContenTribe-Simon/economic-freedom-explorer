@@ -193,16 +193,17 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
     localStorage.removeItem("frihedsmodel-public.v1");
   });
 
-  it("REGRESSION: stop-age bounds are the sanitizer's range, [currentAge, min(lifeExpectancy, 75)]", () => {
+  it("REGRESSION: stop-age bounds are the user's PLAN range, [currentAge, lifeExpectancy]", () => {
     // Low end: a valid early stop below the old hardcoded 40 floor is enterable and storable.
     store().setInputs({ currentAge: 35, desiredStopAge: 38 });
     expect(store().inputs.desiredStopAge).toBe(38);
-    // High end: the ceiling is the ENGINE's FI-search ceiling (min(lifeExpectancy, 75)), not the
-    // raw horizon — findEarliestSustainableStopAge only searches stop ages up to 75, so a later
-    // desired stop age would make the Frihedspunkt headline understate. A loaded 80 clamps to 75.
+    // High end: the stop age is the user's PLAN, which the projection engine accepts as-is —
+    // it is NEVER silently rewritten. (A briefly-added cap at the engine's earliest-FI search
+    // ceiling of 75 rewrote a stop-at-80 plan to 75 on every write path and was reverted; the
+    // Result screen instead words its headline honestly when the earliest is unknowable.)
     store().replaceInputs({ ...DEFAULT_SIMPLE_INPUTS, lifeExpectancy: 90, desiredStopAge: 80 });
-    expect(store().inputs.desiredStopAge).toBe(75);
-    // ...and the ceiling tracks a SHORT horizon too (min, not a hardcoded 75):
+    expect(store().inputs.desiredStopAge).toBe(80);
+    // The horizon itself is still the ceiling:
     store().replaceInputs({ ...DEFAULT_SIMPLE_INPUTS, lifeExpectancy: 70, desiredStopAge: 74 });
     expect(store().inputs.desiredStopAge).toBe(70);
 
@@ -216,8 +217,8 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
     );
     const sliders = screen.getAllByRole("slider");
     const bounds = sliders.map((el) => [el.getAttribute("aria-valuemin"), el.getAttribute("aria-valuemax"), el.getAttribute("aria-valuenow")]);
-    // Ønsket stop-alder: [currentAge, min(lifeExpectancy, 75)] with the clamped value in-band.
-    expect(bounds).toContainEqual(["35", "75", "75"]);
+    // Ønsket stop-alder: [currentAge, lifeExpectancy] with the loaded 80 rendered in-band.
+    expect(bounds).toContainEqual(["35", "90", "80"]);
     // Planlæg til alder: [currentAge+1, 110] (spec max, not the old 105 cap).
     expect(bounds).toContainEqual(["36", "110", "90"]);
     // Pension tilgængelig fra alder: the spec band 50-80 (not the old 60-75).
