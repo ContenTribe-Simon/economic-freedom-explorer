@@ -203,6 +203,24 @@ test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
     await expectNotBlank(page);
   });
 
+  test("trust layer renders across the public flow (copy-loose presence)", async ({ page }) => {
+    // Scope doc item 4's own test requirement: key explainer text renders; wording is pinned
+    // by unit/property tests, not here. Start carries the persistent trust strip (disclaimer
+    // + real-terms note) OUTSIDE any tooltip; the Result screen carries both in its footer
+    // (share-link recipients land there first) plus the plain-language explainer blocks.
+    await page.goto("/start");
+    await expect(page.getByText(/En forenklet beregning ud fra dine egne tal/)).toBeVisible();
+    await expect(page.getByText(/Alle beløb er i nutidskroner/)).toBeVisible();
+
+    await page.goto("/resultat");
+    await expect(page.getByText(/En forenklet beregning ud fra dine egne tal/)).toBeVisible();
+    await expect(page.getByText(/Alle beløb er i nutidskroner/)).toBeVisible();
+    await expect(page.getByText("Flaskehals")).toBeVisible();
+    await expect(page.getByText("Hvor solidt er svaret?")).toBeVisible();
+    await expect(page.getByText("Dine antagelser")).toBeVisible();
+    await expectNotBlank(page);
+  });
+
   test("the Result screen shows the 1-lever sensitivity helper for a plan with cashflow room", async ({ page }) => {
     // Scope doc item 7 (Playwright presence). Seed the PUBLIC store with a plan where the
     // savings lever responds (the default persona's planned savings exceed its cashflow, so
