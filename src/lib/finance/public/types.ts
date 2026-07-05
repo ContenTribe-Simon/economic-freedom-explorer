@@ -55,7 +55,7 @@ export interface PublicDriver {
 export interface PublicScore {
   /** 0–100, clamped and rounded to an integer. */
   score: number;
-  /** Short Danish band label (e.g. "Lav robusthed", "Rimelig antagelsessikkerhed"). */
+  /** Short Danish band label (e.g. "Lav robusthed", "Rimelige antagelser"). */
   label: string;
 }
 

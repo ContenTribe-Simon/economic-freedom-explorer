@@ -1,0 +1,16 @@
+/* Result screen — horizon line draw-in, ported from design-reference/resultat*.html.
+   Gated behind prefers-reduced-motion: no-preference; with reduced motion the line
+   renders complete immediately. The shared .fm-rise entrance lives in start.css. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .fm-hz-draw svg path.fm-hz-line {
+    stroke-dasharray: 2400;
+    stroke-dashoffset: 2400;
+    animation: fm-hz-draw 1.5s cubic-bezier(0.33, 0.66, 0.4, 1) 0.35s forwards;
+  }
+  @keyframes fm-hz-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}

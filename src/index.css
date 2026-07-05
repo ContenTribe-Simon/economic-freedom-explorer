@@ -7,17 +7,25 @@
 
 @layer base {
   :root {
-    /* Frihedsmodel brand reference tokens (raw hex). Light mode is the default. */
+    /* Frihedsmodel brand reference tokens (raw hex). Light mode is the default.
+       Values verbatim from the design system's tokens/colors.css. */
     --paper: #F4F6F2;
+    --paper-sunk: #EBEEE7;
     --ink: #17302B;
     --ink-soft: #51635C;
     --fjord: #1C4A50;
     --fjord-soft: #E2EBE7;
     --dawn: #CC8A43;
+    --dawn-deep: #B57834;
     --dawn-soft: #F3E4D0;
     --dawn-glow: #E2A85C;
     --sage: #5E8A6F;
+    --sage-soft: #EAF1EC;
+    --sage-line: #D2E2D7;
+    --amber-line: #EAD6B8;
     --clay: #B5503C;
+    --clay-soft: #F6E4DF;
+    --clay-line: #E7C5BC;
     --brand-border: #DCE4DF;
 
     /* shadcn/Tailwind tokens (HSL triplets) mapped onto the brand palette,
