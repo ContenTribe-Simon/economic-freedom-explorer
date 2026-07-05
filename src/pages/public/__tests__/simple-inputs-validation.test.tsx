@@ -157,6 +157,68 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
     expect(() => computePublicResult(store().inputs)).not.toThrow();
   });
 
+  it("REGRESSION: corrupted localStorage with action-shaped keys cannot overwrite store functions", async () => {
+    localStorage.setItem(
+      "frihedsmodel-public.v1",
+      JSON.stringify({
+        state: {
+          // action-shaped junk that a naive spread-merge would copy over the live store
+          setInputs: null,
+          replaceInputs: "boom",
+          saveCalculation: 42,
+          junk: 123,
+          inputs: { ...DEFAULT_SIMPLE_INPUTS, currentAge: 75, lifeExpectancy: 70, pensionBalance: -1 },
+          saved: "not-an-array",
+        },
+        version: 0,
+      }),
+    );
+    await usePublicStore.persist.rehydrate();
+    const s = usePublicStore.getState();
+    // The real functions survive…
+    expect(typeof s.setInputs).toBe("function");
+    expect(typeof s.replaceInputs).toBe("function");
+    expect(typeof s.saveCalculation).toBe("function");
+    expect(typeof s.removeCalculation).toBe("function");
+    expect(typeof s.loadCalculation).toBe("function");
+    // …unknown keys are not copied at all…
+    expect("junk" in s).toBe(false);
+    // …data fields are sanitized / defaulted…
+    expect(s.inputs.lifeExpectancy).toBeGreaterThanOrEqual(s.inputs.currentAge + 1);
+    expect(s.inputs.pensionBalance).toBe(0);
+    expect(Array.isArray(s.saved)).toBe(true);
+    // …and the next form interaction actually works.
+    s.setInputs({ annualIncome: 123_456 });
+    expect(usePublicStore.getState().inputs.annualIncome).toBe(123_456);
+    localStorage.removeItem("frihedsmodel-public.v1");
+  });
+
+  it("REGRESSION: stop-age slider bounds are the sanitizer's range, not the old 40-75 band", () => {
+    // Low end: a valid early stop below the old hardcoded 40 floor is enterable and storable.
+    store().setInputs({ currentAge: 35, desiredStopAge: 38 });
+    expect(store().inputs.desiredStopAge).toBe(38);
+    // High end: a valid late stop above the old hardcoded 75 cap survives a load.
+    store().replaceInputs({ ...DEFAULT_SIMPLE_INPUTS, lifeExpectancy: 90, desiredStopAge: 80 });
+    expect(store().inputs.desiredStopAge).toBe(80);
+    render(
+      <TooltipProvider>
+        <MemoryRouter>
+          <SimpleInputs />
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    const sliders = screen.getAllByRole("slider");
+    const bounds = sliders.map((el) => [el.getAttribute("aria-valuemin"), el.getAttribute("aria-valuemax"), el.getAttribute("aria-valuenow")]);
+    // Ønsket stop-alder: [currentAge, lifeExpectancy] with the loaded 80 rendered in-band.
+    expect(bounds).toContainEqual(["35", "90", "80"]);
+    // Planlæg til alder: [currentAge+1, 110] (spec max, not the old 105 cap).
+    expect(bounds).toContainEqual(["36", "110", "90"]);
+    // Pension tilgængelig fra alder: the spec band 50-80 (not the old 60-75).
+    expect(bounds).toContainEqual(["50", "80", "67"]);
+    // Forventet afkast: 0-10 % (spec max, not the old 8 % cap).
+    expect(bounds).toContainEqual(["0", "10", "4"]);
+  });
+
   it("share links cannot smuggle invalid values past the sanitizer", () => {
     expect(decodeShareInputs("%%%not-base64%%%")).toBeNull();
     const hostile = encodeShareInputs({

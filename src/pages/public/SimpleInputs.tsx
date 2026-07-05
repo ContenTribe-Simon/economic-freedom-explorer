@@ -238,10 +238,12 @@ export default function SimpleInputs() {
               tip="Den alder planen skal nå. Vælg gerne lidt højt, så pengene rækker hele livet."
               help="Mange regner med 90."
               value={inputs.lifeExpectancy}
-              // The horizon must stay beyond the current age (a shorter horizon would leave the
-              // projection empty); the store sanitizer enforces the same rule on every write.
-              min={Math.max(70, inputs.currentAge + 1)}
-              max={105}
+              // UI bounds ARE the sanitizer's range, [currentAge + 1, 110]: the horizon must
+              // stay beyond the current age (a shorter horizon would leave the projection
+              // empty and crash downstream), and a loaded shared/saved horizon up to the spec
+              // maximum of 110 stays inside the band.
+              min={inputs.currentAge + 1}
+              max={110}
               step={1}
               onChange={(v) => set({ lifeExpectancy: v })}
               format={yr}
@@ -294,8 +296,10 @@ export default function SimpleInputs() {
               label="Pension tilgængelig fra alder"
               tip="Den alder, hvor du kan begynde at hæve din pension. Ofte 67."
               value={inputs.pensionAccessAge}
-              min={60}
-              max={75}
+              // UI bounds ARE the sanitizer's range (spec §4.1: 50–80), so a loaded
+              // shared/saved value always sits inside the band.
+              min={50}
+              max={80}
               step={1}
               onChange={(v) => set({ pensionAccessAge: v })}
               format={yr}
@@ -309,8 +313,10 @@ export default function SimpleInputs() {
               tip="Afkast efter inflation, altså i nutidskroner. 4 til 5 % er almindeligt på lang sigt."
               help="Efter inflation."
               value={Math.round(inputs.expectedRealReturn * 1000) / 10}
+              // UI bounds ARE the sanitizer's range (spec §4.1: 0–10 %), so a loaded
+              // shared/saved value always sits inside the band.
               min={0}
-              max={8}
+              max={10}
               step={0.1}
               onChange={(v) => set({ expectedRealReturn: Math.round(v * 10) / 1000 })}
               format={pct}
@@ -320,10 +326,10 @@ export default function SimpleInputs() {
               label="Ønsket stop-alder"
               tip="Den alder, du gerne vil stoppe med at arbejde. Vi viser, om tallene rækker."
               value={inputs.desiredStopAge}
-              // The stop age tracks the spec range currentAge–lifeExpectancy; the store
-              // sanitizer enforces the same rule on every write.
-              min={Math.max(40, inputs.currentAge)}
-              max={75}
+              // UI bounds ARE the sanitizer's range, [currentAge, lifeExpectancy]: every valid
+              // plan is enterable, and a loaded shared/saved value always sits inside the band.
+              min={inputs.currentAge}
+              max={inputs.lifeExpectancy}
               step={1}
               onChange={(v) => set({ desiredStopAge: v })}
               format={yr}

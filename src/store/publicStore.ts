@@ -73,15 +73,20 @@ export const usePublicStore = create<PublicState>()(
     }),
     {
       name: "frihedsmodel-public.v1",
+      // Only data is ever persisted — never the action functions.
+      partialize: (s) => ({ inputs: s.inputs, saved: s.saved }),
       // Rehydration is a write path too: legacy/hand-edited localStorage must not smuggle an
-      // invalid input set past the sanitizer.
+      // invalid input set past the sanitizer. Copy ONLY the known persisted fields — never
+      // spread the raw blob over the live store, or a corrupted key shaped like an action
+      // (e.g. `"setInputs": null`) would overwrite the real function and crash the next
+      // form interaction.
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<PublicState>;
+        const p = (persisted ?? {}) as { inputs?: unknown; saved?: unknown };
+        const rawInputs = p.inputs && typeof p.inputs === "object" ? (p.inputs as Record<string, unknown>) : current.inputs;
         return {
           ...current,
-          ...p,
-          inputs: sanitizeSimpleInputs({ ...(p.inputs ?? current.inputs) }),
-          saved: Array.isArray(p.saved) ? p.saved : current.saved,
+          inputs: sanitizeSimpleInputs({ ...rawInputs }),
+          saved: Array.isArray(p.saved) ? (p.saved as SavedCalculation[]) : current.saved,
         };
       },
     },
