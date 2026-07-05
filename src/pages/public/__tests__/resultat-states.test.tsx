@@ -176,6 +176,44 @@ describe("Result screen states (real PublicResult data)", () => {
     expect(aria).not.toContain("tidligst");
   });
 
+  it("tight with the earliest age UNKNOWN (search capped): no 'ikke tidligere' claim", () => {
+    // The TIGHT fixture's earliest-FI search comes back null (no stop age up to 75 reaches the
+    // 50M goal), so the fallback shown is the user's own plan — the card must not label that
+    // fallback as a proven earliest ("ikke tidligere med dine tal"), mirroring the on-track
+    // branch's earliestKnown split.
+    const r = computePublicResult(TIGHT);
+    expect(r.status.kind).toBe("tight");
+    expect(r.earliestSustainableStopAge).toBeNull(); // the capped-search case this guards against
+    renderWith(TIGHT);
+    // The Frihedspunkt card names the user's OWN chosen age, labelled as such:
+    const cardSub = screen.getByText("din valgte stop-alder");
+    expect(cardSub.parentElement?.textContent).toContain(`alder ${r.desiredStopAge}`);
+    expect(screen.queryByText("ikke tidligere med dine tal")).toBeNull();
+    const aria = screen.getByRole("img").getAttribute("aria-label") ?? "";
+    expect(aria).toContain(`Din plan holder ved alder ${r.desiredStopAge}`);
+    expect(aria).not.toContain("Frihedspunktet");
+    expect(aria).not.toContain("tidligst");
+  });
+
+  it("tight with the earliest age KNOWN: the 'ikke tidligere' claim is kept", () => {
+    // Verified through the real pipeline: stopping at 64 holds but ends under a 3M goal (tight),
+    // and the FI search finds the goal IS reachable by stopping at 65 — earliest is known
+    // (non-null), so "ikke tidligere med dine tal" is a provable claim and stays.
+    const tightKnown: SimplePublicInputs = {
+      ...DEFAULT_SIMPLE_INPUTS,
+      desiredStopAge: 64,
+      fiTargetMinNetWorth: 3_000_000,
+    };
+    const r = computePublicResult(tightKnown);
+    expect(r.status.kind).toBe("tight");
+    expect(r.earliestSustainableStopAge).toBe(65);
+    renderWith(tightKnown);
+    expect(screen.getByText("ikke tidligere med dine tal")).toBeTruthy();
+    expect(screen.queryByText("din valgte stop-alder")).toBeNull();
+    const aria = screen.getByRole("img").getAttribute("aria-label") ?? "";
+    expect(aria).toContain("Frihedspunktet, hvor du tidligst kan stoppe");
+  });
+
   it("off track with NO sustainable stop age: marker omitted and aria says so", () => {
     const noFreedom: SimplePublicInputs = {
       ...DEFAULT_SIMPLE_INPUTS,

@@ -239,6 +239,11 @@ export default function Resultat() {
     );
   } else if (kind === "tight") {
     const freedomOnPlan = freedom === plan;
+    // Same search-ceiling rule as the on-track branch below: when the engine's earliest-FI
+    // search (capped at 75) returns null, the earliest stop age is unknowable and the
+    // "ikke tidligere med dine tal" claim must not be made. The card then simply names the
+    // user's own chosen stop age, and the chart aria drops the "Frihedspunktet" sentence.
+    const earliestKnown = result.earliestSustainableStopAge != null;
     headline = (
       <>
         Du kan stoppe ved <Age>alder {freedom}</Age>, men det er stramt.
@@ -254,9 +259,11 @@ export default function Resultat() {
         planAge={plan}
         freedomOnPlan={freedomOnPlan}
         ariaLabel={`Din formue stiger til en top på ${peakKr} ved alder ${peakPoint.age}, og rækker til ${horizonEnd}, men slutter under dit mål. ${
-          freedomOnPlan
-            ? `Frihedspunktet, hvor du tidligst kan stoppe, falder sammen med din plan ved alder ${freedom}.`
-            : `Frihedspunktet, hvor du tidligst kan stoppe, er ved alder ${freedom}.`
+          !earliestKnown
+            ? `Din plan holder ved alder ${plan}, men slutter under dit mål.`
+            : freedomOnPlan
+              ? `Frihedspunktet, hvor du tidligst kan stoppe, falder sammen med din plan ved alder ${freedom}.`
+              : `Frihedspunktet, hvor du tidligst kan stoppe, er ved alder ${freedom}.`
         }`}
       />
     );
@@ -269,7 +276,11 @@ export default function Resultat() {
           sub={hasGoal ? `under dit mål på ${formatKr(inputs.fiTargetMinNetWorth ?? 0)}` : `pengene rækker knap til ${horizonEnd}`}
           tone="accent"
         />
-        <StatCard label="Frihedspunkt" value={`alder ${freedom}`} sub="ikke tidligere med dine tal" />
+        {earliestKnown ? (
+          <StatCard label="Frihedspunkt" value={`alder ${freedom}`} sub="ikke tidligere med dine tal" />
+        ) : (
+          <StatCard label="Frihedspunkt" value={`alder ${plan}`} sub="din valgte stop-alder" />
+        )}
       </>
     );
   } else {
