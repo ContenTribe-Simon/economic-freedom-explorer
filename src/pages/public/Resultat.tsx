@@ -144,6 +144,31 @@ export default function Resultat() {
   // adapter's driver list itself is unchanged.
   const visibleDrivers = kind === "off_track" ? result.drivers.filter((d) => d.direction === "hurts") : result.drivers;
 
+  // Required horizon-relative capital anchors (data contract §4.2): capital when the pension
+  // becomes accessible (rendered only when the adapter says the age is in-horizon — null means
+  // omit, which also covers the "already accessible" fallback) and capital at the end of the
+  // horizon (the LAST YearRow). The tight state's goal card IS the end-of-horizon anchor, so it
+  // is not duplicated there. These extend the references' three-card set because the spec marks
+  // them as required public outputs.
+  const anchorCards: ReactNode = (
+    <>
+      {result.capitalAtPensionAccessAge != null && (
+        <StatCard
+          label="Når pensionen bliver tilgængelig"
+          value={formatKr(result.capitalAtPensionAccessAge)}
+          sub={`ved alder ${inputs.pensionAccessAge}`}
+        />
+      )}
+      {kind !== "tight" && (
+        <StatCard
+          label="Ved planens slutning"
+          value={formatKr(result.capitalAtEndOfHorizon)}
+          sub={`formue ved alder ${horizonEnd}`}
+        />
+      )}
+    </>
+  );
+
   // --- Per-state copy (ported from the three reference screens, parameterized) ---
   let headline: ReactNode;
   let takeaway: string;
@@ -296,6 +321,7 @@ export default function Resultat() {
 
         <section className="fm-rise mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-3" style={{ animationDelay: "0.14s" }}>
           {cards}
+          {anchorCards}
         </section>
 
         <section className="fm-rise mt-[clamp(26px,4.5vw,46px)]" style={{ animationDelay: "0.18s" }}>

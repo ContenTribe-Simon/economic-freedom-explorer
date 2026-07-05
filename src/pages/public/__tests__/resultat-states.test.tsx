@@ -114,6 +114,38 @@ describe("Result screen states (real PublicResult data)", () => {
     }
   });
 
+  it("renders the required §4.2 horizon anchors: pension-access and end-of-horizon capital", () => {
+    // On track: both anchors present with the adapter's exact figures.
+    const on = computePublicResult(ON_TRACK);
+    const { unmount: u1 } = renderWith(ON_TRACK);
+    expect(on.capitalAtPensionAccessAge).not.toBeNull();
+    const kr = (n: number) => `${Math.round(n).toLocaleString("da-DK")} kr`;
+    expect(screen.getByText("Når pensionen bliver tilgængelig")).toBeTruthy();
+    expect(screen.getByText(kr(on.capitalAtPensionAccessAge!))).toBeTruthy();
+    expect(screen.getByText("Ved planens slutning")).toBeTruthy();
+    expect(screen.getByText(`formue ved alder ${on.lifeExpectancy}`)).toBeTruthy();
+    u1();
+
+    // Off track: both anchors present too.
+    const { unmount: u2 } = renderWith(OFF_TRACK);
+    expect(screen.getByText("Når pensionen bliver tilgængelig")).toBeTruthy();
+    expect(screen.getByText("Ved planens slutning")).toBeTruthy();
+    u2();
+
+    // Tight: the goal card IS the end-of-horizon anchor — exactly one, no duplicate.
+    const { unmount: u3 } = renderWith(TIGHT);
+    expect(screen.getAllByText("Ved planens slutning")).toHaveLength(1);
+    expect(screen.getByText("Når pensionen bliver tilgængelig")).toBeTruthy();
+    u3();
+
+    // Out of horizon: pensionAccessAge beyond the plan end -> adapter yields null -> card omitted.
+    const outOfHorizon = { ...DEFAULT_SIMPLE_INPUTS, lifeExpectancy: 75, pensionAccessAge: 80 };
+    expect(computePublicResult(outOfHorizon).capitalAtPensionAccessAge).toBeNull();
+    const { unmount: u4 } = renderWith(outOfHorizon);
+    expect(screen.queryByText("Når pensionen bliver tilgængelig")).toBeNull();
+    u4();
+  });
+
   it("no hedging or em dashes in rendered copy (copy rule)", () => {
     for (const fixture of [ON_TRACK, TIGHT, OFF_TRACK]) {
       const { container, unmount } = renderWith(fixture);
