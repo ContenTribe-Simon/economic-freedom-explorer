@@ -203,6 +203,42 @@ test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
     await expectNotBlank(page);
   });
 
+  test("the Result screen shows the 1-lever sensitivity helper for a plan with cashflow room", async ({ page }) => {
+    // Scope doc item 7 (Playwright presence). Seed the PUBLIC store with a plan where the
+    // savings lever responds (the default persona's planned savings exceed its cashflow, so
+    // the helper is deliberately hidden there — see publicSensitivity.ts).
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "frihedsmodel-public.v1",
+        JSON.stringify({
+          state: {
+            inputs: {
+              // DEFAULT_SIMPLE_INPUTS with spending 15.000 / savings 2.000 / stop 67 — the
+              // same "room" fixture the unit tests pin ("kan du tidligst stoppe ved alder 64
+              // i stedet for 67").
+              currentAge: 35,
+              lifeExpectancy: 90,
+              annualIncome: 500_000,
+              monthlySpending: 15_000,
+              currentInvestments: 200_000,
+              monthlySavings: 2_000,
+              pensionBalance: 300_000,
+              pensionAccessAge: 67,
+              expectedRealReturn: 0.04,
+              desiredStopAge: 67,
+            },
+            saved: [],
+          },
+          version: 0,
+        }),
+      );
+    });
+    await page.goto("/resultat");
+    await expect(page.getByTestId("sensitivity-helper")).toBeVisible();
+    await expect(page.getByText(/Hvis du sparer 1\.000 kr mere op om måneden/)).toBeVisible();
+    await expectNotBlank(page);
+  });
+
   test("the public flow's quiet 'Avanceret' entry hits the door on a fresh device", async ({ page }) => {
     // The data contract's single low-emphasis entry lives on the Save/Share screen. Clicking
     // it goes through the Advanced door like any other advanced URL — it must never bypass it.

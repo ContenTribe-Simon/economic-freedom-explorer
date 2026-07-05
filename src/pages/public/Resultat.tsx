@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Check, Minus, Share2, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { Check, Minus, Share2, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { HorizonChart } from "@/components/public/HorizonChart";
@@ -8,6 +8,7 @@ import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
 import { formatKr, headlineStopAge } from "@/lib/publicFormat";
 import { decodeShareInputs } from "@/lib/publicShare";
+import { deriveSavingsSensitivity } from "@/lib/publicSensitivity";
 import "./start.css";
 import "./resultat.css";
 
@@ -125,6 +126,10 @@ export default function Resultat() {
   }, [searchParams]);
 
   const result = useMemo(() => computePublicResult(inputs), [inputs]);
+  // The 1-lever sensitivity helper: a second REAL pipeline run with monthlySavings + 1.000
+  // (never an approximation). Null means "nothing truthful to claim" and the line is hidden
+  // (see publicSensitivity.ts for the exact rules).
+  const sensitivity = useMemo(() => deriveSavingsSensitivity(inputs, result), [inputs, result]);
 
   const kind = result.status.kind;
   const plan = result.desiredStopAge;
@@ -417,6 +422,17 @@ export default function Resultat() {
                 <DriverRow key={d.text} driver={d} />
               ))}
             </ul>
+          )}
+          {sensitivity && (
+            <div className="mt-4 flex items-start gap-2.5" data-testid="sensitivity-helper">
+              <span
+                aria-hidden="true"
+                className="mt-px inline-flex h-[22px] w-[22px] flex-none items-center justify-center rounded-full bg-[color:var(--paper-sunk)] text-[color:var(--fjord)]"
+              >
+                <TrendingUp className="h-3.5 w-3.5" />
+              </span>
+              <p className="m-0 text-[14px] leading-[1.5] text-[color:var(--ink-soft)]">{sensitivity.text}</p>
+            </div>
           )}
           {result.warnings.length > 0 && (
             <div className="mt-4 flex items-start gap-3 rounded-[14px] border border-[color:var(--amber-line)] bg-[color:var(--dawn-soft)] px-4 py-3.5">
