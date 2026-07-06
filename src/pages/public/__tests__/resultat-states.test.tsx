@@ -288,15 +288,20 @@ describe("Result screen states (real PublicResult data)", () => {
   it("REGRESSION: the no-carry-over reminder sits by the 'Avanceret model' CTA regardless of door state", () => {
     // A returning user whose Advanced door is already open never sees DoorPage's
     // clarification again — the reminder next to the Resultat CTA must not depend on it.
+    // Two instances since Codex round 2: the shared header carries the reminder by the corner
+    // button on every public screen, and Resultat keeps its own next to the row CTA.
     const NOTE = "Den avancerede model har sine egne tal. Tallene fra beregningen her følger ikke med.";
     localStorage.setItem("frihedsmodel-advanced-door.v1", "open");
     const { unmount: u1 } = renderWith(ON_TRACK);
-    expect(screen.getByTestId("advanced-no-carryover-note").textContent).toContain(NOTE);
+    for (const note of screen.getAllByTestId("advanced-no-carryover-note")) {
+      expect(note.textContent).toContain(NOTE);
+    }
+    expect(screen.getAllByTestId("advanced-no-carryover-note")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Avanceret model" })).toBeTruthy();
     u1();
     localStorage.removeItem("frihedsmodel-advanced-door.v1");
     const { unmount: u2 } = renderWith(ON_TRACK);
-    expect(screen.getByTestId("advanced-no-carryover-note").textContent).toContain(NOTE);
+    expect(screen.getAllByTestId("advanced-no-carryover-note")).toHaveLength(2);
     u2();
   });
 

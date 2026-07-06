@@ -25,6 +25,26 @@ describe("Advanced door copy is public-safe", () => {
     expect(joined).not.toMatch(/boede i/i);
   });
 
+  it("REGRESSION (Codex round 2): forbidden concepts do not appear as TITLES either", () => {
+    // Round 1 reworded the bodies but left "Landeanalyse" (literally "country analysis",
+    // the exact concept CLAUDE.md §3 rule 7 names) standing as a heading. Titles are the
+    // most visible strings on the door, so they get the same bans as the bodies.
+    const joined = ALL_STRINGS.join(" | ");
+    expect(joined).not.toMatch(/landeanalyse/i);
+    expect(joined).not.toMatch(/\bland(e|et)?\b/i);
+    // The FIRE acronym (English, community jargon) stays out of public copy. Case-sensitive
+    // on purpose: Danish "fire" (the number four) is fine.
+    expect(joined).not.toMatch(/FIRE/);
+    expect(joined).not.toMatch(/benchmark/i);
+  });
+
+  it("the vocabulary guard itself catches 'Landeanalyse', so it cannot silently return here", () => {
+    // The first test scans this file with containsForbiddenTerm, but that only has teeth if
+    // the guard actually knows the term ("Landeanalyse" passed it in round 1).
+    expect(containsForbiddenTerm("Landeanalyse")).toBe(true);
+    expect(containsForbiddenTerm("landeanalysen viser")).toBe(true);
+  });
+
   it("copy rules: no em dashes, no 'ca.' hedging", () => {
     for (const s of ALL_STRINGS) {
       expect(s).not.toContain("—");

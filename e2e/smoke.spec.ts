@@ -281,6 +281,14 @@ test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
     for (const path of ["/start", "/simple-inputs", "/resultat", "/gem-og-del"]) {
       await page.goto(path);
       await expect(page.getByRole("link", { name: "Avanceret", exact: true }), `corner button on ${path}`).toBeVisible();
+      // The corner button always travels with the no-carry-over reminder (Codex round 2):
+      // for a returning user with the door already open, this note is the only thing saying
+      // the public numbers do not carry over. first() because Resultat also keeps its own
+      // copy next to the action-row CTA.
+      await expect(
+        page.getByTestId("advanced-no-carryover-note").first(),
+        `no-carry-over reminder on ${path}`,
+      ).toBeVisible();
     }
     await expect(page.getByRole("link", { name: "Avanceret model" })).not.toBeVisible(); // row button is Resultat-only
     await page.goto("/resultat");
@@ -293,7 +301,8 @@ test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
     // The enriched intro orients first-time visitors without burying the enter action…
     await expect(page.getByText("Det finder du derinde")).toBeVisible();
     await expect(page.getByText("Scenarier og stress-tests")).toBeVisible();
-    await expect(page.getByText("Landeanalyse")).toBeVisible();
+    // Public-safe title since Codex round 2 ("Landeanalyse" named the forbidden concept).
+    await expect(page.getByText("Sammenlign rammevilkår")).toBeVisible();
     // …and carries the no-carry-over clarification (moved here from the old inline link copy).
     await expect(page.getByText(/starter ikke med tallene fra den enkle beregning/)).toBeVisible();
     await expect(page.getByTestId("open-advanced-door")).toBeVisible();

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Compass, ShieldCheck, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AdvancedAccessButton } from "@/components/public/AdvancedAccessButton";
+import { AdvancedAccessButton, AdvancedNoCarryOverNote } from "@/components/public/AdvancedAccessButton";
 import "./start.css";
 
 /**
@@ -85,18 +85,22 @@ export default function Start() {
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
       <Motif />
 
-      <header className="relative z-[2] flex items-center justify-between px-[clamp(18px,5vw,40px)] pt-[26px]">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="h-3.5 w-3.5 rounded-full bg-[radial-gradient(circle_at_35%_35%,var(--dawn-glow),var(--dawn))] shadow-[0_0_0_4px_var(--dawn-soft)]"
-          />
-          <span className="font-display text-[21px] font-medium tracking-[-0.01em] text-foreground">
-            Frihedsmodel
-          </span>
+      <header className="relative z-[2] px-[clamp(18px,5vw,40px)] pt-[26px]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="h-3.5 w-3.5 rounded-full bg-[radial-gradient(circle_at_35%_35%,var(--dawn-glow),var(--dawn))] shadow-[0_0_0_4px_var(--dawn-soft)]"
+            />
+            <span className="font-display text-[21px] font-medium tracking-[-0.01em] text-foreground">
+              Frihedsmodel
+            </span>
+          </div>
+          {/* Same corner button as PublicHeader renders on the other three public screens. */}
+          <AdvancedAccessButton />
         </div>
-        {/* Same corner button as PublicHeader renders on the other three public screens. */}
-        <AdvancedAccessButton />
+        {/* Same reminder as PublicHeader: every advanced entry point carries it. */}
+        <AdvancedNoCarryOverNote className="mt-1 text-right text-[12px]" />
       </header>
 
       <main className="relative z-[2] flex flex-1 flex-col items-center justify-center px-[clamp(18px,5vw,40px)] pb-[clamp(48px,9vh,110px)] pt-[clamp(40px,8vh,96px)] text-center">

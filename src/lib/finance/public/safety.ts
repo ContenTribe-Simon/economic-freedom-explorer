@@ -22,6 +22,11 @@ export const FORBIDDEN_PUBLIC_TERMS = [
   "barma",
   "koncentration",
   "country",
+  // Danish sibling of "country": the advanced app's own name for the feature ("Landeanalyse"
+  // slipped past the guard as a door TITLE in Codex round 2 because only the English term was
+  // listed). Deliberately the full compound, not "land"/"lande" — those prefixes would
+  // false-positive on ordinary Danish ("lander", "leveomkostninger" is safe but "lander" is not).
+  "landeanalyse",
 ] as const;
 
 const FORBIDDEN_RE = new RegExp(`\\b(${FORBIDDEN_PUBLIC_TERMS.join("|")})`, "i");

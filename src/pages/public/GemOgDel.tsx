@@ -390,8 +390,9 @@ export default function GemOgDel() {
 
         {/* The advanced access point moved to the shared corner button in PublicHeader
             (product decision 2026-07-05: one consistent treatment on every public screen, no
-            special case here). The no-carry-over clarification ("egne tal og indstillinger")
-            lives on the door page every entry passes through. */}
+            special case here). PublicHeader also carries the no-carry-over reminder next to
+            that button — a returning user with the door already open never sees DoorPage's
+            clarification, so the reminder cannot live only there. */}
       </div>
     </div>
   );

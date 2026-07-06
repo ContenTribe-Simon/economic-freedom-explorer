@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Check, Layers, Minus, Share2, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/public/PublicHeader";
+import { AdvancedNoCarryOverNote } from "@/components/public/AdvancedAccessButton";
 import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
@@ -474,10 +475,9 @@ export default function Resultat() {
 
         {/* Local no-carry-over reminder for the CTA above, shown UNCONDITIONALLY: a returning
             user whose door is already open never sees DoorPage's clarification again, and the
-            continuity expectation is highest right here, after adjusting a public plan. */}
-        <p className="mt-2.5 text-[13px] leading-[1.5] text-[color:var(--ink-soft)]" data-testid="advanced-no-carryover-note">
-          Den avancerede model har sine egne tal. Tallene fra beregningen her følger ikke med.
-        </p>
+            continuity expectation is highest right here, after adjusting a public plan. The
+            shared header carries the same note by the corner button (every entry point does). */}
+        <AdvancedNoCarryOverNote className="mt-2.5" />
 
         {/* Share-link recipients land HERE first (never Start/Simple Inputs), so the footer
             carries the real-terms note alongside the canonical disclaimer, same combined
