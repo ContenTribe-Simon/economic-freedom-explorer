@@ -22,6 +22,15 @@ export const FORBIDDEN_PUBLIC_TERMS = [
   "barma",
   "koncentration",
   "country",
+  // Danish sibling of "country": the advanced app's own name for the feature ("Landeanalyse"
+  // slipped past the guard as a door TITLE in Codex round 2 because only the English term was
+  // listed). Deliberately the full compound, NOT a "land"/"lande" prefix: the guard regex
+  // anchors only the start of a word, so a prefix entry would also match ordinary Danish
+  // words that merely begin with those letters — e.g. "lander" (to land/arrive), which
+  // legitimate public copy uses ("så du lander direkte derinde"). The trade-off: other
+  // country compounds ("landesammenligning") are NOT caught; see the door-copy test's
+  // stricter whole-word regex and docs/backlog-public-polish-v1.md for the follow-up.
+  "landeanalyse",
 ] as const;
 
 const FORBIDDEN_RE = new RegExp(`\\b(${FORBIDDEN_PUBLIC_TERMS.join("|")})`, "i");

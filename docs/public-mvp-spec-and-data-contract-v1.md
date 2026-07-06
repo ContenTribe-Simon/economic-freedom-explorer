@@ -136,16 +136,33 @@ is hidden/deferred. This is what a designer builds from. Copy shown is indicativ
 - **Cloud (optional) card:** "Gem i skyen" → login (Supabase). Clearly secondary; never required.
 - *Hidden/deferred:* snapshot history + comparison UI, share links, accounts-first flows.
 
-### The Advanced door (out of MVP scope, present as a link only)
-- A single low-emphasis entry ("Avanceret") that leads to the existing advanced surface
-  (scenarios, snapshots, life events, FIRE, countries, full tables). Not designed in this
-  spec — it reuses the current advanced pages until a later phase.
+### The Advanced door (access points + intro page)
+- **Decision 2026-07-05 (supersedes the earlier "single low-emphasis link on Save/Share"):**
+  the advanced surface has a persistent, small, low-key access point on EVERY public screen —
+  the same corner button ("Avanceret", ghost style, top right in the shared header) on Start,
+  Simple Inputs, Resultat and Save/Share; no special-case placement on any one screen. On
+  Resultat it is ADDITIONALLY surfaced as a third button in the bottom action row ("Avanceret
+  model", same outline style as "Gem eller del"). Discoverability only: every access point
+  links to /dashboard and passes through the AdvancedGate door exactly as any advanced URL.
+- The door page itself is a proper intro, not just consent copy: it introduces the advanced
+  features with one plain-Danish line each, keeps the enter action unburied, and carries the
+  no-carry-over clarification ("med egne tal", see below). Because the door is shown BEFORE
+  opt-in, its copy — titles included — is public-path copy under CLAUDE.md §3 rule 7: the
+  items describe what the person can do, never the advanced app's internal page names. The
+  current titles (canonical source: `src/pages/advancedDoorCopy.ts`, guarded by
+  `src/pages/__tests__/advanced-door-copy.test.ts`): "Scenarier og stress-tests",
+  "Livsfaser", "Milepæle for uafhængighed" (the FIRE-benchmark page, without the acronym),
+  "Snapshots", "Sammenlign rammevilkår" (the country-analysis page, without naming
+  land/country), "År-for-år-tabeller og rapport". Do NOT render "FIRE-benchmarks" or
+  "Landeanalyse" on the door; those names stay behind it.
+  The advanced pages themselves reuse the current advanced surface until a later phase.
 - **Deferred (considered, not forgotten):** pre-filling the advanced app from the public flow
   — mapping the overlapping Simple Inputs fields (age, income, spending, savings, stop age,
   pension) into `useFinanceStore` before navigating. Deliberately out of MVP scope: the
   advanced model's field set is much larger, so a partial mapping risks misrepresenting the
-  user's plan as more complete than what they entered. Until then the entry's copy must NOT
-  imply that the just-entered numbers carry over ("med egne tal og indstillinger").
+  user's plan as more complete than what they entered. Until then the DOOR PAGE's copy must
+  NOT imply that the just-entered numbers carry over (it states "med egne tal: den starter
+  ikke med tallene fra den enkle beregning").
 
 ---
 
@@ -380,8 +397,11 @@ dropped. Match on the stable `id`, not the title text.
 **Filter rule (robust to new checks):** default-deny — drop anything not on the allowlist —
 **and** additionally hard-block any check whose `id`, `title`, or `detail` references the
 advanced/DK/internal vocabulary: *Folkepension, Holding, "No Barma", Barma, ASK, ratepension,
-livrente, livsvarig, deltid, familiefond, exit, audit-panel(et), stress-test*. This keeps a
-newly-added engine check from leaking onto the public path before it has reviewed public copy.
+livrente, livsvarig, deltid, familiefond, exit, audit-panel(et), stress-test, country,
+landeanalyse*. This keeps a newly-added engine check from leaking onto the public path before
+it has reviewed public copy. The ENFORCED list is `FORBIDDEN_PUBLIC_TERMS` in
+`src/lib/finance/public/safety.ts` (the code is canonical for exact terms; keep the two in
+sync when either changes — "landeanalyse" was added 2026-07-06 after the door-title leak).
 
 ### 4.5 Public-safe robustness-drivers adapter
 
@@ -427,8 +447,10 @@ adapter must **not** match on label text. Two robust options (the implementation
 
 **Filter rule (mirrors §4.4):** default-deny on family, **and** hard-block any factor whose
 `label`/`detail` references *holding, buffer, kontant buffer, deltid, ASK, koncentration,
-minimumsmål* (unless an FI target is set) — so a newly-added engine factor can't leak before
-it has reviewed public copy.
+minimumsmål* (unless an FI target is set), plus the shared §4.4 vocabulary incl. *country,
+landeanalyse* — so a newly-added engine factor can't leak before it has reviewed public copy.
+As in §4.4, the enforced term list is `FORBIDDEN_PUBLIC_TERMS` in
+`src/lib/finance/public/safety.ts`; keep doc and code in sync when either changes.
 
 > **Same treatment applies to `confidenceBreakdown`.** It is not shown in the MVP (only the
 > `assumptionConfidence` score is). If a future PR surfaces assumption drivers, they must pass

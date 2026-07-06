@@ -1,8 +1,9 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Check, Minus, Share2, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
+import { Check, Layers, Minus, Share2, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/public/PublicHeader";
+import { AdvancedNoCarryOverNote } from "@/components/public/AdvancedAccessButton";
 import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
@@ -353,7 +354,11 @@ export default function Resultat() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-[920px] px-[clamp(18px,5vw,40px)]">
+        {/* withNoCarryOverNote={false}: this screen's reminder lives by the "Avanceret model"
+            row CTA below, so the header copy is suppressed — the sentence renders exactly
+            once per screen (self-review round 3). */}
         <PublicHeader
+          withNoCarryOverNote={false}
           action={
             <Button asChild variant="ghost" size="sm">
               <Link to="/simple-inputs">
@@ -461,7 +466,22 @@ export default function Resultat() {
               Gem eller del
             </Link>
           </Button>
+          {/* Third action (product decision 2026-07-05): the advanced app surfaced in the
+              action row itself, alongside the corner button the header already carries.
+              Goes through the AdvancedGate door like every advanced URL. */}
+          <Button asChild variant="outline" size="lg" className="h-12 bg-card px-7 text-[15px] [&_svg]:size-[18px]">
+            <Link to="/dashboard">
+              <Layers aria-hidden="true" />
+              Avanceret model
+            </Link>
+          </Button>
         </div>
+
+        {/* THE no-carry-over reminder of this screen (the header's copy is suppressed above),
+            shown UNCONDITIONALLY: a returning user whose door is already open never sees
+            DoorPage's clarification again, and the continuity expectation is highest right
+            here, after adjusting a public plan. */}
+        <AdvancedNoCarryOverNote className="mt-2.5" />
 
         {/* Share-link recipients land HERE first (never Start/Simple Inputs), so the footer
             carries the real-terms note alongside the canonical disclaimer, same combined
