@@ -98,6 +98,30 @@ describe("route-change focus management", () => {
     });
   });
 
+  it("REGRESSION (Codex): a screen with NO h1 (/inputs) still receives focus, via the main landmark", async () => {
+    // Inputs' title is an editable <input>, not a heading, so the h1 fallbacks all miss —
+    // focusRouteHeading() silently did nothing and focus fell to <body> when the door
+    // button unmounted. The final fallback focuses the content landmark instead.
+    renderAppAt("/inputs");
+    fireEvent.click(screen.getByTestId("open-advanced-door"));
+    await waitFor(() => {
+      const active = document.activeElement as HTMLElement;
+      expect(active).not.toBe(document.body);
+      expect(active.tagName).toBe("MAIN");
+    });
+  });
+
+  it("sidebar navigation to /inputs (pathname change) also lands focus on the main landmark", async () => {
+    localStorage.setItem("frihedsmodel-advanced-door.v1", "open");
+    renderAppAt("/dashboard");
+    fireEvent.click(screen.getByRole("link", { name: "Variabler" }));
+    await waitFor(() => {
+      const active = document.activeElement as HTMLElement;
+      expect(active).not.toBe(document.body);
+      expect(active.tagName).toBe("MAIN");
+    });
+  });
+
   it("returning user (door already open) deep-linking straight to /dashboard: initial load keeps default focus", async () => {
     localStorage.setItem("frihedsmodel-advanced-door.v1", "open");
     renderAppAt("/dashboard");
