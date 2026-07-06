@@ -45,6 +45,14 @@ describe("Advanced door copy is public-safe", () => {
     expect(containsForbiddenTerm("landeanalysen viser")).toBe(true);
   });
 
+  it("ordinary Danish 'lander' does NOT trip the guard (the term is the full compound only)", () => {
+    // Pins the rule the guard's comment states: a "land"/"lande" PREFIX entry would match
+    // "lander" (the guard regex anchors only the start of a word), which is why the list
+    // carries the full compound instead. DOOR_REMEMBER_NOTE uses exactly this word.
+    expect(containsForbiddenTerm("så du lander direkte derinde næste gang")).toBe(false);
+    expect(containsForbiddenTerm(DOOR_REMEMBER_NOTE)).toBe(false);
+  });
+
   it("copy rules: no em dashes, no 'ca.' hedging", () => {
     for (const s of ALL_STRINGS) {
       expect(s).not.toContain("—");

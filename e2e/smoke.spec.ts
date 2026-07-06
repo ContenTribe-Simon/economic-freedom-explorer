@@ -281,12 +281,13 @@ test.describe("Advanced door (fresh device, no opt-in seeded)", () => {
     for (const path of ["/start", "/simple-inputs", "/resultat", "/gem-og-del"]) {
       await page.goto(path);
       await expect(page.getByRole("link", { name: "Avanceret", exact: true }), `corner button on ${path}`).toBeVisible();
-      // The corner button always travels with the no-carry-over reminder (Codex round 2):
-      // for a returning user with the door already open, this note is the only thing saying
-      // the public numbers do not carry over. first() because Resultat also keeps its own
-      // copy next to the action-row CTA.
+      // Every screen carries the no-carry-over reminder exactly ONCE (Codex round 2 +
+      // self-review round 3): under the header's corner button on Start/Simple Inputs/
+      // GemOgDel, by the action-row CTA on Resultat. For a returning user with the door
+      // already open, this note is the only thing saying the numbers do not carry over.
+      // Plain getByTestId doubles as the uniqueness check — two notes would fail strict mode.
       await expect(
-        page.getByTestId("advanced-no-carryover-note").first(),
+        page.getByTestId("advanced-no-carryover-note"),
         `no-carry-over reminder on ${path}`,
       ).toBeVisible();
     }

@@ -6,10 +6,18 @@ import { AdvancedAccessButton, AdvancedNoCarryOverNote } from "./AdvancedAccessB
  * an optional action (ghost link/button) plus the persistent small "Avanceret" corner button
  * on the right (product decision 2026-07-05: the advanced access point lives in the same
  * corner on every public screen). Ported from the design references' `.top` / `.brand` header.
- * The corner button always travels with the no-carry-over reminder right under it — every
- * advanced entry point states that the public numbers do not follow along.
+ * The header carries the no-carry-over reminder under the corner button, so every screen
+ * states that the public numbers do not follow along. A screen that owns a closer placement
+ * for the reminder (Resultat, next to its "Avanceret model" row CTA) passes
+ * `withNoCarryOverNote={false}` — each screen shows the sentence exactly once, never twice.
  */
-export function PublicHeader({ action }: { action?: ReactNode }) {
+export function PublicHeader({
+  action,
+  withNoCarryOverNote = true,
+}: {
+  action?: ReactNode;
+  withNoCarryOverNote?: boolean;
+}) {
   return (
     <header className="pt-[26px]">
       {/* flex-wrap + shrinkable right group: on narrow phones the action row wraps under the
@@ -29,7 +37,7 @@ export function PublicHeader({ action }: { action?: ReactNode }) {
           <AdvancedAccessButton />
         </div>
       </div>
-      <AdvancedNoCarryOverNote className="mt-1 text-right text-[12px]" />
+      {withNoCarryOverNote && <AdvancedNoCarryOverNote className="mt-1 text-right text-[12px]" />}
     </header>
   );
 }

@@ -354,7 +354,11 @@ export default function Resultat() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-[920px] px-[clamp(18px,5vw,40px)]">
+        {/* withNoCarryOverNote={false}: this screen's reminder lives by the "Avanceret model"
+            row CTA below, so the header copy is suppressed — the sentence renders exactly
+            once per screen (self-review round 3). */}
         <PublicHeader
+          withNoCarryOverNote={false}
           action={
             <Button asChild variant="ghost" size="sm">
               <Link to="/simple-inputs">
@@ -473,10 +477,10 @@ export default function Resultat() {
           </Button>
         </div>
 
-        {/* Local no-carry-over reminder for the CTA above, shown UNCONDITIONALLY: a returning
-            user whose door is already open never sees DoorPage's clarification again, and the
-            continuity expectation is highest right here, after adjusting a public plan. The
-            shared header carries the same note by the corner button (every entry point does). */}
+        {/* THE no-carry-over reminder of this screen (the header's copy is suppressed above),
+            shown UNCONDITIONALLY: a returning user whose door is already open never sees
+            DoorPage's clarification again, and the continuity expectation is highest right
+            here, after adjusting a public plan. */}
         <AdvancedNoCarryOverNote className="mt-2.5" />
 
         {/* Share-link recipients land HERE first (never Start/Simple Inputs), so the footer
