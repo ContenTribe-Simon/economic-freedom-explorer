@@ -29,6 +29,16 @@ describe("route-change focus management", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
+  it("REGRESSION (Codex): the root redirect '/' -> '/start' is still initial load, no focus steal", async () => {
+    // "/" renders only <Navigate>, so the redirect IS the initial page load spelled as two
+    // pathnames. Landing via "/" must behave exactly like landing on /start directly: the
+    // browser and screen reader own initial-load orientation; we only manage focus for
+    // client-side transitions the user actually made.
+    renderAppAt("/");
+    await screen.findByRole("heading", { name: "Se hvornår du kan stoppe med at arbejde." });
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it("/start -> /simple-inputs: focus moves to the new screen's h1", async () => {
     renderAppAt("/start");
     fireEvent.click(screen.getByRole("link", { name: /Kom i gang/ }));
@@ -67,5 +77,36 @@ describe("route-change focus management", () => {
       expect(active.tagName).toBe("H1");
       expect(active.textContent).toBe("Du er på vej ind i den avancerede model.");
     });
+  });
+
+  it("REGRESSION (Codex): opening the door swaps door -> app at the SAME pathname; focus must follow", async () => {
+    // AdvancedGate replaces the door with the requested page via state, not navigation, so
+    // the pathname-keyed effect never re-fires. Without an explicit trigger the clicked
+    // button unmounts and focus falls to <body>.
+    renderAppAt("/gem-og-del");
+    fireEvent.click(screen.getByRole("link", { name: "Avanceret" }));
+    await waitFor(() => {
+      expect((document.activeElement as HTMLElement).textContent).toBe(
+        "Du er på vej ind i den avancerede model.",
+      );
+    });
+    fireEvent.click(screen.getByTestId("open-advanced-door"));
+    await waitFor(() => {
+      const active = document.activeElement as HTMLElement;
+      expect(active.tagName).toBe("H1");
+      expect(active.textContent).not.toBe("Du er på vej ind i den avancerede model.");
+    });
+  });
+
+  it("returning user (door already open) deep-linking straight to /dashboard: initial load keeps default focus", async () => {
+    localStorage.setItem("frihedsmodel-advanced-door.v1", "open");
+    renderAppAt("/dashboard");
+    // The dashboard renders (door skipped), and, as on every other initial load, focus is
+    // left to the browser: the door-open focus trigger fires only on the in-session swap.
+    await waitFor(() => {
+      expect(screen.queryByTestId("open-advanced-door")).toBeNull();
+      expect(screen.getAllByRole("heading", { level: 1 }).length).toBeGreaterThan(0);
+    });
+    expect(document.activeElement).toBe(document.body);
   });
 });

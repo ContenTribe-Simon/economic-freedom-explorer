@@ -1,34 +1,32 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { focusRouteHeading } from "@/lib/routeFocus";
 
 /**
  * Route-level focus management (Phase 7 accessibility hardening): after every client-side
- * navigation, focus moves to the new screen's heading so keyboard and screen-reader users
- * get an explicit signal that the page changed — before this, focus silently stayed on
- * <body>. The target is the screen's `[data-route-focus]`-marked h1 (explicit marker
- * because e.g. GemOgDel renders a print-only h1 EARLIER in the DOM than its visible
- * heading), falling back to the first h1 for screens that have not opted in (the advanced
- * pages). The browser's default focus is deliberately left alone on initial page load —
- * stealing it there would skip the skip-link/address-bar conventions users expect.
+ * navigation, focus moves to the new screen's heading (see lib/routeFocus.ts for the
+ * target rules) so keyboard and screen-reader users get an explicit signal that the page
+ * changed — before this, focus silently stayed on <body>.
+ *
+ * Initial page load NEVER steals focus — the browser and screen reader own initial-load
+ * orientation; we only manage transitions the user made inside the app. That covers two
+ * cases (Codex round 2): the very first effect run (no previous pathname), AND the app's
+ * root redirect: "/" renders only <Navigate to="/start">, a user cannot act on it, so a
+ * transition OUT of "/" is still the initial load, just spelled as two pathnames. Landing
+ * via "/" must behave exactly like landing on /start directly.
+ *
+ * The Advanced door -> app swap happens WITHOUT a pathname change (AdvancedGate swaps
+ * children by state); AdvancedGate triggers focusRouteHeading itself for that transition.
  */
 export function RouteFocusManager() {
   const { pathname } = useLocation();
-  const isFirstRender = useRef(true);
+  const prevPathname = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    const target =
-      document.querySelector<HTMLElement>("[data-route-focus]") ??
-      document.querySelector<HTMLElement>("main h1") ??
-      document.querySelector<HTMLElement>("h1");
-    if (!target) return;
-    // Headings are not natively focusable; a programmatic-only tabindex makes them a valid
-    // focus target without adding them to the tab order.
-    if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-    target.focus();
+    const prev = prevPathname.current;
+    prevPathname.current = pathname;
+    if (prev === null || prev === "/") return;
+    focusRouteHeading();
   }, [pathname]);
 
   return null;
