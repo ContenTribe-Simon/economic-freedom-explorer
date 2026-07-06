@@ -4,6 +4,23 @@ Dette dokument beskriver hvordan Supabase-laget bruges som save/load for
 modellen, og hvilke regler der gælder for data-konsistens. Cloud er **valgfrit
 overlay**. Appen virker 100% uden login.
 
+### Valgfri konfiguration (Phase 7-hærdning, 2026-07-06)
+
+"Valgfrit overlay" gælder også selve konfigurationen: mangler
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`, er
+`supabase`-klienten (`src/integrations/supabase/client.ts`) **`null`** i stedet
+for at `createClient()` kaster ved module-load (det blankede hele appen,
+inkl. den offentlige flade, fordi `AuthProvider` omslutter alle ruter).
+Regler for forbrugere:
+
+- Tjek `isSupabaseConfigured` (eller `supabase !== null`) før brug.
+- `AuthProvider` lander straks i logget-ud-tilstand uden klient; `signOut` er no-op.
+- `src/lib/cloud/models.ts`-funktionerne kaster en klar dansk fejl via
+  `requireSupabase()` i stedet for at dereferere null.
+- Login-siden viser en rolig note og deaktiverer formularerne.
+
+Reguleret af `src/hooks/__tests__/supabase-optional.test.tsx`.
+
 ## 1. Source of truth
 
 | Lag | Rolle |

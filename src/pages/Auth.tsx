@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ export default function AuthPage() {
 
   const onLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) return; // forms are disabled in unconfigured environments, belt and braces
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
@@ -30,6 +31,7 @@ export default function AuthPage() {
 
   const onSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) return;
     setBusy(true);
     const { error } = await supabase.auth.signUp({
       email,
@@ -49,6 +51,12 @@ export default function AuthPage() {
           Du kan også bruge appen uden login — alt gemmes lokalt i browseren.
         </p>
       </div>
+      {!isSupabaseConfigured && (
+        <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+          Cloud-login er ikke sat op i dette miljø. Appen virker fuldt ud alligevel, alt gemmes
+          lokalt i browseren.
+        </p>
+      )}
       <Tabs defaultValue="login">
         <TabsList className="grid grid-cols-2 w-full">
           <TabsTrigger value="login">Log ind</TabsTrigger>
@@ -58,14 +66,14 @@ export default function AuthPage() {
           <form onSubmit={onLogin} className="space-y-3">
             <div><Label>Email</Label><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div><Label>Adgangskode</Label><Input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-            <Button disabled={busy} className="w-full">Log ind</Button>
+            <Button disabled={busy || !isSupabaseConfigured} className="w-full">Log ind</Button>
           </form>
         </TabsContent>
         <TabsContent value="signup">
           <form onSubmit={onSignup} className="space-y-3">
             <div><Label>Email</Label><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div><Label>Adgangskode (min. 6 tegn)</Label><Input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-            <Button disabled={busy} className="w-full">Opret konto</Button>
+            <Button disabled={busy || !isSupabaseConfigured} className="w-full">Opret konto</Button>
           </form>
         </TabsContent>
       </Tabs>
