@@ -109,7 +109,9 @@ export default function Start() {
             Frihedsmodel
           </p>
           <h1
-            className="fm-rise m-0 font-display text-[clamp(34px,6.4vw,60px)] font-light leading-[1.06] tracking-[-0.018em] text-foreground"
+            data-route-focus
+            tabIndex={-1}
+            className="fm-rise m-0 font-display text-[clamp(34px,6.4vw,60px)] font-light leading-[1.06] tracking-[-0.018em] text-foreground focus:outline-none"
             style={{ animationDelay: "0.04s" }}
           >
             Se hvornår du kan stoppe med at arbejde.

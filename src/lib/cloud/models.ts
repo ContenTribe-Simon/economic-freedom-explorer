@@ -2,6 +2,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useFinanceStore } from "@/store/financeStore";
 import { MODEL_RELEASE, MODEL_VERSION } from "@/lib/finance/types";
 
+/**
+ * The client is null in an unconfigured environment (optional cloud overlay). These
+ * functions are only reachable from the cloud UI, which requires a session — impossible
+ * without a client — so a clear thrown error (surfaced by the callers' normal error
+ * handling) is the graceful path, never a null deref.
+ */
+function requireSupabase(): NonNullable<typeof supabase> {
+  if (!supabase) throw new Error("Cloud er ikke sat op i dette miljø.");
+  return supabase;
+}
+
 export interface CloudModelRow {
   id: string;
   name: string;
@@ -40,7 +51,8 @@ export async function hashCurrentState(): Promise<string> {
 }
 
 export async function listModels(): Promise<CloudModelRow[]> {
-  const { data, error } = await supabase
+  const sb = requireSupabase();
+  const { data, error } = await sb
     .from("finance_models")
     .select("id,name,description,model_version,model_release,created_at,updated_at,last_opened_at")
     .order("updated_at", { ascending: false });
@@ -49,10 +61,11 @@ export async function listModels(): Promise<CloudModelRow[]> {
 }
 
 export async function saveAsNewModel(name: string, description?: string): Promise<string> {
-  const { data: u } = await supabase.auth.getUser();
+  const sb = requireSupabase();
+  const { data: u } = await sb.auth.getUser();
   if (!u.user) throw new Error("Ikke logget ind");
   const data_json = JSON.parse(serializeStoreState());
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("finance_models")
     .insert({
       user_id: u.user.id,
@@ -69,8 +82,9 @@ export async function saveAsNewModel(name: string, description?: string): Promis
 }
 
 export async function overwriteModel(id: string): Promise<void> {
+  const sb = requireSupabase();
   const data_json = JSON.parse(serializeStoreState());
-  const { error } = await supabase
+  const { error } = await sb
     .from("finance_models")
     .update({
       data_json,
@@ -83,22 +97,25 @@ export async function overwriteModel(id: string): Promise<void> {
 }
 
 export async function loadModel(id: string): Promise<void> {
-  const { data, error } = await supabase
+  const sb = requireSupabase();
+  const { data, error } = await sb
     .from("finance_models")
     .select("data_json")
     .eq("id", id)
     .single();
   if (error) throw error;
   applyStateToStore(JSON.stringify(data.data_json));
-  await supabase.from("finance_models").update({ last_opened_at: new Date().toISOString() }).eq("id", id);
+  await sb.from("finance_models").update({ last_opened_at: new Date().toISOString() }).eq("id", id);
 }
 
 export async function renameModel(id: string, name: string): Promise<void> {
-  const { error } = await supabase.from("finance_models").update({ name }).eq("id", id);
+  const sb = requireSupabase();
+  const { error } = await sb.from("finance_models").update({ name }).eq("id", id);
   if (error) throw error;
 }
 
 export async function deleteModel(id: string): Promise<void> {
-  const { error } = await supabase.from("finance_models").delete().eq("id", id);
+  const sb = requireSupabase();
+  const { error } = await sb.from("finance_models").delete().eq("id", id);
   if (error) throw error;
 }

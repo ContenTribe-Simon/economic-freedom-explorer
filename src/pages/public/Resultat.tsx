@@ -376,7 +376,7 @@ export default function Resultat() {
             </p>
             <StatusBadge result={result} />
           </div>
-          <h1 className="m-0 font-display text-[clamp(34px,6vw,56px)] font-light leading-[1.08] tracking-[-0.015em] text-foreground">
+          <h1 data-route-focus tabIndex={-1} className="m-0 font-display text-[clamp(34px,6vw,56px)] font-light leading-[1.08] tracking-[-0.015em] text-foreground focus:outline-none">
             {headline}
           </h1>
           <p className="mt-5 max-w-[34em] text-[clamp(17px,2.4vw,20px)] leading-[1.55] text-[color:var(--ink-soft)]">

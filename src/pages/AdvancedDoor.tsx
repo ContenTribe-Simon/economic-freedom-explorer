@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isAdvancedDoorOpen, openAdvancedDoor } from "@/lib/advancedDoor";
+import { focusRouteHeading } from "@/lib/routeFocus";
 import { DOOR_FEATURES, DOOR_LEAD, DOOR_REMEMBER_NOTE } from "./advancedDoorCopy";
 
 /**
@@ -25,10 +26,20 @@ import { DOOR_FEATURES, DOOR_LEAD, DOOR_REMEMBER_NOTE } from "./advancedDoorCopy
  */
 export function AdvancedGate({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(isAdvancedDoorOpen);
+  // Opening the door swaps door -> requested page at the SAME pathname, so RouteFocusManager's
+  // pathname-keyed effect never fires and the clicked button unmounts, dropping focus to
+  // <body> (Codex, Phase 7 round 2). Trigger the shared focus rules after the swap commits.
+  // The ref limits this to the IN-SESSION transition: a returning user whose door is already
+  // open mounts straight into the app, and initial load never steals focus.
+  const openedThisSession = useRef(false);
+  useEffect(() => {
+    if (open && openedThisSession.current) focusRouteHeading();
+  }, [open]);
   if (open) return <>{children}</>;
   return (
     <DoorPage
       onOpen={() => {
+        openedThisSession.current = true;
         openAdvancedDoor();
         setOpen(true);
       }}
@@ -44,7 +55,7 @@ function DoorPage({ onOpen }: { onOpen: () => void }) {
         <p className="m-0 text-[12.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Frihedsmodel
         </p>
-        <h1 className="mb-4 mt-2 font-display text-[clamp(30px,5vw,42px)] font-light leading-[1.12] tracking-[-0.01em]">
+        <h1 data-route-focus tabIndex={-1} className="mb-4 mt-2 font-display text-[clamp(30px,5vw,42px)] font-light leading-[1.12] tracking-[-0.01em] focus:outline-none">
           Du er på vej ind i den avancerede model.
         </h1>
         <p className="mb-8 text-[16px] leading-[1.6] text-muted-foreground">{DOOR_LEAD}</p>
