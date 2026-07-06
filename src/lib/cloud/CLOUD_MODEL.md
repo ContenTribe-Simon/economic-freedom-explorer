@@ -35,6 +35,12 @@ Snapshots gemmes inde i `data_json` ved `saveAsNewModel` / `overwriteModel`.
 `finance_snapshots`-tabellen er forberedt til fremtidigt brug (snapshot-historik
 på tværs af modeller) og må aldrig være eneste kilde til snapshot-data.
 
+RLS-hærdning (Phase 7, migration `20260706120000`): `model_id` skal, når den er
+sat, pege på en `finance_models`-række ejet af samme bruger — INSERT/UPDATE
+afvises ellers. Pinned af `src/lib/cloud/__tests__/snapshots-rls-migration.test.ts`
+(tekstuel kontrol af migrationskæden; verifikation mod den DEPLOYEDE database er
+et manuelt trin i Supabase-dashboardet).
+
 ## 2. Roundtrip-garanti
 
 `lokal model → save → load → exportJson → importJson` skal bevare 1:1:
