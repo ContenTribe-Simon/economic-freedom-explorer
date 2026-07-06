@@ -183,7 +183,9 @@ export default function GemOgDel() {
           <p className="mb-4 text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
             Behold dit svar
           </p>
-          <h1 className="m-0 font-display text-[clamp(30px,5vw,46px)] font-light leading-[1.08] tracking-[-0.015em] text-foreground">
+          {/* data-route-focus, NOT plain "first h1": the print-summary h1 above comes first
+              in the DOM and must never be the route-change focus target. */}
+          <h1 data-route-focus tabIndex={-1} className="m-0 font-display text-[clamp(30px,5vw,46px)] font-light leading-[1.08] tracking-[-0.015em] text-foreground focus:outline-none">
             Behold dit svar.
           </h1>
           <p className="mt-4 max-w-[32em] text-[clamp(16px,2.2vw,19px)] leading-[1.55] text-[color:var(--ink-soft)]">

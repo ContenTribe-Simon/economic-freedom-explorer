@@ -44,7 +44,7 @@ function DoorPage({ onOpen }: { onOpen: () => void }) {
         <p className="m-0 text-[12.5px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Frihedsmodel
         </p>
-        <h1 className="mb-4 mt-2 font-display text-[clamp(30px,5vw,42px)] font-light leading-[1.12] tracking-[-0.01em]">
+        <h1 data-route-focus tabIndex={-1} className="mb-4 mt-2 font-display text-[clamp(30px,5vw,42px)] font-light leading-[1.12] tracking-[-0.01em] focus:outline-none">
           Du er på vej ind i den avancerede model.
         </h1>
         <p className="mb-8 text-[16px] leading-[1.6] text-muted-foreground">{DOOR_LEAD}</p>

@@ -211,7 +211,7 @@ export default function SimpleInputs() {
           <p className="mb-4 text-[12.5px] font-semibold uppercase tracking-[0.14em] text-[color:var(--ink-soft)]">
             Dine tal
           </p>
-          <h1 className="m-0 font-display text-[clamp(28px,5vw,46px)] font-light leading-[1.1] tracking-[-0.015em] text-foreground">
+          <h1 data-route-focus tabIndex={-1} className="m-0 font-display text-[clamp(28px,5vw,46px)] font-light leading-[1.1] tracking-[-0.015em] text-foreground focus:outline-none">
             Skriv dine tal ind, så regner vi dit svar ud.
           </h1>
           <p className="mt-4 max-w-[33em] text-[clamp(16px,2.2vw,18px)] leading-[1.55] text-[color:var(--ink-soft)]">
