@@ -3,7 +3,12 @@
  * its copy is effectively public-path copy (CLAUDE.md §3 rule 7: no advanced/DK-personal
  * concepts named). The copy lives in advancedDoorCopy.ts precisely so this test can scan it
  * with the same default-deny vocabulary guard the adapters use (Codex: "deltid" and
- * "et andet land" slipped in via the feature list).
+ * "et andet land" slipped in via the feature list; round 2: "Landeanalyse" stood as a title).
+ *
+ * There is deliberately NO test-local ban list here (backlog item 5): every vocabulary
+ * concept lives in FORBIDDEN_PUBLIC_TERMS (safety.ts), and this file only (a) scans the door
+ * strings with the real guard and (b) pins that the guard actually knows the concepts that
+ * leaked in past review rounds — semantics themselves are covered by safety-guard.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { containsForbiddenTerm } from "@/lib/finance/public";
@@ -18,37 +23,33 @@ describe("Advanced door copy is public-safe", () => {
     }
   });
 
-  it("REGRESSION: the two Codex terms are gone and stay gone", () => {
-    const joined = ALL_STRINGS.join(" | ");
-    expect(joined).not.toMatch(/deltid/i);
-    expect(joined).not.toMatch(/andet land/i);
-    expect(joined).not.toMatch(/boede i/i);
+  it("REGRESSION: the guard OWNS every concept that leaked in past review rounds", () => {
+    // Each of these shipped (or nearly shipped) in door copy once. The scan above only has
+    // teeth if the guard knows them — one canonical list, no test-local regexes.
+    const pastLeaks = [
+      "deltid", // round 1, feature body
+      "et andet land", // round 1, feature body
+      "Landeanalyse", // round 2, feature TITLE
+      "landeanalysen viser",
+      "FIRE-benchmarks", // round 2, feature TITLE (case-sensitive FIRE + benchmark)
+    ];
+    for (const s of pastLeaks) {
+      expect(containsForbiddenTerm(s), `guard must catch: ${s}`).toBe(true);
+    }
   });
 
-  it("REGRESSION (Codex round 2): forbidden concepts do not appear as TITLES either", () => {
-    // Round 1 reworded the bodies but left "Landeanalyse" (literally "country analysis",
-    // the exact concept CLAUDE.md §3 rule 7 names) standing as a heading. Titles are the
-    // most visible strings on the door, so they get the same bans as the bodies.
-    const joined = ALL_STRINGS.join(" | ");
-    expect(joined).not.toMatch(/landeanalyse/i);
-    expect(joined).not.toMatch(/\bland(e|et)?\b/i);
-    // The FIRE acronym (English, community jargon) stays out of public copy. Case-sensitive
-    // on purpose: Danish "fire" (the number four) is fine.
-    expect(joined).not.toMatch(/FIRE/);
-    expect(joined).not.toMatch(/benchmark/i);
+  it("door-specific NARRATIVE phrasing stays out (not vocabulary, so not in the guard)", () => {
+    // "boede i …" was the round-1 country-narrative framing ("lived in another country").
+    // It is a phrase pattern, not a concept term, so it is pinned here rather than in
+    // FORBIDDEN_PUBLIC_TERMS — a "boede i" guard entry would ban ordinary biography copy
+    // anywhere on the public surface for no vocabulary reason.
+    expect(ALL_STRINGS.join(" | ")).not.toMatch(/boede i/i);
   });
 
-  it("the vocabulary guard itself catches 'Landeanalyse', so it cannot silently return here", () => {
-    // The first test scans this file with containsForbiddenTerm, but that only has teeth if
-    // the guard actually knows the term ("Landeanalyse" passed it in round 1).
-    expect(containsForbiddenTerm("Landeanalyse")).toBe(true);
-    expect(containsForbiddenTerm("landeanalysen viser")).toBe(true);
-  });
-
-  it("ordinary Danish 'lander' does NOT trip the guard (the term is the full compound only)", () => {
-    // Pins the rule the guard's comment states: a "land"/"lande" PREFIX entry would match
-    // "lander" (the guard regex anchors only the start of a word), which is why the list
-    // carries the full compound instead. DOOR_REMEMBER_NOTE uses exactly this word.
+  it("ordinary Danish 'lander' does NOT trip the guard (land family is whole-word only)", () => {
+    // Pins the rule the guard's comment states: the land family is listed as whole-word
+    // inflections precisely because a "land"/"lande" PREFIX would match "lander" (to
+    // arrive). DOOR_REMEMBER_NOTE uses exactly this word.
     expect(containsForbiddenTerm("så du lander direkte derinde næste gang")).toBe(false);
     expect(containsForbiddenTerm(DOOR_REMEMBER_NOTE)).toBe(false);
   });

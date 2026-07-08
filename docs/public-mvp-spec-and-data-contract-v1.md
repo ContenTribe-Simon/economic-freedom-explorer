@@ -395,13 +395,38 @@ dropped. Match on the stable `id`, not the title text.
 | `le-*` (all life-event checks) | Life events — not in the simple surface |
 
 **Filter rule (robust to new checks):** default-deny — drop anything not on the allowlist —
-**and** additionally hard-block any check whose `id`, `title`, or `detail` references the
-advanced/DK/internal vocabulary: *Folkepension, Holding, "No Barma", Barma, ASK, ratepension,
-livrente, livsvarig, deltid, familiefond, exit, audit-panel(et), stress-test, country,
-landeanalyse*. This keeps a newly-added engine check from leaking onto the public path before
-it has reviewed public copy. The ENFORCED list is `FORBIDDEN_PUBLIC_TERMS` in
-`src/lib/finance/public/safety.ts` (the code is canonical for exact terms; keep the two in
-sync when either changes — "landeanalyse" was added 2026-07-06 after the door-title leak).
+**and** additionally hard-block any check whose `id`, `title`, or `detail` trips the enforced
+vocabulary guard. The enforced terms, exactly as implemented in `FORBIDDEN_PUBLIC_TERMS`:
+
+- Advanced / business capital: *holding, barma* (covers "No Barma"), *koncentration /
+  concentration*.
+- DK account & tax types and their EN siblings: *ask, aktiesparekonto, depotskat, depottax,
+  depot, folkepension / state pension, ratepension, livrente, livsvarig, annuity, annuities*.
+- Advanced income modes: *deltid / part-time / parttime, familiefond / family fund*.
+- FIRE community jargon: *FIRE* (case-sensitive whole-word only, so Danish "fire" = four
+  stays legal) and *benchmark* (prefix, so benchmarks/benchmarking are caught).
+- The country concept in both languages: *country, landeanalyse, landesammenligning,
+  landeoversigt, udland*, plus the whole-word inflections
+  *land/lands/lande/landes/landet/landets/landene/landenes*.
+
+This keeps a newly-added engine check from leaking onto the public path before it has
+reviewed public copy.
+
+> **Open point (docs/code mismatch, flagged 2026-07-08, decision pending):** *exit*,
+> *audit-panel(et)* and *stress-test* were historically listed here as vocabulary but have
+> never been in the enforced list. Those concepts are today kept off the public path by the
+> ALLOWLIST layer (the checks referencing them are default-denied), not by vocabulary. Before
+> promoting them to vocabulary terms, note that "stress-test" would trip the approved door
+> title "Scenarier og stress-tests".
+
+The ENFORCED list is `FORBIDDEN_PUBLIC_TERMS` in `src/lib/finance/public/safety.ts` (the code
+is canonical for exact terms; keep the two in sync when either changes). Since 2026-07-08 the
+list is structured per-term (`{ term, wholeWord?, caseSensitive? }`, compiled into one
+case-sensitive and one case-insensitive regex): default is case-insensitive word-start prefix;
+`wholeWord` exists so the land family cannot false-positive on ordinary Danish ("lander",
+"landing"); `caseSensitive` exists for "FIRE". DA/EN concept siblings are always paired.
+History: "landeanalyse" added 2026-07-06 after the door-title leak; the structure, the country
+inflections and the pairings added 2026-07-08 (backlog items 4-5).
 
 ### 4.5 Public-safe robustness-drivers adapter
 
@@ -445,12 +470,16 @@ adapter must **not** match on label text. Two robust options (the implementation
 | Concentration / part-time source factors | Advanced / deltid |
 | Minimumsmål-not-met critical factor | Only meaningful with an FI target; rephrase via the end-margin family, never raw |
 
-**Filter rule (mirrors §4.4):** default-deny on family, **and** hard-block any factor whose
-`label`/`detail` references *holding, buffer, kontant buffer, deltid, ASK, koncentration,
-minimumsmål* (unless an FI target is set), plus the shared §4.4 vocabulary incl. *country,
-landeanalyse* — so a newly-added engine factor can't leak before it has reviewed public copy.
-As in §4.4, the enforced term list is `FORBIDDEN_PUBLIC_TERMS` in
-`src/lib/finance/public/safety.ts`; keep doc and code in sync when either changes.
+**Filter rule (mirrors §4.4):** two layers, matching `drivers.ts`. First, default-deny on
+family: the label allowlist only passes cashflow-coverage factors, so *buffer / kontant
+buffer*, *koncentration*, *deltid* and *minimumsmål* factors are dropped at the family level
+(minimumsmål is rephrased via the end-margin family, never raw; its copy names the goal only
+when an FI target is set). Second, the produced Danish text is checked against the same
+enforced vocabulary as §4.4 — `FORBIDDEN_PUBLIC_TERMS` in
+`src/lib/finance/public/safety.ts`, exact term list enumerated in §4.4, structured per-term
+since 2026-07-08 — so a newly-added engine factor can't leak before it has reviewed public
+copy. Note that *buffer / kontant buffer* and *minimumsmål* are family-level drops only,
+NOT vocabulary terms; keep doc and code in sync when either changes.
 
 > **Same treatment applies to `confidenceBreakdown`.** It is not shown in the MVP (only the
 > `assumptionConfidence` score is). If a future PR surfaces assumption drivers, they must pass
