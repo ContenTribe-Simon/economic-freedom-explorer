@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Download, ExternalLink, Share2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,19 @@ export default function GemOgDel() {
   const savedTimer = useRef<number | undefined>(undefined);
   const copyTimer = useRef<number | undefined>(undefined);
   const shareFieldRef = useRef<HTMLInputElement>(null);
+
+  // Clear both confirmation timers on unmount. The same-handler clears in onSave/onCopy
+  // only debounce re-clicks; without this, a pending setJustSaved/setCopied outlives the
+  // component — dead work in the app, and in the test suite it can outlive the file's
+  // jsdom teardown and fire with `window` gone (unhandled ReferenceError, non-zero exit
+  // with all assertions green). Cleanup-only: the visible 2600/2200 ms confirmation
+  // timings are unchanged.
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(savedTimer.current);
+      window.clearTimeout(copyTimer.current);
+    };
+  }, []);
 
   const onSave = () => {
     saveCalculation(name);
