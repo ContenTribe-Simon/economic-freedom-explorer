@@ -59,7 +59,14 @@ describe("AppErrorBoundary", () => {
 });
 
 describe("App-level containment (the boundary is actually wired around the routes)", () => {
-  it("a public screen throwing mid-render is contained by the real <App/>", async () => {
+  // Explicit timeout: after vi.resetModules(), the dynamic import("@/App") below
+  // re-executes the ENTIRE app module graph (router, radix, recharts, engine) inside this
+  // one test. Measured under full-suite parallel load it runs 3.9-4.8s even when passing,
+  // so Vitest's 5s default made scheduling jitter fail ~40% of suite runs (15-run
+  // reproduction, 2026-07-08). 15s gives ~3x headroom over the observed worst case. The
+  // heavy import must stay inside the test (it has to happen AFTER vi.doMock), so a
+  // bigger budget, not restructuring, is the honest fix.
+  it("a public screen throwing mid-render is contained by the real <App/>", { timeout: 15_000 }, async () => {
     // Make the real Resultat module throw during render, then mount the REAL App at
     // /resultat. Before this fix the whole tree unmounted (blank page, rethrown error);
     // now the fallback must appear.
