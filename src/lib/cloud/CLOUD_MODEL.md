@@ -21,6 +21,24 @@ Regler for forbrugere:
 
 Reguleret af `src/hooks/__tests__/supabase-optional.test.tsx`.
 
+### Nedbrud og samtidighed (Phase 12-hærdning, 2026-07-08)
+
+- **`loadModel` er lokal-først i fejlrækkefølgen:** `last_opened_at`-opdateringen er ren
+  bogføring og kører EFTER at modellen er lagt i den lokale store. Fejler den (typisk
+  mistet forbindelse midt i en session), fejler indlæsningen IKKE — modellen ER indlæst.
+- **0-rækkers skrivninger er fejl, ikke succes:** PostgREST rapporterer en UPDATE, der ikke
+  matcher nogen række, som succes med 0 rækker. `overwriteModel` og `renameModel` tjekker
+  rækkeantallet og kaster en dansk fejl, hvis modellen er slettet i en anden session.
+- **Optimistisk samtidighed på overskriv:** `overwriteModel(id, expectedUpdatedAt)` tager
+  `updated_at` fra den liste brugeren ser (Cloud-siden sender den altid). Har en anden
+  enhed/fane skrevet siden, matcher opdateringen 0 rækker og afvises med besked om at
+  opdatere listen — sidste-skriver-vinder-tab af data kræver nu et bevidst nyt forsøg.
+- **Netværksfejl får rolig dansk offline-besked** via `cloudErrorMessage()` (Cloud-sidens
+  catches): "Ingen forbindelse til cloud lige nu. Dine data ligger stadig lokalt på denne
+  enhed." Den offentlige flade rører aldrig cloud og er upåvirket af nedetid.
+
+Reguleret af `src/lib/cloud/__tests__/cloud-offline-robustness.test.ts`.
+
 ## 1. Source of truth
 
 | Lag | Rolle |
