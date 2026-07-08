@@ -396,12 +396,22 @@ dropped. Match on the stable `id`, not the title text.
 
 **Filter rule (robust to new checks):** default-deny — drop anything not on the allowlist —
 **and** additionally hard-block any check whose `id`, `title`, or `detail` references the
-advanced/DK/internal vocabulary: *Folkepension, Holding, "No Barma", Barma, ASK, ratepension,
-livrente, livsvarig, deltid, familiefond, exit, audit-panel(et), stress-test, country,
-landeanalyse*. This keeps a newly-added engine check from leaking onto the public path before
-it has reviewed public copy. The ENFORCED list is `FORBIDDEN_PUBLIC_TERMS` in
-`src/lib/finance/public/safety.ts` (the code is canonical for exact terms; keep the two in
-sync when either changes — "landeanalyse" was added 2026-07-06 after the door-title leak).
+advanced/DK/internal vocabulary: *Folkepension / state pension, Holding, "No Barma", Barma,
+ASK, ratepension, livrente, livsvarig, annuity, deltid / part-time, familiefond / family fund,
+exit, audit-panel(et), stress-test, koncentration / concentration, FIRE (all-caps only, Danish
+"fire" = four stays legal), benchmark, and the country concept in both languages: country,
+landeanalyse, landesammenligning, landeoversigt, udland, plus the whole-word inflections
+land/lands/lande/landes/landet/landets/landene/landenes*. This keeps a newly-added engine
+check from leaking onto the public path before it has reviewed public copy.
+
+The ENFORCED list is `FORBIDDEN_PUBLIC_TERMS` in `src/lib/finance/public/safety.ts` (the code
+is canonical for exact terms; keep the two in sync when either changes). Since 2026-07-08 the
+list is structured per-term (`{ term, wholeWord?, caseSensitive? }`, compiled into one
+case-sensitive and one case-insensitive regex): default is case-insensitive word-start prefix;
+`wholeWord` exists so the land family cannot false-positive on ordinary Danish ("lander",
+"landing"); `caseSensitive` exists for "FIRE". DA/EN concept siblings are always paired.
+History: "landeanalyse" added 2026-07-06 after the door-title leak; the structure, the country
+inflections and the pairings added 2026-07-08 (backlog items 4-5).
 
 ### 4.5 Public-safe robustness-drivers adapter
 
@@ -446,11 +456,13 @@ adapter must **not** match on label text. Two robust options (the implementation
 | Minimumsmål-not-met critical factor | Only meaningful with an FI target; rephrase via the end-margin family, never raw |
 
 **Filter rule (mirrors §4.4):** default-deny on family, **and** hard-block any factor whose
-`label`/`detail` references *holding, buffer, kontant buffer, deltid, ASK, koncentration,
-minimumsmål* (unless an FI target is set), plus the shared §4.4 vocabulary incl. *country,
-landeanalyse* — so a newly-added engine factor can't leak before it has reviewed public copy.
-As in §4.4, the enforced term list is `FORBIDDEN_PUBLIC_TERMS` in
-`src/lib/finance/public/safety.ts`; keep doc and code in sync when either changes.
+`label`/`detail` references *holding, buffer, kontant buffer, deltid / part-time, ASK,
+koncentration / concentration, minimumsmål* (unless an FI target is set), plus the shared
+§4.4 vocabulary (incl. the full country-concept family, FIRE and benchmark) — so a
+newly-added engine factor can't leak before it has reviewed public copy. As in §4.4, the
+enforced term list is `FORBIDDEN_PUBLIC_TERMS` in `src/lib/finance/public/safety.ts`
+(structured per-term since 2026-07-08, see §4.4); keep doc and code in sync when either
+changes.
 
 > **Same treatment applies to `confidenceBreakdown`.** It is not shown in the MVP (only the
 > `assumptionConfidence` score is). If a future PR surfaces assumption drivers, they must pass

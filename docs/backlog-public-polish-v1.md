@@ -39,6 +39,10 @@ picked up alone. File/line references are as of the logging date — re-verify b
 
 ## 4. Vocabulary guard only matches exact spellings, single case mode
 
+**Fixed 2026-07-08** on `fix/public-vocab-guard-case-and-pairing` (structured per-term
+entries with `wholeWord`/`caseSensitive`, country inflections, FIRE, DA/EN pairing;
+pinned by `safety-guard.test.ts`). Kept below for the record.
+
 `FORBIDDEN_PUBLIC_TERMS` (`src/lib/finance/public/safety.ts`) is a flat list compiled into
 one case-insensitive word-start-prefix regex. Verified gaps:
 
@@ -58,6 +62,9 @@ absorb the door test's FIRE/benchmark bans (item 5) and the country compounds. U
 stay in sync per the doc's own note).
 
 ## 5. Door-copy test carries its own ban list, diverging from the guard
+
+**Fixed 2026-07-08** on `fix/public-vocab-guard-case-and-pairing` (test-local regexes
+deleted; the door test asserts via the real guard only). Kept below for the record.
 
 `src/pages/__tests__/advanced-door-copy.test.ts` bans `/FIRE/` (case-sensitive),
 `/benchmark/i` and whole-word `land/lande/landet` via test-local regexes. Those concepts are
