@@ -84,11 +84,14 @@ For the public MVP, only the simplest versions are exposed.
   PR #12).
 - Repository foundation docs added: `README.md`, `CLAUDE.md`, `AGENTS.md`, this file.
 
-**Decided this phase:** Danish public UI; one app with an Advanced door; English internal
-product name.
+**Decided during the foundation phases:** Danish public UI; one app with an Advanced door;
+English internal product name.
 
-The test foundation is now a **safety net** while the product moves toward public UX/UI.
-The next phase is *not* more abstract test work unless a concrete bug or risk appears.
+Since then the public MVP surface has shipped end to end (phases 4–11, see §6): the
+Frihedsmodel onboarding, input and result screens built on the approved Claude Design
+concept, the explanation/trust layer, the Advanced door, the sensitivity helper, and
+save/share/export are all merged, with the test foundation as the **safety net**
+throughout. The remaining roadmap item is the Phase 12 pre-launch gate.
 
 ---
 
@@ -99,14 +102,14 @@ The next phase is *not* more abstract test work unless a concrete bug or risk ap
 | 1 | Foundation: engine, tests/CI, model primitives, public MVP scope, simple input mapping | Complete |
 | 2 | Public flow & MVP spec (decide reuse vs. hide, define the public answer-first journey) | Complete |
 | 3 | Public MVP data contract (screens, cards, inputs/outputs, public-safe adapters, copy direction) | Complete |
-| 4 | Brand & UI concept (Claude Design: visual direction, design system, key screens) | In progress |
-| 5 | Public onboarding & input UI v1 (simple input flow over the mapping layer) | Planned |
-| 6 | Public result dashboard v1 (the must-have outputs, plainly shown) | Planned |
-| 7 | Stress test & security (mid-build gate) | Planned |
-| 8 | Explanation & trust layer (a simplified model taken with a grain of salt; assumptions, real terms, robustness) | Planned |
-| 9 | Hide/defer advanced complexity (advanced features stay in the engine, off the public path) | Planned |
-| 10 | Sensitivity & top drivers ("what moves your FI age most?") | Planned |
-| 11 | Save, share, export (local save, summary export; share link / accounts later) | Planned |
+| 4 | Brand & UI concept (Claude Design: visual direction, design system, key screens) | Complete |
+| 5 | Public onboarding & input UI v1 (simple input flow over the mapping layer) | Complete |
+| 6 | Public result dashboard v1 (the must-have outputs, plainly shown) | Complete |
+| 7 | Stress test & security (mid-build gate) | Complete |
+| 8 | Explanation & trust layer (a simplified model taken with a grain of salt; assumptions, real terms, robustness) | Complete |
+| 9 | Hide/defer advanced complexity (advanced features stay in the engine, off the public path) | Complete |
+| 10 | Sensitivity & top drivers ("what moves your FI age most?") | Complete |
+| 11 | Save, share, export (local save, summary export; share link / accounts later) | Complete |
 | 12 | Stress test, security & go-live readiness (pre-launch gate) | Planned |
 
 Phases 7 and 12 are deliberate **gates**: nothing proceeds past a failing gate. The
@@ -143,7 +146,7 @@ Implementation order follows the phases above: foundation → public flow & MVP 
 MVP data contract → brand & UI concept → onboarding & input UI → result dashboard →
 **mid-build stress/security gate** → explanation/trust layer → hide advanced →
 sensitivity/top drivers → save/share/export → **pre-launch stress/security/go-live gate**.
-Phases 1–3 are complete; Phase 4 (brand & UI concept) is in progress.
+Phases 1–11 are complete; only the Phase 12 pre-launch gate remains.
 
 ### Post-launch (beyond Phase 12)
 
@@ -223,8 +226,9 @@ agent. Full detail in `CLAUDE.md`.
 
 ## 11. Current next step
 
-The foundation (Phase 1), the public flow & MVP spec (Phase 2), and the public MVP data
-contract (Phase 3) are complete. The current phase is **Phase 4 — brand & UI concept**
-(Claude Design): turn the spec's screens, cards, and data contract into a visual direction, a
-design system, and the key public screens. That concept becomes the target for the first
-public onboarding & input UI (Phase 5).
+Phases 1–11 are complete (see §6): the public Frihedsmodel flow is built end to end on the
+approved Claude Design concept, with the trust layer, the Advanced door, the sensitivity
+helper and save/share/export merged and covered by the test safety net. The current next
+step is **Phase 12 — the pre-launch stress, security & go-live gate** (checklist in §6).
+The deliberately parked post-launch items (public brand/visual redesign, the Advanced app's
+UX pass) remain in their backlog docs, anchored under "Post-launch" in §6.
