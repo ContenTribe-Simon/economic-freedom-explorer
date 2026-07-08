@@ -1,0 +1,15 @@
+-- Operational note: this timestamp corresponds to a Lovable-generated
+-- migration file created on 2026-07-08 when finance_snapshots RLS
+-- hardening was manually re-applied directly against the live database.
+--
+-- The actual policy definitions are unchanged from, and remain owned by,
+-- supabase/migrations/20260706120000_tighten_finance_snapshots_model_ownership.sql
+-- (originally merged 2026-07-06). That migration's DROP POLICY / CREATE
+-- POLICY statements had not reached the live database despite being
+-- recorded as deployed; they were re-run manually on 2026-07-08 with no
+-- SQL changes.
+--
+-- This file intentionally contains no DDL. It exists only to keep this
+-- migration-history slot (already recorded by Lovable's internal
+-- migration ledger) from being an unexplained gap, and to leave a
+-- deployment-history note for whoever reads this folder later.
