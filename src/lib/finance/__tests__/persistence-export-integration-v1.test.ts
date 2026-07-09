@@ -94,12 +94,12 @@ describe("1. Legacy scenario migration", () => {
   it("project() tolerates a scenario missing all newer fields (engine-level tolerance, not the store migration path)", () => {
     const s = makeBaseScenario();
     // Strip every post-v0 optional field a legacy model would not have.
-    delete (s.inputs as Record<string, unknown>).cashflowAllocation;
-    delete (s.inputs as Record<string, unknown>).capitalWithdrawal;
-    delete (s.inputs.free as Record<string, unknown>).ask;
-    delete (s.inputs.free as Record<string, unknown>).depotTax;
-    delete (s.inputs as Record<string, unknown>).lifeEvents;
-    delete (s as Record<string, unknown>).type;
+    delete (s.inputs as unknown as Record<string, unknown>).cashflowAllocation;
+    delete (s.inputs as unknown as Record<string, unknown>).capitalWithdrawal;
+    delete (s.inputs.free as unknown as Record<string, unknown>).ask;
+    delete (s.inputs.free as unknown as Record<string, unknown>).depotTax;
+    delete (s.inputs as unknown as Record<string, unknown>).lifeEvents;
+    delete (s as unknown as Record<string, unknown>).type;
 
     const years = project(s, A);
     expect(years.length).toBeGreaterThan(0);
@@ -118,7 +118,7 @@ describe("1. Legacy scenario migration", () => {
       s.inputs.spending.desiredMonthlyNet = 10_000; // ample positive cashflow
       s.inputs.free.monthlyContribution = 5_000; s.inputs.free.annualExtraContribution = 0; // planned = 60.000
       s.inputs.savingsLogic = logic;
-      delete (s.inputs as Record<string, unknown>).cashflowAllocation;
+      delete (s.inputs as unknown as Record<string, unknown>).cashflowAllocation;
       return s;
     };
     const planned = project(mk("planned"), A)[0];
@@ -174,7 +174,7 @@ describe("1. Legacy scenario migration", () => {
 
   it("classifyLegacyScenario returns a concrete type for a typeless scenario", () => {
     const s = makeBaseScenario();
-    delete (s as Record<string, unknown>).type;
+    delete (s as unknown as Record<string, unknown>).type;
     const cls = classifyLegacyScenario(s, undefined);
     expect(["base", "custom", "linked_stress_test"]).toContain(cls.type);
     expect(typeof cls.manuallyEdited).toBe("boolean");
@@ -482,10 +482,10 @@ describe("5. Validation & report consistency", () => {
 
   it("runModelValidation does not crash on a legacy scenario missing newer fields", () => {
     const s = makeBaseScenario();
-    delete (s.inputs as Record<string, unknown>).cashflowAllocation;
-    delete (s.inputs as Record<string, unknown>).capitalWithdrawal;
-    delete (s.inputs.free as Record<string, unknown>).ask;
-    delete (s.inputs.free as Record<string, unknown>).depotTax;
+    delete (s.inputs as unknown as Record<string, unknown>).cashflowAllocation;
+    delete (s.inputs as unknown as Record<string, unknown>).capitalWithdrawal;
+    delete (s.inputs.free as unknown as Record<string, unknown>).ask;
+    delete (s.inputs.free as unknown as Record<string, unknown>).depotTax;
     const years = project(s, A);
     expect(() => runModelValidation(s, years)).not.toThrow();
     expect(runModelValidation(s, years).failed).toBe(0);

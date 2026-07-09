@@ -543,10 +543,10 @@ describe("Matrix E — Persistence & compatibility", () => {
   it("old scenario without the new fields still runs and validates", () => {
     const s = makeBaseScenario();
     // Strip every post-v0 field a legacy model would not have.
-    delete (s.inputs as Record<string, unknown>).cashflowAllocation;
-    delete (s.inputs as Record<string, unknown>).capitalWithdrawal;
-    delete (s.inputs.free as Record<string, unknown>).ask;
-    delete (s.inputs.free as Record<string, unknown>).depotTax;
+    delete (s.inputs as unknown as Record<string, unknown>).cashflowAllocation;
+    delete (s.inputs as unknown as Record<string, unknown>).capitalWithdrawal;
+    delete (s.inputs.free as unknown as Record<string, unknown>).ask;
+    delete (s.inputs.free as unknown as Record<string, unknown>).depotTax;
     const years = project(s, defaultAssumptions);
     expect(years.length).toBeGreaterThan(0);
     expect(runModelValidation(s, years).failed).toBe(0);
