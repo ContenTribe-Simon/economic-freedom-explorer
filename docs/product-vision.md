@@ -142,6 +142,69 @@ last projected YearRow) plus expanded standard-scenario regression tests; see
 - Content: figures shown as actual numbers with the single global disclaimer, no false certainty, no advanced/DK/personal concepts leaked, copy proofread (plain Danish, no em dashes), feedback/bug-reporting channel live.
 - Go-live: monitoring / error logging, rollback plan, prod env vars, domain + SEO/robots.
 
+### Phase 12 — workstream breakdown
+
+The checklist above stays the canonical reference; this is the concrete execution plan.
+Four sequential workstreams, each its own branch/PR — never one large PR. Status verified
+against git as of 2026-07-09 (main at PR #37's merge).
+
+**A. Full regression + dependency audit + robustness/load — DONE** (merged via PR #37;
+commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
+- Cleared 11 of 13 npm audit advisories in-range. The 2 residual (esbuild/vite) are
+  dev-server-only exposure, not production; the only npm-offered fix is a vite 5→8 major,
+  deferred as its own decision.
+- Fixed four real cloud-layer defects (non-fatal bookkeeping writes, 0-row writes reported
+  as success, missing Danish offline copy, and optimistic-concurrency protection against
+  false overwrite conflicts — migration `20260709090000` makes `updated_at` move only on
+  real `data_json` changes).
+- Discovered during review: `npx tsc --noEmit` against the root `tsconfig.json` type-checks
+  ZERO files and always exits 0 (references-only config) — every prior "tsc clean" claim in
+  this project verified nothing. Correct command: `npx tsc -p tsconfig.app.json --noEmit`.
+  CI runs no typecheck today; tracked as a separate follow-up (16 pre-existing, unrelated
+  TS2352 errors in two old test files also surfaced and are not yet fixed).
+
+**B. Security — NOT STARTED.** RLS penetration check across ALL tables (not just
+`finance_snapshots`, which was already hardened separately) + auth flows + rate limiting +
+CORS + CSP/security headers + dynamic pen test + end-to-end stress of the public journey
+under hostile conditions. **Start with Lovable's own built-in Security Center scans (Basic
++ Deep: RLS policy linting, dependency vulnerabilities, auto-fix for common RLS
+misconfigurations)** before any manual pen-test work — it may already cover part of the
+RLS-penetration and dependency-audit items.
+
+**C. Privacy & legal + data backup/restore — NOT STARTED.** The privacy policy is drafted
+factually by the agent/Claude Code (based on what the code actually collects and stores)
+for Simon to review and adjust — not written from scratch by Simon. Note the consent tie-in
+with workstream D below.
+
+**D. Content review + go-live — NOT STARTED.** Includes the open
+door-feature-title/advanced-nav-label mismatch item from
+`docs/backlog-public-polish-v1.md`, plus concrete cleanup: `index.html` still carries
+unresolved Lovable scaffolding (og:image pointing at a Lovable preview URL, `author` meta
+set to "Lovable", `twitter:site` set to "@Lovable", and two unresolved TODO comments about
+title/og:title).
+
+**Hosting (decided):** Lovable's own publish/hosting flow (Lovable Cloud — automatic SSL,
+CDN, SOC 2 Type II / ISO 27001 infrastructure), not a switch to self-hosting, at least for
+initial launch.
+
+**Confirmed constraint — response headers:** Lovable does not allow setting custom HTTP
+response headers (CSP, HSTS, X-Frame-Options) on a published project; these are
+platform-controlled. A `<meta http-equiv="Content-Security-Policy">` tag can partially
+substitute, but cannot set `frame-ancestors` or a report-uri, and HSTS/X-Frame-Options have
+no meta-tag equivalent at all. If full header control is later wanted, two options exist —
+Cloudflare in front of the Lovable URL (requires Cloudflare to take over SSL termination,
+since Lovable's own SSL needs Cloudflare's DNS-only mode) or self-hosting — both explicitly
+deferred, not decided, pending a separate call.
+
+**Monitoring/error-logging + analytics (decided): PostHog**, covering both the go-live
+monitoring requirement and Simon's separate wish for more product analytics than exists
+today (currently: none). Installation happens in workstream D as a go-live requirement;
+deeper analytics/event configuration is explicitly deferred as a separate, later,
+non-blocking task. **Consent implication:** PostHog's default cookie/localStorage-based
+identification likely requires a cookie-consent banner under GDPR unless configured
+cookieless — this ties workstream C's privacy/GDPR work to workstream D's PostHog
+installation; build them together, not sequentially.
+
 Implementation order follows the phases above: foundation → public flow & MVP spec → public
 MVP data contract → brand & UI concept → onboarding & input UI → result dashboard →
 **mid-build stress/security gate** → explanation/trust layer → hide advanced →
