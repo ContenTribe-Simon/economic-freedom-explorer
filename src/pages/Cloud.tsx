@@ -128,7 +128,10 @@ export default function CloudPage() {
                 {renamingId !== m.id && (
                   <div className="flex gap-1 shrink-0">
                     <Button size="sm" variant="ghost" onClick={() => setPendingLoad(m)}><FolderOpen className="h-4 w-4 mr-1" />Indlæs</Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleOverwrite(m)}><Save className="h-4 w-4 mr-1" />Overskriv</Button>
+                    {/* Disabled while the list refreshes: the row's updated_at is the
+                        concurrency token, and clicking mid-refresh would send a stale one
+                        (a false conflict at worst, but avoidable). */}
+                    <Button size="sm" variant="ghost" disabled={refreshing} onClick={() => handleOverwrite(m)}><Save className="h-4 w-4 mr-1" />Overskriv</Button>
                     <Button size="sm" variant="ghost" onClick={() => { setRenamingId(m.id); setRenameValue(m.name); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => setPendingDelete(m)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>

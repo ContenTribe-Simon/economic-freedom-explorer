@@ -30,9 +30,19 @@ Reguleret af `src/hooks/__tests__/supabase-optional.test.tsx`.
   matcher nogen række, som succes med 0 rækker. `overwriteModel` og `renameModel` tjekker
   rækkeantallet og kaster en dansk fejl, hvis modellen er slettet i en anden session.
 - **Optimistisk samtidighed på overskriv:** `overwriteModel(id, expectedUpdatedAt)` tager
-  `updated_at` fra den liste brugeren ser (Cloud-siden sender den altid). Har en anden
-  enhed/fane skrevet siden, matcher opdateringen 0 rækker og afvises med besked om at
-  opdatere listen — sidste-skriver-vinder-tab af data kræver nu et bevidst nyt forsøg.
+  `updated_at` fra den liste brugeren ser (Cloud-siden sender den altid). Matcher tokenet
+  ikke rækkens nuværende `updated_at`, rammer opdateringen 0 rækker og afvises med besked
+  om at opdatere listen — sidste-skriver-vinder-tab af data kræver nu et bevidst nyt forsøg.
+  PRÆCIS udløsermekanik (migration `20260709090000`): `updated_at` er server-ejet og
+  flyttes af triggeren KUN når `data_json` reelt ændres (`IS DISTINCT FROM`). At åbne en
+  model (`last_opened_at`-bogføring) eller omdøbe den flytter IKKE tokenet — kun et reelt
+  indholds-gem fra en anden session udløser altså en konflikt. (Konsekvens: "Sidst gemt"
+  følger indholdet, ikke omdøbninger.) Klienten sender aldrig selv `updated_at`.
+  Cloud-sidens Overskriv-knap er deaktiveret mens listen genindlæses, så et forældet token
+  ikke kan sendes i kapløb med `refresh()`.
+  **Kan ikke enhedstestes:** selve trigger-adfærden kræver den rigtige database — verificér
+  ved deploy af migrationen (åbn model i fane A, overskriv fra fane B med gammel liste:
+  skal LYKKES; gem indhold i A, overskriv fra B: skal afvises).
 - **Netværksfejl får rolig dansk offline-besked** via `cloudErrorMessage()` (Cloud-sidens
   catches): "Ingen forbindelse til cloud lige nu. Dine data ligger stadig lokalt på denne
   enhed." Den offentlige flade rører aldrig cloud og er upåvirket af nedetid.

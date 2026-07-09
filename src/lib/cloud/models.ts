@@ -92,13 +92,15 @@ export async function saveAsNewModel(name: string, description?: string): Promis
 export async function overwriteModel(id: string, expectedUpdatedAt?: string): Promise<void> {
   const sb = requireSupabase();
   const data_json = JSON.parse(serializeStoreState());
+  // updated_at is deliberately NOT sent: since migration 20260709090000 the column is
+  // server-owned — the finance_models trigger bumps it exactly when data_json changes and
+  // preserves it otherwise, so it works as a reliable concurrency token.
   let query = sb
     .from("finance_models")
     .update({
       data_json,
       model_version: String(MODEL_VERSION),
       model_release: MODEL_RELEASE,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", id);
   if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
