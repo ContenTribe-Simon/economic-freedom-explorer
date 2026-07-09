@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import {
   CloudModelRow,
+  cloudErrorMessage,
   deleteModel,
   listModels,
   loadModel,
@@ -37,7 +38,7 @@ export default function CloudPage() {
   const refresh = async () => {
     setRefreshing(true);
     try { setModels(await listModels()); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke hente modeller"); }
+    catch (e) { toast.error(cloudErrorMessage(e, "Kunne ikke hente modeller")); }
     finally { setRefreshing(false); }
   };
 
@@ -49,28 +50,30 @@ export default function CloudPage() {
   const handleSaveAsNew = async () => {
     const name = newName.trim() || `Model ${new Date().toLocaleString("da-DK")}`;
     try { await saveAsNewModel(name); toast.success("Gemt i cloud"); setNewName(""); refresh(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke gemme"); }
+    catch (e) { toast.error(cloudErrorMessage(e, "Kunne ikke gemme")); }
   };
 
   const handleOverwrite = async (m: CloudModelRow) => {
-    try { await overwriteModel(m.id); toast.success(`Opdateret: ${m.name}`); refresh(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke opdatere"); }
+    // m.updated_at is the optimistic-concurrency token: overwrite only wins if no other
+    // session wrote the model since this list was fetched (see overwriteModel).
+    try { await overwriteModel(m.id, m.updated_at); toast.success(`Opdateret: ${m.name}`); refresh(); }
+    catch (e) { toast.error(cloudErrorMessage(e, "Kunne ikke opdatere")); }
   };
 
   const handleLoad = async (m: CloudModelRow) => {
     try { await loadModel(m.id); toast.success(`Indlæst: ${m.name}`); refresh(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke indlæse"); }
+    catch (e) { toast.error(cloudErrorMessage(e, "Kunne ikke indlæse")); }
   };
 
   const handleDelete = async (m: CloudModelRow) => {
     try { await deleteModel(m.id); toast.success("Slettet"); refresh(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke slette"); }
+    catch (e) { toast.error(cloudErrorMessage(e, "Kunne ikke slette")); }
   };
 
   const handleRename = async (id: string) => {
     if (!renameValue.trim()) return;
     try { await renameModel(id, renameValue.trim()); toast.success("Omdøbt"); setRenamingId(null); refresh(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Kunne ikke omdøbe"); }
+    catch (e) { toast.error(cloudErrorMessage(e, "Kunne ikke omdøbe")); }
   };
 
   return (
@@ -125,7 +128,10 @@ export default function CloudPage() {
                 {renamingId !== m.id && (
                   <div className="flex gap-1 shrink-0">
                     <Button size="sm" variant="ghost" onClick={() => setPendingLoad(m)}><FolderOpen className="h-4 w-4 mr-1" />Indlæs</Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleOverwrite(m)}><Save className="h-4 w-4 mr-1" />Overskriv</Button>
+                    {/* Disabled while the list refreshes: the row's updated_at is the
+                        concurrency token, and clicking mid-refresh would send a stale one
+                        (a false conflict at worst, but avoidable). */}
+                    <Button size="sm" variant="ghost" disabled={refreshing} onClick={() => handleOverwrite(m)}><Save className="h-4 w-4 mr-1" />Overskriv</Button>
                     <Button size="sm" variant="ghost" onClick={() => { setRenamingId(m.id); setRenameValue(m.name); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => setPendingDelete(m)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>

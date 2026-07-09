@@ -81,19 +81,38 @@ export async function saveAsNewModel(name: string, description?: string): Promis
   return data.id;
 }
 
-export async function overwriteModel(id: string): Promise<void> {
+/**
+ * Overwrite a cloud model with the current local state. `expectedUpdatedAt` is an optional
+ * optimistic-concurrency token (the `updated_at` the caller last SAW, from listModels): when
+ * passed, the update only matches if no other session has written the row since. PostgREST
+ * reports a non-matching update as SUCCESS with 0 rows — before Phase 12 that meant
+ * overwriting a model deleted or changed in another tab/device toasted "Opdateret" while
+ * writing nothing — so the row count is checked explicitly here.
+ */
+export async function overwriteModel(id: string, expectedUpdatedAt?: string): Promise<void> {
   const sb = requireSupabase();
   const data_json = JSON.parse(serializeStoreState());
-  const { error } = await sb
+  // updated_at is deliberately NOT sent: since migration 20260709090000 the column is
+  // server-owned — the finance_models trigger bumps it exactly when data_json changes and
+  // preserves it otherwise, so it works as a reliable concurrency token.
+  let query = sb
     .from("finance_models")
     .update({
       data_json,
       model_version: String(MODEL_VERSION),
       model_release: MODEL_RELEASE,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", id);
+  if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
+  const { data, error } = await query.select("id");
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error(
+      expectedUpdatedAt
+        ? "Modellen er ændret fra en anden enhed eller fane, siden listen blev hentet. Opdatér listen, og prøv igen."
+        : "Modellen findes ikke længere i cloud. Opdatér listen.",
+    );
+  }
 }
 
 export async function loadModel(id: string): Promise<void> {
@@ -105,17 +124,43 @@ export async function loadModel(id: string): Promise<void> {
     .single();
   if (error) throw error;
   applyStateToStore(JSON.stringify(data.data_json));
-  await sb.from("finance_models").update({ last_opened_at: new Date().toISOString() }).eq("id", id);
+  // last_opened_at is bookkeeping only, and the model is ALREADY in the local store at this
+  // point. A failure here (typically the connection dropping mid-session) must not bubble up
+  // as "load failed" — that would tell the user a load that succeeded went wrong.
+  try {
+    await sb.from("finance_models").update({ last_opened_at: new Date().toISOString() }).eq("id", id);
+  } catch {
+    // Non-fatal by design; see comment above.
+  }
 }
 
 export async function renameModel(id: string, name: string): Promise<void> {
   const sb = requireSupabase();
-  const { error } = await sb.from("finance_models").update({ name }).eq("id", id);
+  const { data, error } = await sb.from("finance_models").update({ name }).eq("id", id).select("id");
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Modellen findes ikke længere i cloud. Opdatér listen.");
+  }
 }
 
 export async function deleteModel(id: string): Promise<void> {
   const sb = requireSupabase();
   const { error } = await sb.from("finance_models").delete().eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * Danish, offline-aware error copy for the cloud UI (Phase 12 "backend downtime" hardening).
+ * Network-level failures (fetch rejections, PostgrestError objects wrapping them — note those
+ * are plain objects, NOT instanceof Error) become one calm message that says the important
+ * thing: local data is safe on this device. Other errors keep their own message (our own
+ * Danish throws above arrive here); unknown shapes get the caller's fallback.
+ */
+export function cloudErrorMessage(e: unknown, fallback: string): string {
+  const message =
+    e instanceof Error ? e.message : typeof (e as { message?: unknown })?.message === "string" ? (e as { message: string }).message : null;
+  if (message && /failed to fetch|networkerror|network request failed|fetch failed|load failed/i.test(message)) {
+    return "Ingen forbindelse til cloud lige nu. Dine data ligger stadig lokalt på denne enhed. Prøv igen, når du er online.";
+  }
+  return message || fallback;
 }
