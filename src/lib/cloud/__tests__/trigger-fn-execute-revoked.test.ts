@@ -32,9 +32,17 @@ function allMigrationsSql(): string {
 const TRIGGER_FUNCTIONS = ["handle_new_user", "set_updated_at", "set_updated_at_on_content_change"];
 
 /**
- * Any function name invoked by a CREATE TRIGGER, however the DDL is spelled:
- * `EXECUTE FUNCTION|PROCEDURE public.<name>(`, case-insensitive, and whitespace-tolerant around
- * BOTH the schema-qualifier dot (`public . name` is valid Postgres) and the parentheses.
+ * Any function name invoked by a CREATE TRIGGER. Detection is deliberately format-tolerant:
+ * case-insensitive; whitespace-tolerant, including newlines and whitespace around BOTH the
+ * schema-qualifier dot (`public . name` is valid Postgres) and the parentheses; and it accepts
+ * either the `EXECUTE FUNCTION` or the legacy `EXECUTE PROCEDURE` keyword.
+ *
+ * It does NOT catch QUOTED schema-qualified identifiers, e.g. `EXECUTE FUNCTION "public"."name"()`.
+ * This is an accepted, known limitation (found during Phase 12 workstream B review, 2026-07-10),
+ * not a bug or a TODO. Rationale: this guard defends a BEFORE UPDATE trigger function that is not
+ * directly callable from outside Postgres (defense-in-depth, not the RLS boundary itself), and any
+ * migration that could exploit the gap must still pass code review and manual merge before reaching
+ * main — so this test is not the only barrier. A full SQL parser to close it is not warranted.
  */
 function triggerInvokedFunctions(sql: string): Set<string> {
   const re = /EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+public\s*\.\s*(\w+)\s*\(/gi;
@@ -65,7 +73,7 @@ describe("migration chain: trigger functions are not executable by API roles (fo
     },
   );
 
-  it("every function invoked by a CREATE TRIGGER is in the guarded set (regardless of DDL spelling)", () => {
+  it("every function invoked by a CREATE TRIGGER is in the guarded set (any unquoted DDL spelling)", () => {
     const referenced = triggerInvokedFunctions(sql);
     // Sanity: the tolerant pattern actually matched the existing triggers.
     expect(referenced.size).toBeGreaterThan(0);
