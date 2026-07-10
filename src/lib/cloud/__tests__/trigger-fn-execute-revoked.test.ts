@@ -33,17 +33,19 @@ const TRIGGER_FUNCTIONS = ["handle_new_user", "set_updated_at", "set_updated_at_
 
 /**
  * Any function name invoked by a CREATE TRIGGER, however the DDL is spelled:
- * `EXECUTE FUNCTION|PROCEDURE public.<name>(`, case-insensitive, whitespace-tolerant.
+ * `EXECUTE FUNCTION|PROCEDURE public.<name>(`, case-insensitive, and whitespace-tolerant around
+ * BOTH the schema-qualifier dot (`public . name` is valid Postgres) and the parentheses.
  */
 function triggerInvokedFunctions(sql: string): Set<string> {
-  const re = /EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+public\.(\w+)\s*\(/gi;
+  const re = /EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+public\s*\.\s*(\w+)\s*\(/gi;
   return new Set([...sql.matchAll(re)].map((m) => m[1]));
 }
 
 /** The FROM-role list of the REVOKE EXECUTE statement for public.<fn>(), or null if absent. */
 function revokeRolesFor(sql: string, fn: string): string | null {
+  // Tolerate whitespace around the schema dot and the parentheses, plus case.
   const re = new RegExp(
-    `REVOKE\\s+EXECUTE\\s+ON\\s+FUNCTION\\s+public\\.${fn}\\s*\\(\\s*\\)\\s+FROM\\s+([^;]*);`,
+    `REVOKE\\s+EXECUTE\\s+ON\\s+FUNCTION\\s+public\\s*\\.\\s*${fn}\\s*\\(\\s*\\)\\s+FROM\\s+([^;]*);`,
     "i",
   );
   return re.exec(sql)?.[1] ?? null;
