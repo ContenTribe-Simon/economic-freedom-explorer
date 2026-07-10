@@ -16,11 +16,14 @@ export default defineTool({
   inputSchema: {
     annualSpending: z
       .number()
+      .finite()
       .positive()
+      .max(1_000_000_000) // 1 mia. kr/år — absurd upper sanity bound; keeps the result finite.
       .describe("Desired annual spending in kroner (real terms, present-day value)."),
     safeWithdrawalRate: z
       .number()
-      .positive()
+      .finite()
+      .min(0.0001) // floor the divisor so annualSpending / rate can never overflow to non-finite.
       .max(0.2)
       .default(0.04)
       .describe("Safe withdrawal rate as a decimal, e.g. 0.04 for 4%."),

@@ -105,6 +105,17 @@ Alle tre tabeller har RLS aktiveret med ejerbegrænsning via `auth.uid()`:
 Resultat: en bruger kan udelukkende læse, oprette, ændre og slette egne
 modeller og snapshots.
 
+Trigger-funktionerne (`set_updated_at`, `handle_new_user`,
+`set_updated_at_on_content_change`) har EXECUTE tilbagekaldt fra
+`PUBLIC`/`anon`/`authenticated` (migrationer `20260510163534` +
+`20260710120000`), så ingen API-rolle kan kalde dem direkte. `handle_new_user`
+er desuden `SECURITY DEFINER` med fast `search_path = public`. Pinned tekstuelt
+af `trigger-fn-execute-revoked.test.ts` (tolerant over for store/små bogstaver,
+whitespace omkring skema-punktum og parenteser samt `FUNCTION`/`PROCEDURE`, men
+fanger IKKE citerede identifikatorer som `"public"."name"()` — en accepteret,
+kendt begrænsning, se testens kommentar). Verifikation mod den DEPLOYEDE database
+er et manuelt Supabase-trin (som RLS-policyerne ovenfor).
+
 ## 5. Lokal fallback
 
 Cloud er aldrig påkrævet. Følgende virker uden login:

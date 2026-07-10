@@ -15,20 +15,26 @@ export default defineTool({
   inputSchema: {
     startingBalance: z
       .number()
+      .finite()
       .min(0)
+      .max(1_000_000_000_000) // 1 billion (1e12) kr — sanity cap; keeps the compounded result finite.
       .describe("Current invested balance in kroner (real terms)."),
     monthlyContribution: z
       .number()
+      .finite()
       .min(0)
+      .max(10_000_000_000) // 10 mia. kr/md — absurd sanity cap; keeps the compounded result finite.
       .describe("Ongoing monthly contribution in kroner (real terms)."),
     years: z
       .number()
+      .finite()
       .int()
       .positive()
       .max(80)
       .describe("Number of years to project."),
     realAnnualReturn: z
       .number()
+      .finite()
       .min(-0.2)
       .max(0.5)
       .default(0.04)

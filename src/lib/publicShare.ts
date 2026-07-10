@@ -35,7 +35,12 @@ export function encodeShareInputs(inputs: SimplePublicInputs): string {
 export function decodeShareInputs(param: string): SimplePublicInputs | null {
   try {
     const raw: unknown = JSON.parse(b64urlDecode(param));
-    if (typeof raw !== "object" || raw === null) return null;
+    // Only a JSON object (a record) is a valid inputs payload. Reject primitives, null AND
+    // arrays: `typeof [] === "object"` would otherwise slip an array through to be coerced to
+    // all-defaults, silently REPLACING a recipient's entered plan — while unparsable garbage
+    // correctly leaves it untouched. Any non-record decodes to null so the recipient's inputs
+    // are preserved, consistently.
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
     return sanitizeSimpleInputs(raw as Record<string, unknown>);
   } catch {
     return null;
