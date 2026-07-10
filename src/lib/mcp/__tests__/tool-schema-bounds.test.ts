@@ -2,11 +2,13 @@
  * Phase 12 workstream B (security), Codex fix 3: the MCP tools' Zod input schemas must reject
  * non-finite / unbounded numbers at the SCHEMA level, before the handler computes anything.
  *
- * zod 3.25's z.number() (and .positive()/.min()) ACCEPT Infinity and NaN, so an input like
- * annualSpending: 1e309 (=== Infinity) — or a finite spend divided by a near-zero withdrawal rate
- * — produced non-finite output. Every numeric input now carries .finite() plus domain-appropriate
- * min/max bounds. This tests the ACTUAL schemas exported by the tool source (src/lib/mcp/tools/*),
- * which is what the Lovable plugin bundles into the deployed Edge Function.
+ * zod 3.25's z.number() REJECTS NaN by default but ACCEPTS Infinity (as do .positive()/.min()),
+ * so the vulnerability was non-finite INFINITY inputs: annualSpending: 1e309 (=== Infinity), or a
+ * finite spend divided by a near-zero withdrawal rate, produced non-finite output. Every numeric
+ * input now carries .finite() plus domain-appropriate min/max bounds. (The NaN cases below are
+ * regression cover — base zod already rejects them — kept so the guarantee is explicit.) This
+ * tests the ACTUAL schemas exported by the tool source (src/lib/mcp/tools/*), which is what the
+ * Lovable plugin bundles into the deployed Edge Function.
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
