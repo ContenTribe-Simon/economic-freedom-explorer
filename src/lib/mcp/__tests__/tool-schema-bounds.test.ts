@@ -22,7 +22,7 @@ const ok = (schema: z.ZodTypeAny, input: unknown) => schema.safeParse(input).suc
 describe("estimate_fire_number input schema", () => {
   it("rejects non-finite annualSpending (Infinity, 1e309, NaN)", () => {
     expect(ok(estimateSchema, { annualSpending: Infinity, safeWithdrawalRate: 0.04 })).toBe(false);
-    expect(ok(estimateSchema, { annualSpending: 1e309, safeWithdrawalRate: 0.04 })).toBe(false); // 1e309 === Infinity
+    expect(ok(estimateSchema, { annualSpending: Number("1e309"), safeWithdrawalRate: 0.04 })).toBe(false); // 1e309 parses to Infinity
     expect(ok(estimateSchema, { annualSpending: Number.NaN, safeWithdrawalRate: 0.04 })).toBe(false);
   });
 
