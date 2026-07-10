@@ -13,8 +13,8 @@ var estimate_fire_number_default = defineTool({
   title: "Estimate FIRE number",
   description: "Estimate the invested capital required for financial independence from an annual spending level and a safe withdrawal rate (default 4%). Real terms.",
   inputSchema: {
-    annualSpending: z.number().positive().describe("Desired annual spending in kroner (real terms, present-day value)."),
-    safeWithdrawalRate: z.number().positive().max(0.2).default(0.04).describe("Safe withdrawal rate as a decimal, e.g. 0.04 for 4%.")
+    annualSpending: z.number().finite().positive().max(1e9).describe("Desired annual spending in kroner (real terms, present-day value)."),
+    safeWithdrawalRate: z.number().finite().min(1e-4).max(0.2).default(0.04).describe("Safe withdrawal rate as a decimal, e.g. 0.04 for 4%.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: ({ annualSpending, safeWithdrawalRate }) => {
@@ -41,10 +41,10 @@ var project_savings_growth_default = defineTool2({
   title: "Project savings growth",
   description: "Project the real (inflation-adjusted) future value of a starting balance plus monthly contributions over N years at a real annual return.",
   inputSchema: {
-    startingBalance: z2.number().min(0).describe("Current invested balance in kroner (real terms)."),
-    monthlyContribution: z2.number().min(0).describe("Ongoing monthly contribution in kroner (real terms)."),
-    years: z2.number().int().positive().max(80).describe("Number of years to project."),
-    realAnnualReturn: z2.number().min(-0.2).max(0.5).default(0.04).describe("Expected real annual return as a decimal, e.g. 0.04 for 4%.")
+    startingBalance: z2.number().finite().min(0).max(1e12).describe("Current invested balance in kroner (real terms)."),
+    monthlyContribution: z2.number().finite().min(0).max(1e10).describe("Ongoing monthly contribution in kroner (real terms)."),
+    years: z2.number().finite().int().positive().max(80).describe("Number of years to project."),
+    realAnnualReturn: z2.number().finite().min(-0.2).max(0.5).default(0.04).describe("Expected real annual return as a decimal, e.g. 0.04 for 4%.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: ({ startingBalance, monthlyContribution, years, realAnnualReturn }) => {
