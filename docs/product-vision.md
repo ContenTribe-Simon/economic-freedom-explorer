@@ -91,8 +91,8 @@ Since then the public MVP surface has shipped end to end (phases 4–11, see §6
 Frihedsmodel onboarding, input and result screens built on the approved Claude Design
 concept, the explanation/trust layer, the Advanced door, the sensitivity helper, and
 save/share/export are all merged, with the test foundation as the **safety net**
-throughout. The remaining roadmap item is the Phase 12 pre-launch gate (workstreams A and B
-done, C and D open).
+throughout. The remaining roadmap item is the Phase 12 pre-launch gate (A done; B's code work
+merged with manual checks open; C and D open).
 
 ---
 
@@ -111,7 +111,7 @@ done, C and D open).
 | 9 | Hide/defer advanced complexity (advanced features stay in the engine, off the public path) | Complete |
 | 10 | Sensitivity & top drivers ("what moves your FI age most?") | Complete |
 | 11 | Save, share, export (local save, summary export; share link / accounts later) | Complete |
-| 12 | Stress test, security & go-live readiness (pre-launch gate) | In progress (A, B done; C, D open) |
+| 12 | Stress test, security & go-live readiness (pre-launch gate) | In progress (A done; B code merged, manual checks open; C, D open) |
 
 Phases 7 and 12 are deliberate **gates**: nothing proceeds past a failing gate. The
 mid-build gate runs a thorough stress test and security review once a working public surface
@@ -165,7 +165,8 @@ commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
   test files (which also blocked Lovable's publish pipeline) are fixed type-level only, and
   CI now runs `npx tsc -p tsconfig.app.json --noEmit` before the unit tests.
 
-**B. Security — DONE** (merged via PR #40).
+**B. Security — IN PROGRESS: code work merged via PR #40, manual checks outstanding
+(launch-blocking).**
 - RLS: all three tables (`profiles`, `finance_models`, `finance_snapshots`) confirmed
   scoped via `auth.uid()`. One drift fixed: a migration revokes EXECUTE on
   `set_updated_at_on_content_change()` from PUBLIC/anon/authenticated, matching the
@@ -180,9 +181,11 @@ commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
   (a crafted JSON array previously reset the recipient's plan to defaults).
 - MCP endpoint (added via Lovable on 2026-07-04): tool inputs bounded to finite,
   in-domain ranges.
-- **Still open from B, manual (Simon + Supabase dashboard):** verify password policy,
-  email confirmation, auth rate limits and the redirect allowlist. The dynamic pen test and
-  Lovable Security Center scan from the checklist are not recorded as done in PR #40.
+- **Still open — B is not done until each of these is verified (launch-blocking):**
+  - Supabase dashboard (Simon): password policy, email confirmation, auth rate limits, and
+    the redirect allowlist.
+  - Lovable Security Center scan (Basic + Deep).
+  - Dynamic pen test of the running app (the cheap AI pen test first).
 
 **C. Privacy & legal + data backup/restore — NOT STARTED.** The privacy policy is drafted
 factually by the agent/Claude Code (based on what the code actually collects and stores)
@@ -222,8 +225,8 @@ Implementation order follows the phases above: foundation → public flow & MVP 
 MVP data contract → brand & UI concept → onboarding & input UI → result dashboard →
 **mid-build stress/security gate** → explanation/trust layer → hide advanced →
 sensitivity/top drivers → save/share/export → **pre-launch stress/security/go-live gate**.
-Phases 1–11 are complete; in the Phase 12 pre-launch gate, workstreams A and B are done
-and C and D remain.
+Phases 1–11 are complete; in the Phase 12 pre-launch gate, A is done, B's manual checks
+remain open, and C and D remain.
 
 ### Post-launch (beyond Phase 12)
 
@@ -307,7 +310,8 @@ Phases 1–11 are complete (see §6): the public Frihedsmodel flow is built end 
 approved Claude Design concept, with the trust layer, the Advanced door, the sensitivity
 helper and save/share/export merged and covered by the test safety net. The current next
 step is **Phase 12 — the pre-launch stress, security & go-live gate** (checklist in §6):
-workstreams A and B are merged, C (privacy/legal + backup) and D (content + go-live) remain,
-built together because of the PostHog consent tie-in.
+A is done; B's code work is merged but its manual checks (Supabase auth settings, Security
+Center scan, dynamic pen test) are still open and launch-blocking; C (privacy/legal + backup)
+and D (content + go-live) remain, built together because of the PostHog consent tie-in.
 The deliberately parked post-launch items (public brand/visual redesign, the Advanced app's
 UX pass) remain in their backlog docs, anchored under "Post-launch" in §6.
