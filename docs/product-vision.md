@@ -91,7 +91,8 @@ Since then the public MVP surface has shipped end to end (phases 4–11, see §6
 Frihedsmodel onboarding, input and result screens built on the approved Claude Design
 concept, the explanation/trust layer, the Advanced door, the sensitivity helper, and
 save/share/export are all merged, with the test foundation as the **safety net**
-throughout. The remaining roadmap item is the Phase 12 pre-launch gate.
+throughout. The remaining roadmap item is the Phase 12 pre-launch gate (workstreams A and B
+done, C and D open).
 
 ---
 
@@ -110,7 +111,7 @@ throughout. The remaining roadmap item is the Phase 12 pre-launch gate.
 | 9 | Hide/defer advanced complexity (advanced features stay in the engine, off the public path) | Complete |
 | 10 | Sensitivity & top drivers ("what moves your FI age most?") | Complete |
 | 11 | Save, share, export (local save, summary export; share link / accounts later) | Complete |
-| 12 | Stress test, security & go-live readiness (pre-launch gate) | Planned |
+| 12 | Stress test, security & go-live readiness (pre-launch gate) | In progress (A, B done; C, D open) |
 
 Phases 7 and 12 are deliberate **gates**: nothing proceeds past a failing gate. The
 mid-build gate runs a thorough stress test and security review once a working public surface
@@ -146,7 +147,7 @@ last projected YearRow) plus expanded standard-scenario regression tests; see
 
 The checklist above stays the canonical reference; this is the concrete execution plan.
 Four sequential workstreams, each its own branch/PR — never one large PR. Status verified
-against git as of 2026-07-09 (main at PR #37's merge).
+against git as of 2026-10-10 (main at PR #40's merge).
 
 **A. Full regression + dependency audit + robustness/load — DONE** (merged via PR #37;
 commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
@@ -160,16 +161,28 @@ commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
 - Discovered during review: `npx tsc --noEmit` against the root `tsconfig.json` type-checks
   ZERO files and always exits 0 (references-only config) — every prior "tsc clean" claim in
   this project verified nothing. Correct command: `npx tsc -p tsconfig.app.json --noEmit`.
-  CI runs no typecheck today; tracked as a separate follow-up (16 pre-existing, unrelated
-  TS2352 errors in two old test files also surfaced and are not yet fixed).
+  Follow-up closed by PR #39: the 16 pre-existing TS2352 errors in two legacy-migration
+  test files (which also blocked Lovable's publish pipeline) are fixed type-level only, and
+  CI now runs `npx tsc -p tsconfig.app.json --noEmit` before the unit tests.
 
-**B. Security — NOT STARTED.** RLS penetration check across ALL tables (not just
-`finance_snapshots`, which was already hardened separately) + auth flows + rate limiting +
-CORS + CSP/security headers + dynamic pen test + end-to-end stress of the public journey
-under hostile conditions. **Start with Lovable's own built-in Security Center scans (Basic
-+ Deep: RLS policy linting, dependency vulnerabilities, auto-fix for common RLS
-misconfigurations)** before any manual pen-test work — it may already cover part of the
-RLS-penetration and dependency-audit items.
+**B. Security — DONE** (merged via PR #40).
+- RLS: all three tables (`profiles`, `finance_models`, `finance_snapshots`) confirmed
+  scoped via `auth.uid()`. One drift fixed: a migration revokes EXECUTE on
+  `set_updated_at_on_content_change()` from PUBLIC/anon/authenticated, matching the
+  trigger-function baseline, pinned by a regression test. Accepted limitation: quoted
+  schema-qualified identifiers escape that test (documented in `CLOUD_MODEL.md` §4).
+- Auth flows: full call surface reviewed, no code vulnerability; there is no reset/OTP/
+  OAuth/magic-link surface.
+- CSP: a tight `<meta http-equiv>` CSP injected into production builds only (Lovable allows
+  no custom response headers), guarded permanently by `e2e/csp.spec.ts` with a positive
+  control.
+- Public journey under hostile input: share-link decoding now rejects non-record payloads
+  (a crafted JSON array previously reset the recipient's plan to defaults).
+- MCP endpoint (added via Lovable on 2026-07-04): tool inputs bounded to finite,
+  in-domain ranges.
+- **Still open from B, manual (Simon + Supabase dashboard):** verify password policy,
+  email confirmation, auth rate limits and the redirect allowlist. The dynamic pen test and
+  Lovable Security Center scan from the checklist are not recorded as done in PR #40.
 
 **C. Privacy & legal + data backup/restore — NOT STARTED.** The privacy policy is drafted
 factually by the agent/Claude Code (based on what the code actually collects and stores)
@@ -209,7 +222,8 @@ Implementation order follows the phases above: foundation → public flow & MVP 
 MVP data contract → brand & UI concept → onboarding & input UI → result dashboard →
 **mid-build stress/security gate** → explanation/trust layer → hide advanced →
 sensitivity/top drivers → save/share/export → **pre-launch stress/security/go-live gate**.
-Phases 1–11 are complete; only the Phase 12 pre-launch gate remains.
+Phases 1–11 are complete; in the Phase 12 pre-launch gate, workstreams A and B are done
+and C and D remain.
 
 ### Post-launch (beyond Phase 12)
 
@@ -292,6 +306,8 @@ agent. Full detail in `CLAUDE.md`.
 Phases 1–11 are complete (see §6): the public Frihedsmodel flow is built end to end on the
 approved Claude Design concept, with the trust layer, the Advanced door, the sensitivity
 helper and save/share/export merged and covered by the test safety net. The current next
-step is **Phase 12 — the pre-launch stress, security & go-live gate** (checklist in §6).
+step is **Phase 12 — the pre-launch stress, security & go-live gate** (checklist in §6):
+workstreams A and B are merged, C (privacy/legal + backup) and D (content + go-live) remain,
+built together because of the PostHog consent tie-in.
 The deliberately parked post-launch items (public brand/visual redesign, the Advanced app's
 UX pass) remain in their backlog docs, anchored under "Post-launch" in §6.
