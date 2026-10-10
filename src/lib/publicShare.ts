@@ -6,7 +6,10 @@ import { sanitizeSimpleInputs } from "@/lib/publicInputs";
  * dine tal"), so no backend, no accounts and no server-side state are involved — consistent
  * with the roadmap deferring share-infrastructure (Phase 11: "share link / accounts later").
  *
- * Format: base64url of the SimplePublicInputs JSON in a `d` query param on /resultat.
+ * Format: base64url of the SimplePublicInputs JSON in a `d` param in the URL FRAGMENT on
+ * /resultat (`/resultat#d=…`). The fragment is never sent to the server, so the host never sees
+ * the inputs. Legacy links put `d` in the query string (`/resultat?d=…`); they still decode, and
+ * the fragment wins if both are present.
  * Decoding is defensive: unknown/garbage input returns null, and everything else goes through
  * the shared `sanitizeSimpleInputs` (spec §4.1 ranges + cross-field rules) — a hostile link can
  * only ever produce a valid input set.
@@ -26,7 +29,7 @@ function b64urlDecode(s: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-/** Encode inputs for the share link's `d` param. */
+/** Encode inputs for the share link's `d` fragment param. */
 export function encodeShareInputs(inputs: SimplePublicInputs): string {
   return b64urlEncode(JSON.stringify(inputs));
 }
@@ -47,8 +50,18 @@ export function decodeShareInputs(param: string): SimplePublicInputs | null {
   }
 }
 
+/**
+ * The raw encoded payload from a location's search + hash, or null. Fragment first, then the
+ * legacy query param. Returns the value undecoded; `decodeShareInputs` is the trust boundary.
+ */
+export function readSharePayload(search: string, hash: string): string | null {
+  const fromHash = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash).get("d");
+  if (fromHash != null) return fromHash;
+  return new URLSearchParams(search).get("d");
+}
+
 /** The absolute share URL for the current inputs. */
 export function shareUrlFor(inputs: SimplePublicInputs): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  return `${origin}/resultat?d=${encodeShareInputs(inputs)}`;
+  return `${origin}/resultat#d=${encodeShareInputs(inputs)}`;
 }
