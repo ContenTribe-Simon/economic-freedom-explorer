@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Check, Layers, Minus, Share2, SlidersHorizontal, TrendingUp, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/public/PublicHeader";
@@ -8,7 +8,7 @@ import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
 import { formatKr, headlineStopAge } from "@/lib/publicFormat";
-import { decodeShareInputs } from "@/lib/publicShare";
+import { decodeShareInputs, readSharePayload } from "@/lib/publicShare";
 import { deriveSavingsSensitivity } from "@/lib/publicSensitivity";
 import "./start.css";
 import "./resultat.css";
@@ -111,20 +111,20 @@ function DriverRow({ driver }: { driver: PublicDriver }) {
 export default function Resultat() {
   const inputs = usePublicStore((s) => s.inputs);
   const replaceInputs = usePublicStore((s) => s.replaceInputs);
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  // Share-link hydration: /resultat?d=<encoded inputs> loads the sender's numbers into the
-  // local state ("Linket indeholder dine tal"), then cleans the URL. Decoding is defensive —
-  // a malformed param is simply ignored.
+  // Share-link hydration: /resultat#d=<encoded inputs> (legacy: ?d=) loads the sender's numbers
+  // into the local state ("Linket indeholder dine tal"), then cleans the URL. The fragment is
+  // never sent to the server. Decoding is defensive: a malformed payload is simply ignored.
   useEffect(() => {
-    const d = searchParams.get("d");
+    const d = readSharePayload(location.search, location.hash);
     if (d == null) return;
     const decoded = decodeShareInputs(d);
     if (decoded) replaceInputs(decoded);
     navigate("/resultat", { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per mount/param change
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per mount/link change
+  }, [location.search, location.hash]);
 
   const result = useMemo(() => computePublicResult(inputs), [inputs]);
   // The 1-lever sensitivity helper: a second REAL pipeline run with monthlySavings + 1.000
