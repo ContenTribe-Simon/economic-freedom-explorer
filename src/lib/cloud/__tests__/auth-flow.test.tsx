@@ -1,6 +1,6 @@
 /**
- * Auth flow fix (2026-10-11): confirmation links never point at Lovable's preview, the signup
- * message is true whether or not the email already has an account, errors are Danish.
+ * Auth flow fix (2026-10-11): confirmation links never point at Lovable's preview, an email that
+ * already has an account gets told so (and lands on the login tab), errors are Danish.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -11,7 +11,7 @@ const sb = vi.hoisted(() => ({
   signInWithPassword: vi.fn(async () => ({ error: { message: "Invalid login credentials" } })),
   resend: vi.fn(async () => ({ error: null })),
 }));
-const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { auth: { signUp: sb.signUp, signInWithPassword: sb.signInWithPassword, resend: sb.resend } },
   isSupabaseConfigured: true,
@@ -19,13 +19,31 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ session: null }) }));
 vi.mock("sonner", () => ({ toast }));
 
-import { SIGNUP_SENT_MESSAGE, authErrorMessage, isLovablePreviewHost, signupRedirectTo } from "../authFlow";
+import {
+  RESEND_MESSAGE,
+  SIGNUP_EXISTS_MESSAGE,
+  SIGNUP_SENT_MESSAGE,
+  authErrorMessage,
+  isExistingAccountSignup,
+  isLovablePreviewHost,
+  signupRedirectTo,
+} from "../authFlow";
 import AuthPage from "@/pages/Auth";
 
 beforeEach(() => {
   Object.values(sb).forEach((f) => f.mockClear());
   toast.success.mockClear();
   toast.error.mockClear();
+  toast.info.mockClear();
+});
+
+describe("isExistingAccountSignup", () => {
+  it("reads Supabase's empty-identities marker", () => {
+    expect(isExistingAccountSignup({ user: { identities: [] } })).toBe(true);
+    expect(isExistingAccountSignup({ user: { identities: [{ id: "1" }] } })).toBe(false);
+    expect(isExistingAccountSignup({ user: null })).toBe(false);
+    expect(isExistingAccountSignup(null)).toBe(false);
+  });
 });
 
 describe("signupRedirectTo", () => {
@@ -58,7 +76,7 @@ describe("authErrorMessage", () => {
   });
 
   it("no message contains an em dash", () => {
-    expect(SIGNUP_SENT_MESSAGE).not.toContain("—");
+    for (const m of [SIGNUP_SENT_MESSAGE, SIGNUP_EXISTS_MESSAGE, RESEND_MESSAGE]) expect(m).not.toContain("—");
   });
 });
 
@@ -73,25 +91,39 @@ describe("Auth page", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Opret konto" }));
   }
 
-  it("an already registered email gets the same neutral message (Supabase sends no mail then)", async () => {
+  async function submitSignup() {
     renderAuth();
     const panel = await screen.findByRole("tabpanel");
     fireEvent.change(panel.querySelector('input[type="email"]')!, { target: { value: "x@example.dk" } });
     fireEvent.change(panel.querySelector('input[type="password"]')!, { target: { value: "frihed2026" } });
     fireEvent.submit(panel.querySelector("form")!);
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(SIGNUP_SENT_MESSAGE));
+  }
+
+  it("an email that already has an account is told so and lands on the login tab", async () => {
+    sb.signUp.mockResolvedValueOnce({ data: { user: { identities: [] } }, error: null });
+    await submitSignup();
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(SIGNUP_EXISTS_MESSAGE));
+    expect(toast.success).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Log ind" }).getAttribute("aria-selected")).toBe("true"));
     expect(sb.signUp).toHaveBeenCalledWith(
       expect.objectContaining({ email: "x@example.dk", options: { emailRedirectTo: `${window.location.origin}/cloud` } }),
     );
   });
 
-  it("can resend the confirmation, with the same neutral answer", async () => {
+  it("a new account is told a confirmation mail was sent", async () => {
+    sb.signUp.mockResolvedValueOnce({ data: { user: { identities: [{ id: "i1" }] } }, error: null });
+    await submitSignup();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(SIGNUP_SENT_MESSAGE));
+    expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("can resend the confirmation", async () => {
     renderAuth();
     const panel = await screen.findByRole("tabpanel");
     fireEvent.change(panel.querySelector('input[type="email"]')!, { target: { value: "x@example.dk" } });
     fireEvent.click(screen.getByRole("button", { name: "Fik du ikke mailen? Send den igen" }));
     await waitFor(() => expect(sb.resend).toHaveBeenCalledWith(expect.objectContaining({ type: "signup", email: "x@example.dk" })));
-    expect(toast.success).toHaveBeenCalledWith(SIGNUP_SENT_MESSAGE);
+    expect(toast.success).toHaveBeenCalledWith(RESEND_MESSAGE);
   });
 
   it("login errors are Danish", async () => {

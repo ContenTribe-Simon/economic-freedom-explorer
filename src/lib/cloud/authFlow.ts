@@ -17,12 +17,23 @@ export function signupRedirectTo(origin: string, hostname: string): string | und
   return isLovablePreviewHost(hostname) ? undefined : `${origin}/cloud`;
 }
 
+/** Shown after a signup that created a new, unconfirmed account (a confirmation mail was sent). */
+export const SIGNUP_SENT_MESSAGE = "Vi har sendt dig en mail. Klik på linket i den for at bekræfte kontoen.";
+
 /**
- * Shown after every successful signup call. Neutral on purpose: Supabase answers an existing email
- * with success but sends no mail (so nobody can probe which emails have accounts), and the message
- * must stay true in both cases without revealing which one it was.
+ * Supabase answers a signup for an email that already has an account with "success" but sends no
+ * mail, and marks it with an empty `identities` list. Telling the user plainly beats a "check your
+ * mail" that never arrives. Hiding it would protect nothing: the same signal is in the public API
+ * response for anyone who calls it directly.
  */
-export const SIGNUP_SENT_MESSAGE = "Tjek din mail for at bekræfte kontoen. Har du allerede en konto, så log ind i stedet.";
+export const SIGNUP_EXISTS_MESSAGE = "Der findes allerede en konto med den e-mail. Log ind i stedet.";
+
+export function isExistingAccountSignup(data: { user?: { identities?: unknown[] | null } | null } | null | undefined): boolean {
+  return Array.isArray(data?.user?.identities) && data!.user!.identities!.length === 0;
+}
+
+/** After "send again": true whether or not a mail went out (Supabase does not say). */
+export const RESEND_MESSAGE = "Hvis kontoen venter på bekræftelse, har vi sendt mailen igen. Tjek også spam.";
 
 /** Danish text for the auth errors a user can actually cause; anything else gets a calm fallback. */
 export function authErrorMessage(error: { message?: string; code?: string } | null | undefined): string {

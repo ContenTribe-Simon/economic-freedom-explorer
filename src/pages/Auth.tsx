@@ -8,7 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PASSWORD_MIN_LENGTH, PASSWORD_RULE_TEXT, passwordProblem } from "@/lib/cloud/passwordPolicy";
-import { SIGNUP_SENT_MESSAGE, authErrorMessage, signupRedirectTo } from "@/lib/cloud/authFlow";
+import {
+  RESEND_MESSAGE,
+  SIGNUP_EXISTS_MESSAGE,
+  SIGNUP_SENT_MESSAGE,
+  authErrorMessage,
+  isExistingAccountSignup,
+  signupRedirectTo,
+} from "@/lib/cloud/authFlow";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -16,6 +23,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState("login");
 
   useEffect(() => {
     if (session) navigate("/cloud", { replace: true });
@@ -40,18 +48,22 @@ export default function AuthPage() {
       return;
     }
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: signupRedirectTo(window.location.origin, window.location.hostname) },
     });
     setBusy(false);
     if (error) toast.error(authErrorMessage(error));
-    else toast.success(SIGNUP_SENT_MESSAGE);
+    else if (isExistingAccountSignup(data)) {
+      toast.info(SIGNUP_EXISTS_MESSAGE);
+      setPassword("");
+      setTab("login");
+    } else toast.success(SIGNUP_SENT_MESSAGE);
   };
 
-  // "Fik du ikke mailen?": resends the confirmation for an unconfirmed signup. Same neutral answer
-  // either way, so it reveals nothing about whether the email has an account.
+  // "Fik du ikke mailen?": resends the confirmation for an unconfirmed signup. Supabase does not say
+  // whether a mail went out, so the message is true either way.
   const onResend = async () => {
     if (!supabase || !email) {
       toast.error("Skriv din e-mail først.");
@@ -65,7 +77,7 @@ export default function AuthPage() {
     });
     setBusy(false);
     if (error && /rate|too many/i.test(error.message)) toast.error(authErrorMessage(error));
-    else toast.success(SIGNUP_SENT_MESSAGE);
+    else toast.success(RESEND_MESSAGE);
   };
 
   return (
@@ -82,7 +94,7 @@ export default function AuthPage() {
           lokalt i browseren.
         </p>
       )}
-      <Tabs defaultValue="login">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="grid grid-cols-2 w-full">
           <TabsTrigger value="login">Log ind</TabsTrigger>
           <TabsTrigger value="signup">Opret konto</TabsTrigger>
