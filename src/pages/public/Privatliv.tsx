@@ -16,7 +16,7 @@ import {
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import { LEGAL_ENTITY } from "@/lib/legalEntity";
-import { clearLocalAppData } from "@/lib/localData";
+import { clearLocalAppData, clearSessionAppData } from "@/lib/localData";
 import { supabase } from "@/integrations/supabase/client";
 import "./start.css";
 
@@ -66,6 +66,7 @@ export default function Privatliv() {
       // Offline or not signed in: the stored session is removed below either way.
     }
     clearLocalAppData();
+    clearSessionAppData();
     try {
       sessionStorage.setItem(WIPED_FLAG, "1");
     } catch {
@@ -112,7 +113,7 @@ export default function Privatliv() {
           <Section title="Kort fortalt">
             <ul className="m-0 grid list-disc gap-1.5 pl-5">
               <li>De tal, du taster ind, bliver i din egen browser. Vi modtager dem ikke.</li>
-              <li>Vi bruger ingen cookies. Vi måler anonymt, hvordan siden bruges, og spørger, før vi husker din browser.</li>
+              <li>Vores hosting sætter to cookies: én teknisk og én, der tæller besøg. Vi måler, hvordan siden bruges, og spørger, før vi husker din browser.</li>
               <li>Hvis du opretter en konto i den avancerede model, gemmer vi din e-mail og dine modeller i EU.</li>
               <li>Du kan altid slette dine data. Knappen står nederst på siden.</li>
             </ul>
@@ -166,12 +167,22 @@ export default function Privatliv() {
             </p>
           </Section>
 
-          <Section title="Hosting og tekniske logs">
+          <Section title="Hosting, besøgstal og cookies">
             <p className="m-0">
               Siden hostes af Lovable. Som på de fleste websteder registrerer hostingen tekniske oplysninger, når du
               besøger siden, for eksempel IP-adresse, browsertype og tidspunkt. Det sker for at drive og beskytte
               siden, og grundlaget er vores legitime interesse i en sikker og stabil tjeneste. Lovable behandler
               oplysningerne på vores vegne.
+            </p>
+            <p className="m-0">
+              Lovable tæller også besøg for os: hvilken side du ser, din browser, dit sprog og hvor i verden du er. Adressen
+              sendes uden dine tal. Har du åbnet et delt link, fjerner siden tallene fra adressen, før optællingen
+              sker.
+            </p>
+            <p className="m-0">
+              Til det sætter hostingen to cookies: <strong>__dpl</strong>, som sikrer, at du får den rigtige version
+              af siden (udløber efter 7 dage), og <strong>session-id</strong>, som samler dine sidevisninger til ét
+              besøg (udløber efter 30 minutter). Ingen af dem bruges til reklame.
             </p>
           </Section>
 

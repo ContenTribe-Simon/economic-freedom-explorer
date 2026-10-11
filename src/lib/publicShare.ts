@@ -60,6 +60,24 @@ export function readSharePayload(search: string, hash: string): string | null {
   return new URLSearchParams(search).get("d");
 }
 
+export const SHARE_STASH_KEY = "frihedsmodel-share-payload";
+
+/**
+ * The payload public/share-guard.js moved out of the URL before any analytics could read it. Read
+ * once and removed, so a later visit to /resultat does not re-apply an old share link.
+ */
+export function takeStashedSharePayload(storage?: Pick<Storage, "getItem" | "removeItem">): string | null {
+  try {
+    // Resolved inside the try: merely reading window.sessionStorage throws where storage is denied.
+    const s = storage ?? window.sessionStorage;
+    const v = s.getItem(SHARE_STASH_KEY);
+    if (v !== null) s.removeItem(SHARE_STASH_KEY);
+    return v;
+  } catch {
+    return null;
+  }
+}
+
 /** The absolute share URL for the current inputs. */
 export function shareUrlFor(inputs: SimplePublicInputs): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";

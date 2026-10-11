@@ -45,7 +45,10 @@ describe("Privatliv page", () => {
     expect(text).toContain(LEGAL_ENTITY.email);
     expect(text).toContain("Stockholm");
     expect(text).toContain("Datatilsynet");
-    expect(text).toContain("Vi bruger ingen cookies.");
+    // Truthful about the host's cookies (found live on 2026-10-11): no "no cookies" claim.
+    expect(text).not.toContain("ingen cookies");
+    expect(text).toContain("__dpl");
+    expect(text).toContain("session-id");
     expect(text).toContain("PostHog med servere i EU");
     expect(text).toContain("Dine tal og de beløb, du ser, bliver aldrig sendt.");
   });
@@ -85,6 +88,7 @@ describe("Privatliv page", () => {
       localStorage.setItem("frihedsmodel-public.v1", "{\"state\":{}}");
       localStorage.setItem("finance-tool.v1", "{}");
       localStorage.setItem("sb-x-auth-token", "session");
+      sessionStorage.setItem("frihedsmodel-share-payload", "parked-share-figures");
       renderAt("/privatliv", <Privatliv />);
 
       fireEvent.click(screen.getByRole("button", { name: "Slet alle mine data i denne browser" }));
@@ -95,6 +99,7 @@ describe("Privatliv page", () => {
       expect(localStorage.getItem("frihedsmodel-public.v1")).toBeNull();
       expect(localStorage.getItem("finance-tool.v1")).toBeNull();
       expect(localStorage.getItem("sb-x-auth-token")).toBeNull();
+      expect(sessionStorage.getItem("frihedsmodel-share-payload")).toBeNull();
     });
 
     it("cancelling keeps everything", () => {
