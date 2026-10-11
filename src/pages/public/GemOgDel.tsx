@@ -9,6 +9,8 @@ import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
 import { formatDaLongDate, formatKr, headlineStopAge } from "@/lib/publicFormat";
 import { shareUrlFor } from "@/lib/publicShare";
+import { PublicFooter } from "@/components/public/PublicFooter";
+import { PUBLIC_DISCLAIMER, REAL_TERMS_NOTE } from "@/lib/publicCopy";
 import "./start.css";
 
 /**
@@ -175,8 +177,7 @@ export default function GemOgDel() {
         </table>
 
         <p className="mt-6 border-t border-border pt-3 text-[11.5px] leading-[1.5] text-[color:var(--ink-soft)]">
-          Alle beløb er i nutidskroner. En forenklet beregning ud fra dine egne tal og antagelser.
-          Tag tallene som et kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning.
+          {REAL_TERMS_NOTE} {PUBLIC_DISCLAIMER}
         </p>
       </section>
 
@@ -408,6 +409,7 @@ export default function GemOgDel() {
             special case here). PublicHeader also carries the no-carry-over reminder next to
             that button — a returning user with the door already open never sees DoorPage's
             clarification, so the reminder cannot live only there. */}
+        <PublicFooter className="mb-14 mt-10" />
       </div>
     </div>
   );

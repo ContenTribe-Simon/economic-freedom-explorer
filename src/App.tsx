@@ -8,6 +8,7 @@ import Start from "./pages/public/Start";
 import SimpleInputs from "./pages/public/SimpleInputs";
 import Resultat from "./pages/public/Resultat";
 import GemOgDel from "./pages/public/GemOgDel";
+import Privatliv from "./pages/public/Privatliv";
 import Dashboard from "./pages/Dashboard";
 import Inputs from "./pages/Inputs";
 import Assumptions from "./pages/Assumptions";
@@ -25,6 +26,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AdvancedGate } from "./pages/AdvancedDoor";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { RouteFocusManager } from "@/components/RouteFocusManager";
+import { WipeSync } from "./components/WipeSync";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -53,6 +55,8 @@ const App = () => (
         <BrowserRouter>
           {/* Moves focus to the new screen's heading on every route change (a11y). */}
           <RouteFocusManager />
+          {/* Reload when another tab wipes the browser data (Privatliv). */}
+          <WipeSync />
           <AuthProvider>
             <Routes>
               {/* The public Frihedsmodel flow is the DEFAULT entry (product structure §4):
@@ -62,6 +66,7 @@ const App = () => (
               <Route path="/simple-inputs" element={<SimpleInputs />} />
               <Route path="/resultat" element={<Resultat />} />
               <Route path="/gem-og-del" element={<GemOgDel />} />
+              <Route path="/privatliv" element={<Privatliv />} />
 
               {/* Advanced app inside the shell, behind the Advanced door (see AdvancedDoor.tsx).
                   Paths are unchanged except the dashboard, which moves from "/" to /dashboard —

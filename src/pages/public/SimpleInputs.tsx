@@ -16,6 +16,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { usePublicStore } from "@/store/publicStore";
 import type { SimplePublicInputs } from "@/lib/finance/public";
+import { PublicFooter } from "@/components/public/PublicFooter";
+import { PUBLIC_DISCLAIMER } from "@/lib/publicCopy";
 import "./start.css";
 
 /**
@@ -369,13 +371,11 @@ export default function SimpleInputs() {
         <div className="mt-6 flex items-start gap-3 rounded-[14px] border border-border bg-card px-4 py-3.5 text-[13.5px] leading-[1.5] text-[color:var(--ink-soft)]">
           <Info aria-hidden="true" className="mt-0.5 h-[18px] w-[18px] flex-none text-[color:var(--fjord)]" />
           <p className="m-0">
-            Alle beløb er i nutidskroner, så de er sammenlignelige med dagens priser. En forenklet
-            beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret billede,
-            ikke en garanti, og ikke som økonomisk rådgivning.
+            Alle beløb er i nutidskroner, så de er sammenlignelige med dagens priser. {PUBLIC_DISCLAIMER}
           </p>
         </div>
 
-        <div className="mb-14 mt-[clamp(26px,4vw,36px)] flex flex-wrap items-center gap-[18px]">
+        <div className="mb-10 mt-[clamp(26px,4vw,36px)] flex flex-wrap items-center gap-[18px]">
           <Button asChild size="lg" className="h-12 px-7 text-[15px] [&_svg]:size-[18px]">
             <Link to="/resultat">
               Se mit svar
@@ -384,6 +384,9 @@ export default function SimpleInputs() {
           </Button>
           <span className="text-[13.5px] text-[color:var(--ink-soft)]">Du kan altid rette tallene bagefter.</span>
         </div>
+
+        {/* The disclaimer already sits in the info box above, so the footer carries only links. */}
+        <PublicFooter withDisclaimer={false} className="mb-14" />
       </div>
     </div>
   );

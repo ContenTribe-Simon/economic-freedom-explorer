@@ -1,0 +1,88 @@
+/**
+ * PR 3 (Phase 12 C/D): the shared disclaimer, the data-controller details and the local wipe.
+ */
+import { describe, expect, it, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { PUBLIC_DISCLAIMER, REAL_TERMS_NOTE } from "@/lib/publicCopy";
+import { FEEDBACK_MAILTO, LEGAL_ENTITY } from "@/lib/legalEntity";
+import { APP_STORAGE_KEYS, clearLocalAppData, isSessionKey, isWipeSignal } from "@/lib/localData";
+
+describe("PUBLIC_DISCLAIMER", () => {
+  it("is the canonical text from the public data contract, verbatim", () => {
+    const contract = readFileSync(path.resolve(__dirname, "../../../docs/public-mvp-spec-and-data-contract-v1.md"), "utf8");
+    expect(contract.replace(/\s+/g, " ")).toContain(PUBLIC_DISCLAIMER);
+    expect(PUBLIC_DISCLAIMER).not.toContain("—");
+    expect(REAL_TERMS_NOTE).toBe("Alle beløb er i nutidskroner.");
+  });
+});
+
+describe("LEGAL_ENTITY", () => {
+  it("names ContenTribe with a real CVR and contact address", () => {
+    expect(LEGAL_ENTITY.name).toBe("ContenTribe");
+    expect(LEGAL_ENTITY.cvr).toMatch(/^\d{8}$/);
+    expect(LEGAL_ENTITY.email).toMatch(/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/);
+  });
+
+  it("feedback link opens a mail to that address with a subject and no body", () => {
+    const url = new URL(FEEDBACK_MAILTO);
+    expect(url.protocol).toBe("mailto:");
+    expect(url.pathname).toBe(LEGAL_ENTITY.email);
+    expect(url.searchParams.get("subject")).toBe("Feedback på Frihedsmodel");
+    expect(url.searchParams.has("body")).toBe(false);
+  });
+});
+
+describe("isWipeSignal (other tabs reload after a wipe)", () => {
+  it("fires on removal of an app key or a full clear, nothing else", () => {
+    expect(isWipeSignal({ key: "frihedsmodel-public.v1", newValue: null })).toBe(true);
+    expect(isWipeSignal({ key: "finance-tool.v1", newValue: null })).toBe(true);
+    expect(isWipeSignal({ key: null, newValue: null })).toBe(true);
+    expect(isWipeSignal({ key: "frihedsmodel-public.v1", newValue: "{}" })).toBe(false);
+    expect(isWipeSignal({ key: "unrelated", newValue: null })).toBe(false);
+  });
+});
+
+describe("clearLocalAppData", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("removes every app-owned key and reports what was there", () => {
+    localStorage.setItem("frihedsmodel-public.v1", "{}");
+    localStorage.setItem("finance-tool.v1", "{}");
+    localStorage.setItem("frihedsmodel-advanced-door.v1", "open");
+    expect(clearLocalAppData().sort()).toEqual([...APP_STORAGE_KEYS].sort());
+    for (const k of APP_STORAGE_KEYS) expect(localStorage.getItem(k)).toBeNull();
+  });
+
+  it("also removes a signed-in cloud session, so the next person cannot reopen the account", () => {
+    localStorage.setItem("sb-nixcnzzourbxflxxmjdu-auth-token", "session");
+    expect(clearLocalAppData()).toEqual(["sb-nixcnzzourbxflxxmjdu-auth-token"]);
+    expect(localStorage.getItem("sb-nixcnzzourbxflxxmjdu-auth-token")).toBeNull();
+    expect(isSessionKey("sb-x-auth-token")).toBe(true);
+    expect(isSessionKey("sb-x-auth-token-code-verifier")).toBe(false);
+  });
+
+  it("leaves keys it does not own", () => {
+    localStorage.setItem("frihedsmodel-public.v1", "{}");
+    localStorage.setItem("unrelated", "x");
+    localStorage.setItem("sb-settings", "x");
+    expect(clearLocalAppData()).toEqual(["frihedsmodel-public.v1"]);
+    expect(localStorage.getItem("unrelated")).toBe("x");
+    expect(localStorage.getItem("sb-settings")).toBe("x");
+  });
+
+  it("never throws when storage is blocked", () => {
+    const blocked = { getItem: () => { throw new Error("blocked"); }, removeItem: () => { throw new Error("blocked"); } };
+    expect(clearLocalAppData(blocked)).toEqual([]);
+  });
+
+  it("covers every persisted store key in the codebase", () => {
+    const src = (f: string) => readFileSync(path.resolve(__dirname, "..", f), "utf8");
+    const keys = [
+      src("../store/publicStore.ts").match(/name: "([^"]+\.v\d+)"/)![1],
+      src("../store/financeStore.ts").match(/name: "(finance-tool\.v\d+)"/)![1],
+      src("advancedDoor.ts").match(/ADVANCED_DOOR_KEY = "([^"]+)"/)![1],
+    ];
+    for (const k of keys) expect(APP_STORAGE_KEYS).toContain(k);
+  });
+});

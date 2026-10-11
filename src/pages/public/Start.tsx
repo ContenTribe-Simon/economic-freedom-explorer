@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Compass, ShieldCheck, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AdvancedAccessButton, AdvancedNoCarryOverNote } from "@/components/public/AdvancedAccessButton";
+import { PublicFooter } from "@/components/public/PublicFooter";
 import "./start.css";
 
 /**
@@ -159,13 +160,9 @@ export default function Start() {
       {/* Trust strip (persistent, spec Screen A): the single global disclaimer VERBATIM plus
           the real-terms note — same canonical text as Simple Inputs, Resultat and GemOgDel,
           never a paraphrase, and never buried in a tooltip. */}
-      <footer className="relative z-[2] px-[clamp(18px,5vw,40px)] pb-6">
-        <p className="mx-auto m-0 max-w-[58em] border-t border-border pt-[14px] text-center text-[13px] leading-[1.55] text-[color:var(--ink-soft)]">
-          En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et
-          kvalificeret billede, ikke en garanti, og ikke som økonomisk rådgivning. Alle beløb er
-          i nutidskroner.
-        </p>
-      </footer>
+      <div className="relative z-[2] px-[clamp(18px,5vw,40px)] pb-6">
+        <PublicFooter className="mx-auto max-w-[58em] text-center [&_nav]:justify-center [&_p]:mx-auto" />
+      </div>
     </div>
   );
 }

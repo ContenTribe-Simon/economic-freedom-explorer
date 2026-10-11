@@ -10,6 +10,7 @@ import { computePublicResult, type PublicDriver, type PublicResult, type StatusC
 import { formatKr, headlineStopAge } from "@/lib/publicFormat";
 import { decodeShareInputs, readSharePayload } from "@/lib/publicShare";
 import { deriveSavingsSensitivity } from "@/lib/publicSensitivity";
+import { PublicFooter } from "@/components/public/PublicFooter";
 import "./start.css";
 import "./resultat.css";
 
@@ -486,10 +487,7 @@ export default function Resultat() {
         {/* Share-link recipients land HERE first (never Start/Simple Inputs), so the footer
             carries the real-terms note alongside the canonical disclaimer, same combined
             pattern as GemOgDel's. */}
-        <p className="mb-14 mt-4 max-w-[58em] border-t border-border pt-[18px] text-[13px] leading-[1.55] text-[color:var(--ink-soft)]">
-          En forenklet beregning ud fra dine egne tal og antagelser. Tag tallene som et kvalificeret
-          billede, ikke en garanti, og ikke som økonomisk rådgivning. Alle beløb er i nutidskroner.
-        </p>
+        <PublicFooter className="mb-14 mt-4" />
       </div>
     </div>
   );
