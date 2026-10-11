@@ -111,7 +111,7 @@ and ready for a closed beta with the first users.
 | 9 | Hide/defer advanced complexity (advanced features stay in the engine, off the public path) | Complete |
 | 10 | Sensitivity & top drivers ("what moves your FI age most?") | Complete |
 | 11 | Save, share, export (local save, summary export; share link / accounts later) | Complete |
-| 12 | Stress test, security & go-live readiness (pre-launch gate) | Complete (2026-10-11; beta-ready, owner decisions recorded below) |
+| 12 | Stress test, security & go-live readiness (pre-launch gate) | Complete for the closed beta (2026-10-11; dependency residuals and owner decisions recorded below) |
 
 Phases 7 and 12 are deliberate **gates**: nothing proceeds past a failing gate. The
 mid-build gate runs a thorough stress test and security review once a working public surface
@@ -154,6 +154,21 @@ commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
 - Cleared 11 of 13 npm audit advisories in-range. The 2 residual (esbuild/vite) are
   dev-server-only exposure, not production; the only npm-offered fix is a vite 5→8 major,
   deferred as its own decision.
+- **Current audit result (2026-10-11, after the MCP dependency was removed):** `npm audit`
+  reports 16 advisories (2 critical, 6 high, 8 moderate); `npm audit --omit=dev` reports 9
+  (5 high, 4 moderate). All of them need a semver-major upgrade (vite, vitest, tailwindcss 3→4,
+  react-router-dom 6→7); none has an in-range fix. The checklist's "no known vulnerabilities"
+  is therefore **not met**; it is carried as an accepted residual for the closed beta, not
+  claimed as done:
+  - Dev/test toolchain only (vitest, tinypool, @vitest/mocker, vite, esbuild): never shipped.
+  - Build-time only (tailwindcss and its chokidar/fast-glob/micromatch/braces/postcss-selector-
+    parser chain, listed under `dependencies` but not in the bundle): ReDoS/CPU-exhaustion on
+    our own source files at build time.
+  - **The one runtime package is `react-router` 6.30.6** (moderate): an open redirect via a
+    backslash in `<Link>`/`useNavigate` targets, and constructor injection in SSR hydration.
+    The app has no SSR, and every navigation target is a literal internal path (the only
+    interpolated one, `/report?snapshot=<id>`, varies only the query string).
+  - Before a public launch: plan the react-router 7 and vite/vitest majors as their own PRs.
 - Fixed four real cloud-layer defects (non-fatal bookkeeping writes, 0-row writes reported
   as success, missing Danish offline copy, and optimistic-concurrency protection against
   false overwrite conflicts — migration `20260709090000` makes `updated_at` move only on
@@ -190,8 +205,13 @@ commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
 - Known platform limit, unchanged: no HSTS/X-Frame-Options/`frame-ancestors` on Lovable hosting.
 
 **C. Privacy & legal + data backup/restore — DONE** (PRs #44, #47, #49, #52).
-- Share links carry the inputs in the URL fragment, never sent to the server (#44), and
+- New share links carry the inputs in the URL fragment, never sent to the server (#44), and
   `public/share-guard.js` moves them out of the URL before the host's analytics reads it (#52).
+  Two known exceptions: legacy `?d=` links (from before #44) still decode, and their figures do
+  reach the host in the initial request (hosting logs) before the guard runs; and if
+  `sessionStorage` throws, the guard leaves the link in the URL so it still works, so the host's
+  analytics can see it. Both are accepted for the closed beta; dropping the legacy `?d=` path is
+  the fix if they ever matter.
 - `/privatliv` written from what the code does: ContenTribe (CVR 44349124) as data controller,
   local storage, share links, the optional cloud account (Supabase via Lovable Cloud,
   eu-north-1 / Stockholm), hosting logs, analytics, both host cookies, rights and Datatilsynet.
@@ -221,7 +241,8 @@ commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
   Lovable Pro (custom domain, no badge) versus moving to Cloudflare Pages + own Supabase is
   decided when the domain is bought.
 - **Edge functions do not deploy with GitHub sync or Publish**; Lovable deploys them only
-  through its own agent. New or changed functions must be deployed deliberately after merge.
+  through its own agent. New or changed functions must be deployed deliberately after merge
+  (also recorded in `src/lib/cloud/CLOUD_MODEL.md`, "Deploy").
 
 **Hosting (decided for launch):** Lovable's own publish/hosting flow (Lovable Cloud: automatic
 SSL, CDN, SOC 2 Type II / ISO 27001 infrastructure). Revisited when the domain is bought (see
