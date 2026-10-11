@@ -115,6 +115,11 @@ that name inside.
 phrasing as subtitles on those advanced pages. The door titles themselves must NOT revert
 (guarded by `advanced-door-copy.test.ts`).
 
+**Fixed (2026-10-11, Phase 12 C/D PR 2):** the advanced nav now says "Milepæle" and
+"Rammevilkår", and the two pages carry the door titles as their eyebrow ("Milepæle for
+uafhængighed", "Sammenlign rammevilkår"); the technical page titles stay. Pinned by
+`src/pages/__tests__/door-advanced-alignment.test.ts`.
+
 ## 9. E2e reminder check does not pin placement
 
 The corner-button test in `e2e/smoke.spec.ts` asserts

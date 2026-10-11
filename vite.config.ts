@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
+import { applySiteUrl, normalizeSiteUrl, robotsTxt, sitemapXml } from "./src/build/siteMeta";
 
 /**
  * Production-only Content-Security-Policy meta tag (Phase 12 workstream B — security).
@@ -64,6 +65,32 @@ function cspMetaPlugin(supabaseUrl: string): Plugin {
   };
 }
 
+/**
+ * Build-only site metadata (Phase 12 C/D, PR 2): always emits robots.txt (advanced and debug
+ * routes disallowed); with a valid VITE_SITE_URL also emits sitemap.xml, a robots Sitemap line
+ * and absolute social-image URLs. The domain is undecided, so without the variable those
+ * absolute-URL parts are omitted rather than wrong. Logic lives in src/build/siteMeta.ts.
+ */
+function siteMetaPlugin(rawSiteUrl: string): Plugin {
+  const siteUrl = normalizeSiteUrl(rawSiteUrl);
+  return {
+    name: "site-meta",
+    apply: "build",
+    configResolved(config) {
+      if (rawSiteUrl.trim() && !siteUrl) {
+        config.logger.warn(`[site-meta] Ignoring invalid VITE_SITE_URL "${rawSiteUrl}" (expected https://domain).`);
+      }
+    },
+    transformIndexHtml(html) {
+      return applySiteUrl(html, siteUrl);
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "robots.txt", source: robotsTxt(siteUrl) });
+      if (siteUrl) this.emitFile({ type: "asset", fileName: "sitemap.xml", source: sitemapXml(siteUrl) });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -79,6 +106,7 @@ export default defineConfig(({ mode }) => {
       react(),
       mcpPlugin(),
       cspMetaPlugin(env.VITE_SUPABASE_URL ?? ""),
+      siteMetaPlugin(env.VITE_SITE_URL ?? ""),
       mode === "development" && componentTagger(),
     ].filter(Boolean),
     resolve: {
