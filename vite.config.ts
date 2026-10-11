@@ -2,7 +2,6 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 import { applySiteUrl, normalizeSiteUrl, robotsTxt, sitemapXml } from "./src/build/siteMeta";
 
 /**
@@ -104,7 +103,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      mcpPlugin(),
       cspMetaPlugin(env.VITE_SUPABASE_URL ?? ""),
       siteMetaPlugin(env.VITE_SITE_URL ?? ""),
       mode === "development" && componentTagger(),
