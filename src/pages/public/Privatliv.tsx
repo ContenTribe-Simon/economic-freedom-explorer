@@ -24,7 +24,7 @@ import "./start.css";
  * Privacy page (Phase 12 C/D, PR 3). Every statement here describes what the code actually does
  * (spec: docs/superpowers/specs/2026-10-10-phase12-cd-privacy-golive-design.md §4 PR 3), so a code
  * change that alters data handling must update this page in the same PR (PR 4 added the analytics
- * section; PR 5 adds the self-service account deletion). Drafted from code, reviewed by Simon; not legal
+ * section, PR 5 the self-service account deletion). Drafted from code, reviewed by Simon; not legal
  * advice.
  */
 
@@ -159,8 +159,10 @@ export default function Privatliv() {
             </p>
             <p className="m-0">
               Data gemmes hos vores leverandør af database og login, som kører på servere i Stockholm i Sverige,
-              altså i EU. Oplysningerne ligger der, indtil du sletter dem. Du kan slette dine modeller på
-              cloud-siden. Vil du have hele kontoen slettet, så skriv til os, så sletter vi den inden for 30 dage.
+              altså i EU. Oplysningerne ligger der, indtil du sletter dem. På cloud-siden kan du slette enkelte
+              modeller eller hele kontoen. Sletter du kontoen, forsvinder din e-mail og alle dine gemte modeller med
+              det samme. Databasen tages der daglig sikkerhedskopi af, og kopierne slettes automatisk efter den
+              periode, vores leverandør fastsætter.
             </p>
           </Section>
 
@@ -216,7 +218,7 @@ export default function Privatliv() {
             <p className="m-0">
               Knappen sletter dine tal, dine gemte beregninger, den avancerede model og dit svar om at huske din
               browser i denne browser, og logger dig ud, hvis du er logget ind på en konto her. Selve kontoen bliver
-              ikke slettet. Skriv til os, hvis den skal slettes.
+              ikke slettet. Den sletter du på cloud-siden.
             </p>
             <div>
               <AlertDialog>

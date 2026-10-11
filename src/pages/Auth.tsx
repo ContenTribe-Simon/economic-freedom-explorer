@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { PASSWORD_MIN_LENGTH, PASSWORD_RULE_TEXT, passwordProblem } from "@/lib/cloud/passwordPolicy";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -32,6 +33,11 @@ export default function AuthPage() {
   const onSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) return;
+    const problem = passwordProblem(password);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.auth.signUp({
       email,
@@ -48,7 +54,7 @@ export default function AuthPage() {
       <div>
         <h1 className="font-display text-3xl font-semibold">Log ind</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Du kan også bruge appen uden login — alt gemmes lokalt i browseren.
+          Du kan også bruge appen uden login. Så gemmes alt lokalt i browseren.
         </p>
       </div>
       {!isSupabaseConfigured && (
@@ -72,7 +78,11 @@ export default function AuthPage() {
         <TabsContent value="signup">
           <form onSubmit={onSignup} className="space-y-3">
             <div><Label>Email</Label><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-            <div><Label>Adgangskode (min. 6 tegn)</Label><Input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+            <div>
+              <Label htmlFor="signup-password">Adgangskode</Label>
+              <Input id="signup-password" type="password" required minLength={PASSWORD_MIN_LENGTH} aria-describedby="signup-password-rule" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <p id="signup-password-rule" className="mt-1 text-xs text-muted-foreground">{PASSWORD_RULE_TEXT}</p>
+            </div>
             <Button disabled={busy || !isSupabaseConfigured} className="w-full">Opret konto</Button>
           </form>
         </TabsContent>
