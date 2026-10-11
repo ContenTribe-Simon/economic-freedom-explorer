@@ -4,7 +4,9 @@ import { CUSTOM_EVENTS, SYSTEM_EVENTS } from "./events";
  * PostHog `before_send` filter (Phase 12 C/D, PR 4): the last line of defence for the rule that no
  * financial figure leaves the browser.
  * - Unknown events (autocapture, rage clicks, page leave, replay, surveys...) are dropped.
- * - Custom events lose every property they did not get from PostHog itself ($-prefixed).
+ * - Custom events lose every property they did not get from PostHog itself: $-prefixed keys plus
+ *   PostHog's own unprefixed `token` and `distinct_id`, without which the server drops the event
+ *   (found live on 2026-10-11: custom events never arrived while page views did).
  * - Every URL-like property loses its query string and fragment (a share link's numbers live in
  *   the fragment; legacy links put them in `?d=`).
  * - Exception messages have digit runs masked, in case an error ever echoes a number.
@@ -13,6 +15,8 @@ export type CaptureEvent = { event: string; properties?: Record<string, unknown>
 
 const ALLOWED = new Set<string>([...CUSTOM_EVENTS, ...SYSTEM_EVENTS]);
 const CUSTOM = new Set<string>(CUSTOM_EVENTS);
+/** Unprefixed properties PostHog itself sets on every event and needs for ingestion. */
+const POSTHOG_SYSTEM_KEYS = new Set(["token", "distinct_id"]);
 const URL_KEYS = /(url|referrer|href)$/i;
 
 export function stripUrl(value: string): string {
@@ -46,7 +50,7 @@ export function scrubEvent<T extends CaptureEvent>(event: T | null): T | null {
   if (!event || !ALLOWED.has(event.event)) return null;
   const props: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(event.properties ?? {})) {
-    if (CUSTOM.has(event.event) && !k.startsWith("$")) continue;
+    if (CUSTOM.has(event.event) && !k.startsWith("$") && !POSTHOG_SYSTEM_KEYS.has(k)) continue;
     props[k] = scrubValue(k, v);
   }
   const $set = event.$set;
