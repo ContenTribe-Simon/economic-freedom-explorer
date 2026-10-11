@@ -8,7 +8,7 @@ import { HorizonChart } from "@/components/public/HorizonChart";
 import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
 import { formatKr, headlineStopAge } from "@/lib/publicFormat";
-import { decodeShareInputs, readSharePayload } from "@/lib/publicShare";
+import { decodeShareInputs, readSharePayload, takeStashedSharePayload } from "@/lib/publicShare";
 import { track } from "@/lib/analytics/client";
 import { deriveSavingsSensitivity } from "@/lib/publicSensitivity";
 import { PublicFooter } from "@/components/public/PublicFooter";
@@ -120,7 +120,9 @@ export default function Resultat() {
   // into the local state ("Linket indeholder dine tal"), then cleans the URL. The fragment is
   // never sent to the server. Decoding is defensive: a malformed payload is simply ignored.
   useEffect(() => {
-    const d = readSharePayload(location.search, location.hash);
+    // Normally public/share-guard.js has already moved the payload out of the URL (so the host's
+    // analytics never sees it); the URL itself is the fallback when that could not run.
+    const d = readSharePayload(location.search, location.hash) ?? takeStashedSharePayload();
     if (d == null) return;
     const decoded = decodeShareInputs(d);
     if (decoded) replaceInputs(decoded);

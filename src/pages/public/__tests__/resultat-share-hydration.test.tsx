@@ -71,3 +71,24 @@ describe("Resultat share-link hydration", () => {
     expect(usePublicStore.getState().inputs.currentAge).toBe(33);
   });
 });
+
+describe("share-guard stash (public/share-guard.js moved the payload out of the URL)", () => {
+  it("hydrates from the stash once, then forgets it", async () => {
+    sessionStorage.setItem("frihedsmodel-share-payload", encodeShareInputs({ ...DEFAULT_SIMPLE_INPUTS, currentAge: 61 }));
+    const { unmount } = open("/resultat");
+    await waitFor(() => expect(usePublicStore.getState().inputs.currentAge).toBe(61));
+    expect(sessionStorage.getItem("frihedsmodel-share-payload")).toBeNull();
+    unmount();
+    usePublicStore.setState({ inputs: { ...OWN }, saved: [] });
+    open("/resultat");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(usePublicStore.getState().inputs.currentAge).toBe(33);
+  });
+
+  it("a hostile stash is ignored like a hostile link", async () => {
+    sessionStorage.setItem("frihedsmodel-share-payload", "%%%not-base64%%%");
+    open("/resultat");
+    await waitFor(() => expect(sessionStorage.getItem("frihedsmodel-share-payload")).toBeNull());
+    expect(usePublicStore.getState().inputs.currentAge).toBe(33);
+  });
+});
