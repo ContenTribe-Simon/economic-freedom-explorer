@@ -85,3 +85,17 @@ test("a shared plan never reaches PostHog", async ({ page }) => {
   for (const n of NUMBERS) expect(all, `payload must not contain ${n}`).not.toContain(n);
   expect(all).not.toContain("monthlySavings");
 });
+
+test("consent can be reopened and withdrawn from the advanced app too", async ({ page }) => {
+  await setup(page);
+  await page.addInitScript(() => localStorage.setItem("frihedsmodel-advanced-door.v1", "open"));
+  await page.goto(`${PREVIEW}/dashboard`);
+  await page.getByRole("button", { name: "Ja tak" }).click();
+  await page.getByRole("button", { name: "Cookie-indstillinger" }).click();
+  const banner = page.getByRole("region", { name: "Må vi huske din browser?" });
+  await expect(banner.getByText("Dit nuværende valg: Ja tak.")).toBeVisible();
+  await banner.getByRole("button", { name: "Nej tak" }).click();
+  await page.waitForTimeout(500);
+  expect(await phKeys(page)).toEqual([]);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("frihedsmodel-consent.v1")!).status)).toBe("denied");
+});

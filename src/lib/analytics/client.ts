@@ -49,6 +49,17 @@ export function isAnalyticsEnabled(): boolean {
 
 let client: PostHog | null = null;
 let loading: Promise<PostHog | null> | null = null;
+/** The latest consent asked for; applied once the lazily loaded client is ready. */
+let desiredConsent: ConsentStatus = "undecided";
+/** Captures made while the SDK chunk loads (a deep link to /resultat tracks on mount). Bounded. */
+const MAX_QUEUE = 50;
+let queue: Array<(ph: PostHog) => void> = [];
+
+function withClient(fn: (ph: PostHog) => void): void {
+  if (client) return fn(client);
+  if (!loading || queue.length >= MAX_QUEUE) return;
+  queue.push(fn);
+}
 
 /** Drops PostHog's own browser storage (its persisted id and consent flag). */
 export function clearPosthogStorage(storage: Pick<Storage, "length" | "key" | "removeItem"> = window.localStorage): void {
@@ -66,7 +77,8 @@ export function clearPosthogStorage(storage: Pick<Storage, "length" | "key" | "r
 
 export function initAnalytics(consent: ConsentStatus): Promise<PostHog | null> {
   if (!isAnalyticsEnabled()) return Promise.resolve(null);
-  if (loading) return loading.then((ph) => (ph && applyConsent(consent), ph));
+  desiredConsent = consent;
+  if (loading) return loading;
   loading = (async () => {
     const [{ default: posthog }] = await Promise.all([
       import("posthog-js/dist/module.no-external"),
@@ -91,14 +103,22 @@ export function initAnalytics(consent: ConsentStatus): Promise<PostHog | null> {
       before_send: (event) => scrubEvent(event as unknown as CaptureEvent) as unknown as typeof event,
     });
     client = posthog;
-    applyConsent(consent);
+    // Whatever the visitor chose while the chunk loaded wins over the status init started with.
+    applyConsent(desiredConsent);
+    const pending = queue;
+    queue = [];
+    pending.forEach((fn) => fn(posthog));
     return posthog;
-  })().catch(() => null);
+  })().catch(() => {
+    queue = [];
+    return null;
+  });
   return loading;
 }
 
 /** Brings PostHog in line with our consent record. */
 export function applyConsent(consent: ConsentStatus): void {
+  desiredConsent = consent;
   if (!client) return;
   const current = client.get_explicit_consent_status();
   if (consent === "granted") {
@@ -111,7 +131,7 @@ export function applyConsent(consent: ConsentStatus): void {
 }
 
 export function track(event: CustomEvent | "$pageview", properties?: Record<string, unknown>): void {
-  client?.capture(event, properties);
+  withClient((ph) => ph.capture(event, properties));
 }
 
 export function trackPageview(pathname: string): void {
@@ -119,5 +139,5 @@ export function trackPageview(pathname: string): void {
 }
 
 export function reportError(error: unknown): void {
-  client?.captureException(error);
+  withClient((ph) => ph.captureException(error));
 }

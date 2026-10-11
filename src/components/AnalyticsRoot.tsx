@@ -18,8 +18,10 @@ export function AnalyticsRoot() {
   }, [enabled]);
 
   useEffect(() => {
-    if (!enabled) return;
-    void initAnalytics(useConsentStore.getState().status).then(() => trackPageview(pathname));
+    // "/" only redirects to /start (App.tsx): counting it would double every root entry.
+    if (!enabled || pathname === "/") return;
+    void initAnalytics(useConsentStore.getState().status);
+    trackPageview(pathname); // queued until the SDK is ready
   }, [enabled, pathname]);
 
   return enabled ? <ConsentBanner /> : null;

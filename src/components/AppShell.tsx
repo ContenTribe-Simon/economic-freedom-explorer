@@ -2,6 +2,8 @@ import { NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, Sliders, Settings2, Table, GitCompareArrows, Download, Upload, FileText, Layers, Camera, Cloud, Calendar, Flame, Globe } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFinanceStore } from "@/store/financeStore";
+import { isAnalyticsEnabled } from "@/lib/analytics/client";
+import { useConsentStore } from "@/lib/analytics/consentStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -45,6 +47,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     useFinanceStore();
   const snapshotCount = useFinanceStore((s) => s.snapshots.length);
   const { user } = useAuth();
+  const openConsentSettings = useConsentStore((s) => s.openSettings);
   const fileRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const isReport = location.pathname === "/report";
@@ -232,6 +235,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
             <p className="text-[10px] text-sidebar-foreground/50 leading-relaxed">
               Data gemmes lokalt i din browser. Modellen er forsimplet og udgør ikke rådgivning.
+            </p>
+            {/* Same privacy controls as the public footer: consent can be withdrawn from here too. */}
+            <p className="flex flex-wrap gap-x-3 text-[10px]">
+              <NavLink to="/privatliv" className="font-medium text-sidebar-foreground/70 hover:underline">
+                Privatliv
+              </NavLink>
+              {isAnalyticsEnabled() && (
+                <button type="button" onClick={openConsentSettings} className="font-medium text-sidebar-foreground/70 hover:underline">
+                  Cookie-indstillinger
+                </button>
+              )}
             </p>
           </div>
         </div>

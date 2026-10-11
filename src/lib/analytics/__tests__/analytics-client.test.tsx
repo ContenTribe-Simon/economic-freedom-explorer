@@ -116,6 +116,59 @@ describe("applyConsent", () => {
   });
 });
 
+describe("lazy initialisation races", () => {
+  it("a choice made while the SDK loads wins over the status init started with", async () => {
+    const { client } = await freshModules();
+    const ready = client.initAnalytics("granted");
+    client.applyConsent("denied"); // visitor withdraws before the chunk arrived
+    await ready;
+    expect(ph.opt_in_capturing).not.toHaveBeenCalled();
+  });
+
+  it("a quick opt-in during loading is applied once ready", async () => {
+    const { client } = await freshModules();
+    const ready = client.initAnalytics("undecided");
+    client.applyConsent("granted");
+    await ready;
+    expect(ph.opt_in_capturing).toHaveBeenCalledTimes(1);
+  });
+
+  it("captures made during loading are queued and sent once ready", async () => {
+    const { client } = await freshModules();
+    const ready = client.initAnalytics("undecided");
+    client.track("calculation_completed");
+    client.reportError(new Error("boom"));
+    expect(ph.capture).not.toHaveBeenCalled();
+    await ready;
+    expect(ph.capture).toHaveBeenCalledWith("calculation_completed", undefined);
+    expect(ph.captureException).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("page views from AnalyticsRoot", () => {
+  async function renderAt(path: string) {
+    await freshModules();
+    const { AnalyticsRoot } = await import("@/components/AnalyticsRoot");
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <AnalyticsRoot />
+      </MemoryRouter>,
+    );
+    await vi.waitFor(() => expect(ph.init).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+  }
+
+  it("counts a real screen", async () => {
+    await renderAt("/start");
+    expect(ph.capture).toHaveBeenCalledWith("$pageview", { $current_url: `${window.location.origin}/start` });
+  });
+
+  it("does not count the redirect-only root", async () => {
+    await renderAt("/");
+    expect(ph.capture).not.toHaveBeenCalledWith("$pageview", expect.anything());
+  });
+});
+
 describe("tracking", () => {
   it("page views carry only origin + path", async () => {
     const { client } = await freshModules();
