@@ -18,7 +18,14 @@ import { usePublicStore } from "@/store/publicStore";
 import type { SimplePublicInputs } from "@/lib/finance/public";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import { PUBLIC_DISCLAIMER } from "@/lib/publicCopy";
-import { caretForDigits, digitsBefore, formatKronerInput, parseKronerInput } from "@/lib/kronerInput";
+import {
+  caretForDigits,
+  digitsBefore,
+  formatKronerInput,
+  parsePastedKroner,
+  parseTypedKroner,
+  skipSeparatorForDeletion,
+} from "@/lib/kronerInput";
 import "./start.css";
 
 /**
@@ -80,9 +87,11 @@ function NumField({
   className?: string;
 }) {
   // A text input with a numeric keyboard, because a native number input cannot show Danish
-  // thousands separators (backlog item 1). Digits only: a minus sign or letters are ignored, so
-  // an amount can never go negative; the store sanitizer still clamps to the spec §4.1 maxima.
-  // The caret is kept next to the same digit when a separator appears or disappears.
+  // thousands separators (backlog item 1). Typing accepts digits only and pasting understands
+  // Danish notation ("12.345,67 kr" → 12.346); anything else (a minus sign, a comma typed by hand,
+  // letters) is rejected so the field keeps its value instead of changing magnitude. The store
+  // sanitizer still clamps to the spec §4.1 maxima. The caret stays next to the same digit, and
+  // Delete/Backspace skip over a generated separator instead of getting stuck on it.
   const ref = useRef<HTMLInputElement>(null);
   const pendingCaret = useRef<number | null>(null);
   useLayoutEffect(() => {
@@ -106,9 +115,24 @@ function NumField({
           inputMode="numeric"
           autoComplete="off"
           value={formatKronerInput(value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Delete" && e.key !== "Backspace") return;
+            const el = e.currentTarget;
+            if (el.selectionStart !== el.selectionEnd || el.selectionStart === null) return;
+            const to = skipSeparatorForDeletion(el.value, el.selectionStart, e.key);
+            if (to !== null) el.setSelectionRange(to, to);
+          }}
+          onPaste={(e) => {
+            const n = parsePastedKroner(e.clipboardData.getData("text"));
+            e.preventDefault();
+            if (n === null) return;
+            pendingCaret.current = formatKronerInput(n).length;
+            onChange(n);
+          }}
           onChange={(e) => {
             const raw = e.target.value;
-            const n = parseKronerInput(raw);
+            const n = parseTypedKroner(raw);
+            if (n === null) return; // rejected edit: React restores the formatted value
             pendingCaret.current = caretForDigits(formatKronerInput(n), digitsBefore(raw, e.target.selectionStart ?? raw.length));
             onChange(n);
           }}

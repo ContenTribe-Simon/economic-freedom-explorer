@@ -21,3 +21,50 @@ test("typing into a kroner field shows Danish thousands separators and keeps the
   await expect(income).toHaveValue("123.456");
   expect(await income.evaluate((el: HTMLInputElement) => el.value.slice(0, el.selectionStart ?? 0))).toBe("12");
 });
+
+test("Delete and Backspace step over a separator instead of getting stuck on it", async ({ page }) => {
+  await page.goto("/simple-inputs");
+  const income = page.getByLabel("Årlig indkomst før skat", { exact: true });
+  const before = () => income.evaluate((el: HTMLInputElement) => el.value.slice(0, el.selectionStart ?? 0));
+  await income.click();
+  await income.press("ControlOrMeta+a");
+  await income.pressSequentially("1234567");
+  await expect(income).toHaveValue("1.234.567");
+
+  // Caret right before the first dot: Delete removes the 2 behind it.
+  await income.evaluate((el: HTMLInputElement) => el.setSelectionRange(1, 1));
+  await income.press("Delete");
+  await expect(income).toHaveValue("134.567");
+  expect(await before()).toBe("1");
+
+  // Caret right after the dot in "134.567": Backspace removes the 4 in front of it.
+  await income.evaluate((el: HTMLInputElement) => el.setSelectionRange(4, 4));
+  await income.press("Backspace");
+  await expect(income).toHaveValue("13.567");
+  expect(await before()).toBe("13");
+});
+
+test("a minus sign is rejected and a pasted Danish amount is rounded, not glued together", async ({ page }) => {
+  await page.goto("/simple-inputs");
+  const income = page.getByLabel("Årlig indkomst før skat", { exact: true });
+  await income.click();
+  await income.press("ControlOrMeta+a");
+  await income.pressSequentially("400000");
+  await expect(income).toHaveValue("400.000");
+
+  await income.press("Home");
+  await income.press("Minus");
+  await expect(income).toHaveValue("400.000");
+
+  const paste = (text: string) =>
+    income.evaluate((el: HTMLInputElement, t: string) => {
+      const data = new DataTransfer();
+      data.setData("text/plain", t);
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    }, text);
+  await income.press("ControlOrMeta+a");
+  await paste("12.345,67 kr");
+  await expect(income).toHaveValue("12.346");
+  await paste("-5000");
+  await expect(income).toHaveValue("12.346");
+});
