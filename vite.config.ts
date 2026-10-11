@@ -23,15 +23,18 @@ import { applySiteUrl, normalizeSiteUrl, robotsTxt, sitemapXml } from "./src/bui
  *  - style-src 'self' 'unsafe-inline' — FORCED: sonner and react-style-singleton (Radix scroll
  *    lock) inject <style> elements at runtime and support no nonce.
  *  - font-src / img-src 'self' — fonts are self-hosted (@fontsource); no external or data: images.
- *  - connect-src 'self' + the Supabase origin, added only when VITE_SUPABASE_URL is configured:
- *    Supabase is the sole network consumer (no realtime/websocket, no analytics).
+ *  - connect-src 'self' + PostHog EU ingestion and remote config + the Supabase origin (the latter only when
+ *    VITE_SUPABASE_URL is configured). No realtime/websocket.
  *  - object-src / base-uri 'none', form-action 'self' — close plugin/base-tag/redirect vectors.
  *
  * Cannot be expressed via <meta> (documented limits, not gaps): frame-ancestors (clickjacking),
  * report-uri, HSTS and X-Frame-Options — those require real HTTP headers.
  */
 function cspMetaPlugin(supabaseUrl: string): Plugin {
-  let connectSrc = "'self'";
+  // PostHog EU (Phase 12 C/D, PR 4), production hosts only: event ingestion, plus the project's
+  // remote config (JSON from eu-assets; it carries the server-side autocapture/replay switches).
+  // Extensions are bundled, so script-src stays 'self'.
+  let connectSrc = "'self' https://eu.i.posthog.com https://eu-assets.i.posthog.com";
   if (supabaseUrl) {
     try {
       connectSrc += ` ${new URL(supabaseUrl).origin}`;
