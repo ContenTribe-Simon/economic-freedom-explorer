@@ -27,7 +27,7 @@ async function expectNotBlank(page: Page): Promise<void> {
   expect(text.length, "page should not be blank").toBeGreaterThan(40);
 }
 
-const SIDEBAR_LINKS = ["Dashboard", "Variabler", "Livsfaser", "År-for-år", "Scenarier", "FIRE", "Lande", "Antagelser", "Rapport", "Snapshots", "Cloud"];
+const SIDEBAR_LINKS = ["Dashboard", "Variabler", "Livsfaser", "År-for-år", "Scenarier", "Milepæle", "Rammevilkår", "Antagelser", "Rapport", "Snapshots", "Cloud"];
 
 /**
  * Open the Advanced door before the app boots. These are advanced-app smoke tests, and the
@@ -62,8 +62,8 @@ test.describe("App shell & navigation", () => {
       ["Livsfaser", "/life-events"],
       ["År-for-år", "/projection"],
       ["Scenarier", "/scenarios"],
-      ["FIRE", "/fire"],
-      ["Lande", "/countries"],
+      ["Milepæle", "/fire"],
+      ["Rammevilkår", "/countries"],
       ["Antagelser", "/assumptions"],
       ["Snapshots", "/snapshots"],
       ["Dashboard", "/dashboard"],

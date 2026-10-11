@@ -199,7 +199,7 @@ export default function CountriesPage() {
     <div className="space-y-8" data-testid="countries-page">
       {/* A. Header */}
       <header>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground">Lande</div>
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Sammenlign rammevilkår</div>
         <h1 className="font-display text-4xl font-semibold mt-1">Landeanalyse</h1>
         <p className="text-muted-foreground mt-2 max-w-3xl">
           Sammenlign hvordan forskellige lande og livsstilsniveauer påvirker dit FIRE-behov.

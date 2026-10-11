@@ -50,7 +50,7 @@ export default function FirePage() {
   return (
     <div className="space-y-8">
       <header>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground">FIRE-analyse</div>
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Milepæle for uafhængighed</div>
         <h1 className="font-display text-4xl font-semibold mt-1">{scenario.name}</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">
           FIRE-status beregnes oven på den eksisterende fremskrivning. Alle beløb er i nutidskroner.
