@@ -99,6 +99,10 @@ export function initAnalytics(consent: ConsentStatus): Promise<PostHog | null> {
       capture_pageleave: false,
       disable_session_recording: true,
       disable_surveys: true,
+      // The PostHog project has heatmaps on by default; click positions and dead clicks are not
+      // part of the agreed event list (scrubEvent would drop them anyway).
+      enable_heatmaps: false,
+      capture_dead_clicks: false,
       disable_external_dependency_loading: true,
       capture_exceptions: true,
       capture_performance: { web_vitals: true, network_timing: false },

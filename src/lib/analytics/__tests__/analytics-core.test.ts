@@ -85,11 +85,19 @@ describe("scrubEvent", () => {
   it.each(CUSTOM_EVENTS)("%s keeps only PostHog's own properties", (name) => {
     const out = scrubEvent({
       event: name,
-      properties: { ...INPUTS, formatted: "612.345 kr", $current_url: `https://x.dk/gem-og-del#d=${payload}`, $lib: "web" },
+      properties: {
+        ...INPUTS,
+        formatted: "612.345 kr",
+        $current_url: `https://x.dk/gem-og-del#d=${payload}`,
+        $lib: "web",
+        token: "phc_project",
+        distinct_id: "anon-123",
+      },
       $set: { ...INPUTS },
       $set_once: { first: INPUTS.monthlySavings },
     });
-    expect(Object.keys(out!.properties!).sort()).toEqual(["$current_url", "$lib"]);
+    // PostHog's own unprefixed keys survive: without `token` the server drops the event.
+    expect(Object.keys(out!.properties!).sort()).toEqual(["$current_url", "$lib", "distinct_id", "token"]);
     expect(out).not.toHaveProperty("$set");
     expect(out).not.toHaveProperty("$set_once");
     assertNoLeak(out);
