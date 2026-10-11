@@ -23,8 +23,8 @@ import "./start.css";
 /**
  * Privacy page (Phase 12 C/D, PR 3). Every statement here describes what the code actually does
  * (spec: docs/superpowers/specs/2026-10-10-phase12-cd-privacy-golive-design.md §4 PR 3), so a code
- * change that alters data handling must update this page in the same PR. PR 4 adds the analytics
- * section, PR 5 the self-service account deletion. Drafted from code, reviewed by Simon; not legal
+ * change that alters data handling must update this page in the same PR (PR 4 added the analytics
+ * section; PR 5 adds the self-service account deletion). Drafted from code, reviewed by Simon; not legal
  * advice.
  */
 
@@ -112,7 +112,7 @@ export default function Privatliv() {
           <Section title="Kort fortalt">
             <ul className="m-0 grid list-disc gap-1.5 pl-5">
               <li>De tal, du taster ind, bliver i din egen browser. Vi modtager dem ikke.</li>
-              <li>Vi bruger ingen cookies og intet analyseværktøj.</li>
+              <li>Vi bruger ingen cookies. Vi måler anonymt, hvordan siden bruges, og spørger, før vi husker din browser.</li>
               <li>Hvis du opretter en konto i den avancerede model, gemmer vi din e-mail og dine modeller i EU.</li>
               <li>Du kan altid slette dine data. Knappen står nederst på siden.</li>
             </ul>
@@ -136,7 +136,10 @@ export default function Privatliv() {
               eksempel med knappen nederst på siden.
             </p>
             <p className="m-0">
-              Siden henter ingen skrifttyper, scripts eller sporing fra andre tjenester.
+              Dit svar på spørgsmålet om at huske din browser gemmes samme sted, så vi ikke spørger igen.
+            </p>
+            <p className="m-0">
+              Siden henter ingen skrifttyper eller scripts fra andre tjenester.
             </p>
           </Section>
 
@@ -170,6 +173,25 @@ export default function Privatliv() {
             </p>
           </Section>
 
+          <Section title="Analyse og fejlovervågning">
+            <p className="m-0">
+              Vi bruger PostHog med servere i EU til at se, hvilke sider der bliver brugt, og om der opstår fejl.
+              Vi registrerer sidevisninger (kun sidens adresse uden dine tal), nogle få handlinger, nemlig at en
+              beregning bliver vist, gemt eller delt, og tekniske oplysninger som browsertype og skærmstørrelse.
+              Dine tal og de beløb, du ser, bliver aldrig sendt.
+            </p>
+            <p className="m-0">
+              <strong>Hvis du siger nej eller ikke svarer</strong>, måler vi uden at gemme noget på din enhed.
+              PostHog laver et anonymt fingeraftryk ud fra din IP-adresse, som ikke gemmes. Grundlaget er vores
+              legitime interesse i at holde siden kørende og forbedre den.
+            </p>
+            <p className="m-0">
+              <strong>Hvis du siger ja</strong>, gemmer PostHog et tilfældigt id i din browser, så vi kan se, om du
+              kommer igen. Grundlaget er dit samtykke, og du kan trække det tilbage når som helst under
+              Cookie-indstillinger nederst på siden. Data slettes automatisk efter den periode, PostHog fastsætter.
+            </p>
+          </Section>
+
           <Section title="Dine rettigheder">
             <p className="m-0">
               Du har ret til at få indsigt i de oplysninger, vi har om dig, og til at få dem rettet, slettet eller
@@ -192,9 +214,9 @@ export default function Privatliv() {
 
           <Section title="Slet dine data i denne browser">
             <p className="m-0">
-              Knappen sletter dine tal, dine gemte beregninger og den avancerede model i denne browser, og logger dig
-              ud, hvis du er logget ind på en konto her. Selve kontoen bliver ikke slettet. Skriv til os, hvis den skal
-              slettes.
+              Knappen sletter dine tal, dine gemte beregninger, den avancerede model og dit svar om at huske din
+              browser i denne browser, og logger dig ud, hvis du er logget ind på en konto her. Selve kontoen bliver
+              ikke slettet. Skriv til os, hvis den skal slettes.
             </p>
             <div>
               <AlertDialog>

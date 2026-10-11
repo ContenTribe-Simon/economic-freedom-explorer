@@ -50,8 +50,12 @@ describe("clearLocalAppData", () => {
     localStorage.setItem("frihedsmodel-public.v1", "{}");
     localStorage.setItem("finance-tool.v1", "{}");
     localStorage.setItem("frihedsmodel-advanced-door.v1", "open");
-    expect(clearLocalAppData().sort()).toEqual([...APP_STORAGE_KEYS].sort());
+    localStorage.setItem("frihedsmodel-consent.v1", "{}");
+    localStorage.setItem("ph_phc_x_posthog", "{\"distinct_id\":\"abc\"}");
+    localStorage.setItem("__ph_opt_in_out_phc_x", "1");
+    expect(clearLocalAppData().sort()).toEqual([...APP_STORAGE_KEYS, "__ph_opt_in_out_phc_x", "ph_phc_x_posthog"].sort());
     for (const k of APP_STORAGE_KEYS) expect(localStorage.getItem(k)).toBeNull();
+    expect(localStorage.getItem("ph_phc_x_posthog")).toBeNull();
   });
 
   it("also removes a signed-in cloud session, so the next person cannot reopen the account", () => {

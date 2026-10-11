@@ -45,7 +45,9 @@ describe("Privatliv page", () => {
     expect(text).toContain(LEGAL_ENTITY.email);
     expect(text).toContain("Stockholm");
     expect(text).toContain("Datatilsynet");
-    expect(text).toContain("Vi bruger ingen cookies og intet analyseværktøj.");
+    expect(text).toContain("Vi bruger ingen cookies.");
+    expect(text).toContain("PostHog med servere i EU");
+    expect(text).toContain("Dine tal og de beløb, du ser, bliver aldrig sendt.");
   });
 
   it("follows the public copy rules", () => {

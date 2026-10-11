@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { reportError } from "@/lib/analytics/client";
 
 /**
  * Last-resort error containment for the whole app (Phase 7 hardening). Resultat and
@@ -19,6 +20,8 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, { hasEr
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Visible in the browser console for debugging; the user sees only the calm fallback.
     console.error("Uventet fejl i visningen:", error, info.componentStack);
+    // No-op unless analytics is running; the message is digit-masked before sending (scrub.ts).
+    reportError(error);
   }
 
   render() {

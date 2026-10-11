@@ -27,6 +27,7 @@ import { AdvancedGate } from "./pages/AdvancedDoor";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { RouteFocusManager } from "@/components/RouteFocusManager";
 import { WipeSync } from "./components/WipeSync";
+import { AnalyticsRoot } from "./components/AnalyticsRoot";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,8 @@ const App = () => (
           <RouteFocusManager />
           {/* Reload when another tab wipes the browser data (Privatliv). */}
           <WipeSync />
+          {/* Analytics + consent banner; inert outside production hosts (src/lib/analytics). */}
+          <AnalyticsRoot />
           <AuthProvider>
             <Routes>
               {/* The public Frihedsmodel flow is the DEFAULT entry (product structure §4):
