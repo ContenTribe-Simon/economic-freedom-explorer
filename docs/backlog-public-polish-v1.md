@@ -15,6 +15,12 @@ mål for mindste formue). En rettelse kræver skift til formateret tekst-input
 vise separatorer. Slider-labels og alle beregnede tal er allerede korrekt formateret via
 `formatKr`/`format`-props.
 
+**Rettet (2026-10-11):** `NumField` er nu et tekst-input med `inputMode="numeric"`, der formaterer
+mens man skriver ("612.345") og kun læser cifre (et minustegn ignoreres, så beløb aldrig bliver
+negative). Markøren bliver ved samme ciffer, når et punktum dukker op eller forsvinder. Logikken
+ligger i `src/lib/kronerInput.ts`; dækket af `kroner-input.test.ts`,
+`simple-inputs-validation.test.tsx` og `e2e/kroner-input.spec.ts`.
+
 ## 2. Print/PDF-resuméet skal tættere på Resultat-skærmens fulde præsentation
 
 Gem og del-skærmens print-resumé (sektionen `hidden print:block` i

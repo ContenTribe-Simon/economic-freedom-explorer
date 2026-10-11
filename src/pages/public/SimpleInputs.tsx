@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -18,6 +18,14 @@ import { usePublicStore } from "@/store/publicStore";
 import type { SimplePublicInputs } from "@/lib/finance/public";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import { PUBLIC_DISCLAIMER } from "@/lib/publicCopy";
+import {
+  caretForDigits,
+  digitsBefore,
+  formatKronerInput,
+  parsePastedKroner,
+  parseTypedKroner,
+  skipSeparatorForDeletion,
+} from "@/lib/kronerInput";
 import "./start.css";
 
 /**
@@ -78,6 +86,22 @@ function NumField({
   onChange: (n: number) => void;
   className?: string;
 }) {
+  // A text input with a numeric keyboard, because a native number input cannot show Danish
+  // thousands separators (backlog item 1). Typing accepts digits only and pasting understands
+  // Danish notation ("12.345,67 kr" → 12.346); anything else (a minus sign, a comma typed by hand,
+  // letters) is rejected so the field keeps its value instead of changing magnitude. The store
+  // sanitizer still clamps to the spec §4.1 maxima. The caret stays next to the same digit, and
+  // Delete/Backspace skip over a generated separator instead of getting stuck on it.
+  const ref = useRef<HTMLInputElement>(null);
+  const pendingCaret = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (pendingCaret.current !== null && el && document.activeElement === el) {
+      el.setSelectionRange(pendingCaret.current, pendingCaret.current);
+    }
+    pendingCaret.current = null;
+  });
+
   return (
     <div className={`flex flex-col gap-1.5 ${className ?? ""}`}>
       <FieldLabel htmlFor={id} tip={tip}>
@@ -85,20 +109,34 @@ function NumField({
       </FieldLabel>
       <div className="relative">
         <Input
+          ref={ref}
           id={id}
-          type="number"
+          type="text"
           inputMode="numeric"
-          min={0}
-          value={value}
-          onChange={(e) => {
-            // Clamp in the handler itself: `min={0}` on a native number input is cosmetic
-            // (marks :invalid, never blocks the value), and the CTA is a Link, so constraint
-            // validation would never fire. NaN (cleared field / bad paste) becomes 0. The
-            // store sanitizer re-clamps to the spec §4.1 maxima as the hard boundary.
-            const n = e.target.valueAsNumber;
-            onChange(Number.isFinite(n) ? Math.max(0, n) : 0);
+          autoComplete="off"
+          value={formatKronerInput(value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Delete" && e.key !== "Backspace") return;
+            const el = e.currentTarget;
+            if (el.selectionStart !== el.selectionEnd || el.selectionStart === null) return;
+            const to = skipSeparatorForDeletion(el.value, el.selectionStart, e.key);
+            if (to !== null) el.setSelectionRange(to, to);
           }}
-          className="bg-white pr-12 text-[15px]"
+          onPaste={(e) => {
+            const n = parsePastedKroner(e.clipboardData.getData("text"));
+            e.preventDefault();
+            if (n === null) return;
+            pendingCaret.current = formatKronerInput(n).length;
+            onChange(n);
+          }}
+          onChange={(e) => {
+            const raw = e.target.value;
+            const n = parseTypedKroner(raw);
+            if (n === null) return; // rejected edit: React restores the formatted value
+            pendingCaret.current = caretForDigits(formatKronerInput(n), digitsBefore(raw, e.target.selectionStart ?? raw.length));
+            onChange(n);
+          }}
+          className="bg-white pr-12 text-[15px] tabular-nums"
         />
         <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[13px] font-medium text-[color:var(--ink-soft)]">
           kr

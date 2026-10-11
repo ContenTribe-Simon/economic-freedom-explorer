@@ -123,7 +123,11 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
     expect(store().inputs.currentAge).toBeLessThanOrEqual(75);
   });
 
-  it("typing a negative amount into the form writes 0 to the store (onChange clamp)", () => {
+  it("a minus sign can never make an amount negative (the kroner fields reject it)", () => {
+    // Since backlog item 1 the amount fields are formatted text inputs, not native number inputs.
+    // A minus sign is rejected outright: the field keeps its previous value instead of silently
+    // turning -5000 into 5000. No negative amount ever reaches the store.
+    usePublicStore.setState({ inputs: { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 400_000, pensionBalance: 250_000 } });
     render(
       <TooltipProvider>
         <MemoryRouter>
@@ -131,12 +135,53 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
         </MemoryRouter>
       </TooltipProvider>,
     );
-    fireEvent.change(screen.getByLabelText("Årlig indkomst før skat", { selector: "input" }), {
-      target: { value: "-5000" },
-    });
-    expect(store().inputs.annualIncome).toBe(0);
-    fireEvent.change(screen.getByLabelText("Pensionssaldo", { selector: "input" }), { target: { value: "-1" } });
-    expect(store().inputs.pensionBalance).toBe(0);
+    const income = screen.getByLabelText("Årlig indkomst før skat", { selector: "input" }) as HTMLInputElement;
+    fireEvent.change(income, { target: { value: "-5000" } });
+    expect(store().inputs.annualIncome).toBe(400_000);
+    expect(income.value).toBe("400.000");
+    fireEvent.change(screen.getByLabelText("Pensionssaldo", { selector: "input" }), { target: { value: "-" } });
+    expect(store().inputs.pensionBalance).toBe(250_000);
+  });
+
+  it("pasting a Danish amount rounds decimals; anything else keeps the old value", () => {
+    usePublicStore.setState({ inputs: { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 400_000 } });
+    render(
+      <TooltipProvider>
+        <MemoryRouter>
+          <SimpleInputs />
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    const income = screen.getByLabelText("Årlig indkomst før skat", { selector: "input" }) as HTMLInputElement;
+    const paste = (text: string) => fireEvent.paste(income, { clipboardData: { getData: () => text } });
+    paste("512.345,67 kr");
+    expect(store().inputs.annualIncome).toBe(512_346);
+    expect(income.value).toBe("512.346");
+    paste("-5000");
+    expect(store().inputs.annualIncome).toBe(512_346);
+    paste("12345.67");
+    expect(store().inputs.annualIncome).toBe(512_346);
+  });
+
+  it("kroner fields show Danish thousands separators and read them back", () => {
+    usePublicStore.setState({ inputs: { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 612_345 } });
+    render(
+      <TooltipProvider>
+        <MemoryRouter>
+          <SimpleInputs />
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    const income = screen.getByLabelText("Årlig indkomst før skat", { selector: "input" }) as HTMLInputElement;
+    expect(income.value).toBe("612.345");
+    expect(income.inputMode).toBe("numeric");
+    // A digit typed into the middle of "123.456" regroups the whole number.
+    fireEvent.change(income, { target: { value: "123.4567" } });
+    expect(store().inputs.annualIncome).toBe(1_234_567);
+    expect(income.value).toBe("1.234.567");
+    // Typing anything but digits is rejected rather than reinterpreted.
+    fireEvent.change(income, { target: { value: "1.234.567,8" } });
+    expect(store().inputs.annualIncome).toBe(1_234_567);
   });
 
   it("loadCalculation sanitizes saved entries (legacy/hand-edited persistence)", () => {
