@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { PUBLIC_DISCLAIMER, REAL_TERMS_NOTE } from "@/lib/publicCopy";
 import { FEEDBACK_MAILTO, LEGAL_ENTITY } from "@/lib/legalEntity";
-import { APP_STORAGE_KEYS, clearLocalAppData } from "@/lib/localData";
+import { APP_STORAGE_KEYS, clearLocalAppData, isSessionKey, isWipeSignal } from "@/lib/localData";
 
 describe("PUBLIC_DISCLAIMER", () => {
   it("is the canonical text from the public data contract, verbatim", () => {
@@ -33,6 +33,16 @@ describe("LEGAL_ENTITY", () => {
   });
 });
 
+describe("isWipeSignal (other tabs reload after a wipe)", () => {
+  it("fires on removal of an app key or a full clear, nothing else", () => {
+    expect(isWipeSignal({ key: "frihedsmodel-public.v1", newValue: null })).toBe(true);
+    expect(isWipeSignal({ key: "finance-tool.v1", newValue: null })).toBe(true);
+    expect(isWipeSignal({ key: null, newValue: null })).toBe(true);
+    expect(isWipeSignal({ key: "frihedsmodel-public.v1", newValue: "{}" })).toBe(false);
+    expect(isWipeSignal({ key: "unrelated", newValue: null })).toBe(false);
+  });
+});
+
 describe("clearLocalAppData", () => {
   beforeEach(() => localStorage.clear());
 
@@ -44,13 +54,21 @@ describe("clearLocalAppData", () => {
     for (const k of APP_STORAGE_KEYS) expect(localStorage.getItem(k)).toBeNull();
   });
 
-  it("leaves keys it does not own, including a cloud session", () => {
+  it("also removes a signed-in cloud session, so the next person cannot reopen the account", () => {
+    localStorage.setItem("sb-nixcnzzourbxflxxmjdu-auth-token", "session");
+    expect(clearLocalAppData()).toEqual(["sb-nixcnzzourbxflxxmjdu-auth-token"]);
+    expect(localStorage.getItem("sb-nixcnzzourbxflxxmjdu-auth-token")).toBeNull();
+    expect(isSessionKey("sb-x-auth-token")).toBe(true);
+    expect(isSessionKey("sb-x-auth-token-code-verifier")).toBe(false);
+  });
+
+  it("leaves keys it does not own", () => {
     localStorage.setItem("frihedsmodel-public.v1", "{}");
-    localStorage.setItem("sb-project-auth-token", "session");
     localStorage.setItem("unrelated", "x");
+    localStorage.setItem("sb-settings", "x");
     expect(clearLocalAppData()).toEqual(["frihedsmodel-public.v1"]);
-    expect(localStorage.getItem("sb-project-auth-token")).toBe("session");
     expect(localStorage.getItem("unrelated")).toBe("x");
+    expect(localStorage.getItem("sb-settings")).toBe("x");
   });
 
   it("never throws when storage is blocked", () => {

@@ -26,6 +26,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AdvancedGate } from "./pages/AdvancedDoor";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { RouteFocusManager } from "@/components/RouteFocusManager";
+import { WipeSync } from "./components/WipeSync";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,8 @@ const App = () => (
         <BrowserRouter>
           {/* Moves focus to the new screen's heading on every route change (a11y). */}
           <RouteFocusManager />
+          {/* Reload when another tab wipes the browser data (Privatliv). */}
+          <WipeSync />
           <AuthProvider>
             <Routes>
               {/* The public Frihedsmodel flow is the DEFAULT entry (product structure §4):

@@ -17,6 +17,7 @@ import { PublicHeader } from "@/components/public/PublicHeader";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import { LEGAL_ENTITY } from "@/lib/legalEntity";
 import { clearLocalAppData } from "@/lib/localData";
+import { supabase } from "@/integrations/supabase/client";
 import "./start.css";
 
 /**
@@ -57,7 +58,13 @@ export default function Privatliv() {
     }
   }, []);
 
-  const onWipe = () => {
+  const onWipe = async () => {
+    // Sign out locally first so the client's in-memory session cannot write itself back.
+    try {
+      await supabase?.auth.signOut({ scope: "local" });
+    } catch {
+      // Offline or not signed in: the stored session is removed below either way.
+    }
     clearLocalAppData();
     try {
       sessionStorage.setItem(WIPED_FLAG, "1");
@@ -185,9 +192,9 @@ export default function Privatliv() {
 
           <Section title="Slet dine data i denne browser">
             <p className="m-0">
-              Knappen sletter dine tal, dine gemte beregninger og den avancerede model i denne browser. En eventuel
-              konto i den avancerede model bliver ikke slettet. Den sletter du på cloud-siden eller ved at skrive til
-              os.
+              Knappen sletter dine tal, dine gemte beregninger og den avancerede model i denne browser, og logger dig
+              ud, hvis du er logget ind på en konto her. Selve kontoen bliver ikke slettet. Skriv til os, hvis den skal
+              slettes.
             </p>
             <div>
               <AlertDialog>
@@ -201,8 +208,8 @@ export default function Privatliv() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Slet dine data i denne browser?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Dine tal, gemte beregninger og den avancerede model forsvinder fra denne browser. Det kan ikke
-                      fortrydes.
+                      Dine tal, gemte beregninger og den avancerede model forsvinder fra denne browser, og du bliver
+                      logget ud. Det kan ikke fortrydes.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

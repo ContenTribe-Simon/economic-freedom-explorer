@@ -4,7 +4,7 @@
  * carries the shared footer with the disclaimer exactly once.
  */
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactElement } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -69,7 +69,7 @@ describe("Privatliv page", () => {
       Object.defineProperty(window, "location", { configurable: true, value: original });
     });
 
-    it("asks first, then removes the app's browser data and reloads the page", () => {
+    it("asks first, then removes the app's browser data and any session, and reloads the page", async () => {
       localStorage.setItem("frihedsmodel-public.v1", "{\"state\":{}}");
       localStorage.setItem("finance-tool.v1", "{}");
       localStorage.setItem("sb-x-auth-token", "session");
@@ -79,10 +79,10 @@ describe("Privatliv page", () => {
       expect(localStorage.getItem("frihedsmodel-public.v1")).not.toBeNull(); // nothing yet
       fireEvent.click(screen.getByRole("button", { name: "Slet" }));
 
+      await waitFor(() => expect(assign).toHaveBeenCalledWith("/privatliv"));
       expect(localStorage.getItem("frihedsmodel-public.v1")).toBeNull();
       expect(localStorage.getItem("finance-tool.v1")).toBeNull();
-      expect(localStorage.getItem("sb-x-auth-token")).toBe("session");
-      expect(assign).toHaveBeenCalledWith("/privatliv");
+      expect(localStorage.getItem("sb-x-auth-token")).toBeNull();
     });
 
     it("cancelling keeps everything", () => {
