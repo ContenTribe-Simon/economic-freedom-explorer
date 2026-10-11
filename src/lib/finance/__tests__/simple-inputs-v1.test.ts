@@ -68,7 +68,7 @@ describe("Simple public inputs — mapping to the full model", () => {
     expect(inp.income.statePension.mode).toBe("none");
     expect(inp.income.partTime.netMonthly).toBe(0);
     expect(inp.income.partTime.grossAnnual).toBe(0);
-    expect(inp.income.familyFundAnnualNet).toBe(0);
+    expect(inp.income.otherIncomes).toEqual([]);
     expect(inp.pension.monthlyContribution).toBe(0);
     expect(inp.pension.employerContribution).toBe(0);
     expect(inp.pension.lifeAnnuity.enabled).toBe(false);

@@ -1,4 +1,4 @@
-import type { Scenario, Assumptions, YearRow } from "./types";
+import { MODEL_VERSION, type Scenario, type Assumptions, type YearRow } from "./types";
 import type { FireAnalysis } from "./fire";
 
 export interface ProjectionExport {
@@ -31,7 +31,7 @@ export function buildProjectionExport(
 ): ProjectionExport {
   return {
     exportedAt: new Date().toISOString(),
-    modelVersion: 1,
+    modelVersion: MODEL_VERSION,
     scenario: {
       id: scenario.id,
       name: scenario.name,

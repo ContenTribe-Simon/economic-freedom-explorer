@@ -13,7 +13,12 @@ import {
   DebtCashflowImpact,
   PartTimeMode,
   StatePensionMode,
+  OtherIncome,
+  OtherIncomeTaxation,
 } from "@/lib/finance/types";
+import { otherIncomesOf } from "@/lib/finance/otherIncome";
+import { isHoldingEnabled } from "@/lib/finance/holdingToggle";
+import { Switch } from "@/components/ui/switch";
 import { resolveCapitalWithdrawal } from "@/lib/finance/capitalWithdrawal";
 import { decimalToPctString, parsePctInput } from "@/lib/format";
 import { NumberInput } from "@/components/NumberInput";
@@ -148,6 +153,27 @@ export default function Inputs() {
     ]);
   };
   const removeDebt = (idx: number) => set("debts", inp.debts.filter((_, i) => i !== idx));
+
+  const otherIncomes = otherIncomesOf(inp.income);
+  const setOtherIncomes = (next: OtherIncome[]) => set("income", { ...inp.income, otherIncomes: next });
+  const updateOtherIncome = (idx: number, patch: Partial<OtherIncome>) =>
+    setOtherIncomes(otherIncomes.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
+  const addOtherIncome = () => {
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    setOtherIncomes([
+      ...otherIncomes,
+      {
+        id,
+        name: "Ny indtægt",
+        annualAmount: 0,
+        taxation: "net",
+        fromAge: inp.person.currentAge,
+        untilAge: inp.person.lifeExpectancy + 1,
+      },
+    ]);
+  };
+  const removeOtherIncome = (idx: number) => setOtherIncomes(otherIncomes.filter((_, i) => i !== idx));
+  const holdingOn = isHoldingEnabled(inp);
 
   const confirmConvert = () => {
     convertToCustom(scenario.id);
@@ -403,14 +429,38 @@ export default function Inputs() {
         </p>
       </Section>
 
-      <Section title="Holding" description="Selskabskapital. Udlodning beskattes som personlig aktieindkomst.">
+      <Card className="p-6" data-testid="holding-section">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display text-xl font-semibold">Holding eller selskab</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Selskabskapital. Udlodning beskattes som personlig aktieindkomst.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 pt-1">
+            <Label htmlFor="holding-enabled" className="text-sm">Jeg har en holding eller et selskab</Label>
+            <Switch
+              id="holding-enabled"
+              checked={holdingOn}
+              onCheckedChange={(on) => set("holding", { ...inp.holding, enabled: on })}
+            />
+          </div>
+        </div>
+        {!holdingOn ? (
+          <p className="text-sm text-muted-foreground mt-4">
+            Beregningen regner uden holding. Tal du har tastet ind, gemmes og bruges igen, hvis du slår den til.
+          </p>
+        ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <NumField label="Nuværende holdingkapital" value={inp.holding.balance} onChange={(v) => set("holding", { ...inp.holding, balance: v })} suffix="kr" step={50000} />
         <NumField label="Forventet exitværdi" value={inp.holding.expectedExitValue} onChange={(v) => set("holding", { ...inp.holding, expectedExitValue: v })} suffix="kr" step={100000} hint="Tilføjes til holding i exit-året (efter selskabsskat)" />
         <NumField label="Exit-år (kalenderår)" value={inp.holding.exitYear} onChange={(v) => set("holding", { ...inp.holding, exitYear: v })} step={1} />
         <div className="md:col-span-2 p-3 rounded-md border border-border bg-muted/30 text-xs text-muted-foreground">
           Holdingens udtræksrækkefølge og planlagte udlodning styres nu under <strong>Kapitaludtræk &amp; nedsparing</strong>. Udlodning fra holding beskattes som personlig aktieindkomst og deler 27/42 %-grænsen med realiserede depotgevinster.
         </div>
-      </Section>
+        </div>
+        )}
+      </Card>
 
 
       <Card className="p-6">
@@ -458,6 +508,9 @@ export default function Inputs() {
                 <PctField label="Rente" value={d.interestRate} onChange={(v) => updateDebt(i, { interestRate: v })} />
                 <NumField label="Månedlig ydelse" value={d.monthlyPayment} onChange={(v) => updateDebt(i, { monthlyPayment: v })} suffix="kr/md" step={500} />
               </div>
+              {!holdingOn && (d.kind === "holding" || d.impact === "holding") && (
+                <p className="text-xs text-muted-foreground">Regnes ikke med, så længe holding er slået fra.</p>
+              )}
               {d.kind === "holding" && (
                 <div className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">Holdinggæld – finansiering</Label>
@@ -511,11 +564,58 @@ export default function Inputs() {
         </div>
       </Card>
 
-      <Section title="Indkomst (løn & familie)">
+      <Section title="Løn">
         <NumField label="Bruttoløn (årlig)" value={inp.income.salaryGross} onChange={(v) => set("income", { ...inp.income, salaryGross: v })} suffix="kr/år" step={10000} hint="Skat beregnes automatisk" />
-        <NumField label="Familiefond (netto/år)" value={inp.income.familyFundAnnualNet} onChange={(v) => set("income", { ...inp.income, familyFundAnnualNet: v })} suffix="kr/år" step={5000} />
-        <NumField label="Familiefond stopper før alder" value={inp.income.familyFundUntilAge} onChange={(v) => set("income", { ...inp.income, familyFundUntilAge: v })} suffix="år" hint="Sidste udbetaling sker året før denne alder." />
       </Section>
+
+      <Card className="p-6" data-testid="other-income-section">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-semibold">Anden indtægt</h2>
+          <Button size="sm" variant="outline" onClick={addOtherIncome}>+ Tilføj indtægt</Button>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">
+          Fx lejeindtægt, honorarer eller faste udbetalinger. Vælg om beløbet allerede er beskattet, eller om det skal beskattes som løn.
+        </p>
+        <div className="space-y-3">
+          {otherIncomes.map((o, i) => (
+            <div key={o.id} className="border border-border rounded-md p-4 space-y-3">
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor={`other-income-name-${o.id}`} className="text-xs uppercase tracking-wider text-muted-foreground">Navn</Label>
+                  <Input id={`other-income-name-${o.id}`} value={o.name} onChange={(e) => updateOtherIncome(i, { name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`other-income-tax-${o.id}`} className="text-xs uppercase tracking-wider text-muted-foreground">Beskatning</Label>
+                  <select
+                    id={`other-income-tax-${o.id}`}
+                    className="h-10 px-3 rounded-md border border-border bg-background text-sm"
+                    value={o.taxation}
+                    onChange={(e) => updateOtherIncome(i, { taxation: e.target.value as OtherIncomeTaxation })}
+                  >
+                    <option value="net">Allerede beskattet (netto)</option>
+                    <option value="gross_labor">Beskattes som løn (brutto)</option>
+                  </select>
+                </div>
+                <Button size="icon" variant="ghost" onClick={() => removeOtherIncome(i)} className="text-destructive" aria-label={`Fjern ${o.name}`}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <NumField
+                  label={o.taxation === "net" ? "Beløb netto pr. år" : "Beløb brutto pr. år"}
+                  value={o.annualAmount}
+                  onChange={(v) => updateOtherIncome(i, { annualAmount: v })}
+                  suffix="kr/år"
+                  step={5000}
+                />
+                <NumField label="Fra alder" value={o.fromAge} onChange={(v) => updateOtherIncome(i, { fromAge: v })} suffix="år" />
+                <NumField label="Stopper før alder" value={o.untilAge} onChange={(v) => updateOtherIncome(i, { untilAge: v })} suffix="år" hint="Sidste udbetaling er året før." />
+              </div>
+            </div>
+          ))}
+          {otherIncomes.length === 0 && <p className="text-sm text-muted-foreground">Ingen andre indtægter. Klik “Tilføj indtægt”.</p>}
+        </div>
+      </Card>
 
       <Section title="Deltidsindtægt" description="Vælg om beløbet er angivet som brutto/år (skat beregnes) eller netto/md (bruges direkte).">
         <div className="md:col-span-2 flex gap-2">

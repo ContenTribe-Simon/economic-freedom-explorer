@@ -27,6 +27,8 @@ import {
   type ShareIncomeCtx,
 } from "./tax";
 import { computeLifeEventEffects } from "./lifeEvents";
+import { otherIncomeForAge } from "./otherIncome";
+import { withHoldingToggleApplied } from "./holdingToggle";
 
 
 export function mergeAssumptions(global: Assumptions, override?: Partial<Assumptions>): Assumptions {
@@ -378,10 +380,12 @@ export function resolvePlannedContributionStopAge(
 }
 
 export function projectWithStopAge(
-  inp: ScenarioInputs,
+  rawInputs: ScenarioInputs,
   a: Assumptions,
   stopAge: number,
 ): YearRow[] {
+  // Holding slået fra regner som ingen holding (uændret objekt når den er slået til).
+  const inp = withHoldingToggleApplied(rawInputs);
   const startYear = new Date().getFullYear();
   const years: YearRow[] = [];
   const savingsLogic = inp.savingsLogic ?? "planned";
@@ -501,7 +505,9 @@ export function projectWithStopAge(
       }
     }
 
-    const familyFundNet = age < inp.income.familyFundUntilAge ? inp.income.familyFundAnnualNet : 0;
+    const otherIncome = otherIncomeForAge(inp.income, age, a.tax);
+    const otherIncomeNet = otherIncome.net;
+    laborTaxAmt += otherIncome.tax;
 
     const sp = inp.income.statePension;
     let statePensionNet = 0;
@@ -827,7 +833,7 @@ export function projectWithStopAge(
     const spending = Math.max(0, baseSpending + (lifeEventEffects?.spendingDelta ?? 0));
     const pensionStreamNet = ratePension.net + lifeAnnuity.net;
     const incomeNet =
-      salaryNet + partTimeNet + familyFundNet + statePensionNet + holdingPlanned.net + pensionStreamNet
+      salaryNet + partTimeNet + otherIncomeNet + statePensionNet + holdingPlanned.net + pensionStreamNet
       + plannedNetExtra
       + (lifeEventEffects?.incomeDelta ?? 0);
 
@@ -1260,7 +1266,7 @@ export function projectWithStopAge(
         salaryGross,
         salaryNet,
         partTimeNet,
-        familyFundNet,
+        otherIncomeNet,
         statePensionNet,
         statePensionGross,
         statePensionTax,
@@ -1302,7 +1308,7 @@ export function projectWithStopAge(
         } : undefined,
         cashflowBridge: {
           baseIncomeNet:
-            salaryNet + partTimeNet + familyFundNet + statePensionNet
+            salaryNet + partTimeNet + otherIncomeNet + statePensionNet
             + holdingPlanned.net + pensionStreamNet + plannedNetExtra,
           lifeEventIncome: lifeEventEffects?.incomeDelta ?? 0,
           lifeEventSpending: lifeEventEffects?.spendingDelta ?? 0,

@@ -84,8 +84,9 @@ export const defaultInputs: ScenarioInputs = {
       fromAge: 55,
       untilAge: 62,
     },
-    familyFundAnnualNet: 50000,
-    familyFundUntilAge: 70,
+    otherIncomes: [
+      { id: "default-family-fund", name: "Familiefond", annualAmount: 50000, taxation: "net", fromAge: 0, untilAge: 70 },
+    ],
     statePension: {
       mode: "baseOnly",
       fromAge: 67,
@@ -109,4 +110,21 @@ export function makeBaseScenario(): Scenario {
     modifiers: {},
     inputs: structuredClone(defaultInputs),
   };
+}
+
+/**
+ * Startværdier for en ny bruger i den avancerede app. `defaultInputs` ovenfor er motorens faste
+ * referencescenarie (som testsuiten regner på) og bevares uændret; en ny bruger starter i stedet
+ * neutralt: ingen holding (slået fra, tom) og ingen andre indtægter end løn.
+ */
+export function makeNewUserInputs(): ScenarioInputs {
+  const inp = structuredClone(defaultInputs);
+  inp.debts = structuredClone(defaultDebts).map((d) => ({ ...d, id: id() }));
+  inp.holding = { ...inp.holding, enabled: false, balance: 0, expectedExitValue: 0, annualDistribution: 0 };
+  inp.income.otherIncomes = [];
+  return inp;
+}
+
+export function makeNewUserScenario(): Scenario {
+  return { ...makeBaseScenario(), inputs: makeNewUserInputs() };
 }

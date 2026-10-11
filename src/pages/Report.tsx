@@ -19,6 +19,7 @@ import { MODEL_RELEASE, MODEL_VERSION, type Snapshot } from "@/lib/finance/types
 import { Link, useSearchParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { toast } from "sonner";
+import { isHoldingEnabled, withHoldingToggleApplied } from "@/lib/finance/holdingToggle";
 
 const SP_METHOD_LABEL = {
   none: "Ingen folkepension",
@@ -153,6 +154,8 @@ export default function Report() {
 
   const reportDate = formatDate(Date.now());
   const inputs = view.inputs;
+  // Gæld som beregningen ser den: holding slået fra udelader holdinggæld og koblede hæftelser.
+  const reportDebts = withHoldingToggleApplied(inputs).debts;
   const kpis = view.kpis;
 
   const [snapName, setSnapName] = useState("");
@@ -365,6 +368,7 @@ export default function Report() {
         </table>
       </section>
 
+      {isHoldingEnabled(inputs) && (
       <section className="mb-6 break-inside-avoid">
         <h3 className="font-display text-base font-semibold mb-2">Holding</h3>
         <table className="w-full text-sm border-collapse">
@@ -381,8 +385,9 @@ export default function Report() {
           </tbody>
         </table>
       </section>
+      )}
 
-      {inputs.debts.length > 0 && (
+      {reportDebts.length > 0 && (
         <section className="mb-6 break-inside-avoid">
           <h3 className="font-display text-base font-semibold mb-2">Gældsoversigt</h3>
           <table className="w-full text-sm border-collapse">
@@ -395,7 +400,7 @@ export default function Report() {
               </tr>
             </thead>
             <tbody>
-              {inputs.debts.map((d) => (
+              {reportDebts.map((d) => (
                 <tr key={d.id} className="border-b border-border">
                   <td className="py-1.5 pr-4">{d.name}</td>
                   <td className="py-1.5 pr-4 text-muted-foreground">{d.kind}</td>

@@ -90,7 +90,7 @@ function drawdown(opts: {
   s.inputs.stopAge = age;
   s.inputs.fullRetireAge = age; // ⇒ part-time gate (age < fullRetireAge) is false ⇒ no part-time income
   s.inputs.debts = [];
-  s.inputs.income.familyFundAnnualNet = 0;
+  s.inputs.income.otherIncomes = [];
   s.inputs.income.statePension = { ...s.inputs.income.statePension, mode: "none" };
   s.inputs.pension.ratePensionEnabled = false;
   s.inputs.pension.lifeAnnuity = { ...s.inputs.pension.lifeAnnuity, enabled: false };
@@ -397,7 +397,7 @@ describe("E. Holding + depot shared bracket over multiple years", () => {
     s.inputs.stopAge = 55;
     s.inputs.fullRetireAge = 55; // no labour / part-time income
     s.inputs.debts = [];
-    s.inputs.income.familyFundAnnualNet = 0;
+    s.inputs.income.otherIncomes = [];
     s.inputs.income.statePension = { ...s.inputs.income.statePension, mode: "none" };
     s.inputs.pension.ratePensionEnabled = false;
     s.inputs.pension.lifeAnnuity = { ...s.inputs.pension.lifeAnnuity, enabled: false };

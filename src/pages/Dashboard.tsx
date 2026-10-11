@@ -1,5 +1,6 @@
 import { ReactNode, useMemo, useState } from "react";
 import { useFinanceStore, useResolvedActiveScenario } from "@/store/financeStore";
+import { isHoldingEnabled } from "@/lib/finance/holdingToggle";
 import { project } from "@/lib/finance/projection";
 import { deriveKPIs, scoreVerdict, LEVEL_LABELS } from "@/lib/finance/kpis";
 import { sanityChecks } from "@/lib/finance/sanity";
@@ -141,6 +142,7 @@ export default function Dashboard() {
   const confidence = kpis.assumptionConfidence;
   const confTone = confidence >= 70 ? "good" : confidence >= 50 ? "warn" : "bad";
   const spMode = scenario.inputs.income.statePension.mode;
+  const holdingOn = isHoldingEnabled(scenario.inputs);
   const targetMissed = kpis.endShortfallVsTarget > 0;
 
   return (
@@ -320,7 +322,7 @@ export default function Dashboard() {
               <Area type="monotone" dataKey="Fri" stackId="1" stroke="hsl(var(--accent))" fill="url(#g-free)" />
               <Area type="monotone" dataKey="Buffer" stackId="1" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted))" />
               <Area type="monotone" dataKey="Pension" stackId="1" stroke="hsl(var(--primary))" fill="url(#g-pension)" />
-              <Area type="monotone" dataKey="Holding" stackId="1" stroke="hsl(var(--success))" fill="url(#g-holding)" />
+              {holdingOn && <Area type="monotone" dataKey="Holding" stackId="1" stroke="hsl(var(--success))" fill="url(#g-holding)" />}
               <Line type="monotone" dataKey="Forbrug" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} />
             </AreaChart>
           </ResponsiveContainer>

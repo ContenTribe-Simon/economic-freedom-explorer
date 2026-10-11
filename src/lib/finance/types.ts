@@ -145,6 +145,12 @@ export interface HoldingBucketInputs {
   withdrawalStrategy: HoldingWithdrawalStrategy;
   /** Pensionsudbetaling antages tilgængelig fra denne alder (bruges af pension_before_extra_holding). */
   pensionAvailableFromAge: number;
+  /**
+   * Har brugeren en holding/et selskab? `false` får motoren til at regne uden holding (se
+   * `withHoldingToggleApplied`), mens de indtastede tal bevares til hvis den slås til igen.
+   * Mangler feltet (alle modeller fra før kontakten), regnes holding med som hidtil.
+   */
+  enabled?: boolean;
 }
 
 export type DebtKind = "su" | "private" | "holding" | "personal_liability";
@@ -200,11 +206,35 @@ export interface StatePensionInputs {
   manualNetAnnual: number;
 }
 
+/**
+ * Hvordan en "anden indtægt" beskattes:
+ *  - "net": beløbet er allerede beskattet og lægges direkte til (fx udbetaling fra en fond).
+ *  - "gross_labor": beløbet er brutto og beskattes som personlig indkomst (AM-bidrag +
+ *    progressiv skat), beregnet for sig selv på samme måde som deltid brutto.
+ */
+export type OtherIncomeTaxation = "net" | "gross_labor";
+
+/** En indtægt ud over løn, deltid og folkepension. Erstatter det tidligere familiefond-felt. */
+export interface OtherIncome {
+  id: string;
+  name: string;
+  /** Beløb pr. år; netto eller brutto afhængigt af `taxation`. */
+  annualAmount: number;
+  taxation: OtherIncomeTaxation;
+  /** Udbetales fra og med denne alder. */
+  fromAge: number;
+  /** Udbetales til (ikke med) denne alder: sidste udbetaling er året før. */
+  untilAge: number;
+}
+
 export interface IncomeInputs {
   salaryGross: number;
   partTime: PartTimeInputs;
-  familyFundAnnualNet: number;
-  familyFundUntilAge: number;
+  /**
+   * Andre indtægter. Gemte modeller fra før listen (med `familyFundAnnualNet`/`familyFundUntilAge`)
+   * læses via `otherIncomesOf()` og migreres i store v18, så de regner præcis som før.
+   */
+  otherIncomes: OtherIncome[];
   statePension: StatePensionInputs;
 }
 
@@ -281,7 +311,7 @@ export type ConfidenceLevel = "very_high" | "high" | "low" | "speculative";
 export type ConfidenceKey =
   | "salary"
   | "partTime"
-  | "familyFund"
+  | "otherIncome"
   | "statePension"
   | "ratePension"
   | "lifeAnnuity"
@@ -466,7 +496,8 @@ export interface YearFlows {
   salaryGross: number;
   salaryNet: number;
   partTimeNet: number;
-  familyFundNet: number;
+  /** Andre indtægter netto (efter skat for brutto-poster). */
+  otherIncomeNet: number;
   statePensionNet: number;
   statePensionGross: number;
   statePensionTax: number;
@@ -700,7 +731,12 @@ export interface Scenario {
 }
 
 /** Aktuel modelversion for lokal/eksport persistens. Bumpes ved breaking changes i datamodellen. */
-export const MODEL_VERSION = 1 as const;
+/**
+ * Dataskema-version for eksporter, snapshots og cloud-rækker.
+ * 2 (2026-10-11): `income.otherIncomes` afløser `familyFundAnnualNet`/`familyFundUntilAge`,
+ * `flows.otherIncomeNet` afløser `familyFundNet`, og `holding.enabled` er tilføjet.
+ */
+export const MODEL_VERSION = 2 as const;
 
 /**
  * Stabilt release-label for den nuværende modelversion.

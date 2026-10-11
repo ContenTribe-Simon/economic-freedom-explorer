@@ -25,8 +25,11 @@ describe("checkpoint: release labels", () => {
   it("MODEL_RELEASE matches the stable label", () => {
     expect(MODEL_RELEASE).toBe("personal-fire-v0.3-stable");
   });
-  it("MODEL_VERSION numeric schema is still 1", () => {
-    expect(MODEL_VERSION).toBe(1);
+  // Bumped deliberately to 2 on 2026-10-11 (PR #56): the income schema changed
+  // (`otherIncomes` replaces the family-fund fields, `holding.enabled` added). The pin stays so
+  // any further schema bump is a conscious, reviewed change.
+  it("MODEL_VERSION numeric schema is 2", () => {
+    expect(MODEL_VERSION).toBe(2);
   });
 });
 
