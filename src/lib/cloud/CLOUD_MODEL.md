@@ -145,3 +145,24 @@ veje:
   `overwriteModel` så vi kan migrere/inspicere senere.
 - `importJson` accepterer legacy-data uden `type`-felt på scenarier
   (klassificeres via `classifyLegacyScenario`) og uden `snapshots`-array.
+
+## Sletning af konto og backup (Phase 12 C/D, PR 5, 2026-10-11)
+
+- **Selvbetjent kontosletning:** `/cloud` → "Slet min konto" (bekræftes ved at skrive sin e-mail)
+  kalder edge-funktionen `supabase/functions/delete-account`. Den læser KUN brugerens identitet fra
+  JWT'en (`Authorization: Bearer`), verificeret af Supabase Auth; request-body læses aldrig. Den
+  sletter præcis den bruger med service-rollen (`auth.admin.deleteUser`), og `ON DELETE CASCADE`
+  fjerner `profiles`, `finance_models` og `finance_snapshots`. Logikken og testene ligger i
+  `handler.ts` / `src/lib/cloud/__tests__/delete-account-handler.test.ts`; `config.toml` sætter
+  `verify_jwt = true`.
+- **Deploy:** Lovable deployer edge functions fra repoet (bekræftet: `mcp` blev deployet sådan).
+  `SUPABASE_URL`, `SUPABASE_ANON_KEY` og `SUPABASE_SERVICE_ROLE_KEY` stilles til rådighed af
+  platformen. `ALLOWED_ORIGINS` (valgfri, kommasepareret) tilføjer et eget domæne til CORS; uden den
+  er `*.lovable.app`, `*.lovableproject.com` og `localhost:8080` tilladt.
+- **Lokale data røres ikke** af kontosletning; brugeren logges ud lokalt bagefter. "Slet alle mine
+  data i denne browser" på `/privatliv` er den lokale modpart.
+- **Backup:** Lovable Cloud (Supabase, region eu-north-1 / Stockholm) tager daglig backup af
+  databasen. En slettet konto kan derfor ligge i en backup, indtil den roterer ud; det står på
+  privatlivssiden. Gendannelse sker via Lovable Cloud / Supabase-dashboardet, ikke fra appen.
+- **Brugerens egen backup** er JSON-eksporten i den avancerede model (export/import round-trip er
+  dækket af `persistence-export-integration-v1.test.ts`).

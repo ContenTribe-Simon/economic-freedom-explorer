@@ -1,1 +1,5 @@
 project_id = "nixcnzzourbxflxxmjdu"
+
+# Self-service account deletion (PR 5): the gateway must reject calls without a valid user JWT.
+[functions.delete-account]
+verify_jwt = true
