@@ -8,6 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PASSWORD_MIN_LENGTH, PASSWORD_RULE_TEXT, passwordProblem } from "@/lib/cloud/passwordPolicy";
+import {
+  RESEND_MESSAGE,
+  SIGNUP_EXISTS_MESSAGE,
+  SIGNUP_SENT_MESSAGE,
+  authErrorMessage,
+  isExistingAccountSignup,
+  signupRedirectTo,
+} from "@/lib/cloud/authFlow";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -15,6 +23,7 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState("login");
 
   useEffect(() => {
     if (session) navigate("/cloud", { replace: true });
@@ -26,7 +35,7 @@ export default function AuthPage() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(authErrorMessage(error));
     else toast.success("Logget ind");
   };
 
@@ -39,14 +48,36 @@ export default function AuthPage() {
       return;
     }
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/cloud` },
+      options: { emailRedirectTo: signupRedirectTo(window.location.origin, window.location.hostname) },
     });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("Tjek din mail for at bekræfte din konto");
+    if (error) toast.error(authErrorMessage(error));
+    else if (isExistingAccountSignup(data)) {
+      toast.info(SIGNUP_EXISTS_MESSAGE);
+      setPassword("");
+      setTab("login");
+    } else toast.success(SIGNUP_SENT_MESSAGE);
+  };
+
+  // "Fik du ikke mailen?": resends the confirmation for an unconfirmed signup. Supabase does not say
+  // whether a mail went out, so the message is true either way.
+  const onResend = async () => {
+    if (!supabase || !email) {
+      toast.error("Skriv din e-mail først.");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: signupRedirectTo(window.location.origin, window.location.hostname) },
+    });
+    setBusy(false);
+    if (error) toast.error(authErrorMessage(error));
+    else toast.success(RESEND_MESSAGE);
   };
 
   return (
@@ -63,7 +94,7 @@ export default function AuthPage() {
           lokalt i browseren.
         </p>
       )}
-      <Tabs defaultValue="login">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="grid grid-cols-2 w-full">
           <TabsTrigger value="login">Log ind</TabsTrigger>
           <TabsTrigger value="signup">Opret konto</TabsTrigger>
@@ -84,6 +115,9 @@ export default function AuthPage() {
               <p id="signup-password-rule" className="mt-1 text-xs text-muted-foreground">{PASSWORD_RULE_TEXT}</p>
             </div>
             <Button disabled={busy || !isSupabaseConfigured} className="w-full">Opret konto</Button>
+            <button type="button" onClick={onResend} disabled={busy || !isSupabaseConfigured} className="w-full text-center text-xs text-muted-foreground hover:underline">
+              Fik du ikke mailen? Send den igen
+            </button>
           </form>
         </TabsContent>
       </Tabs>
