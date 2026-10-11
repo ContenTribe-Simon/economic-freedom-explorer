@@ -45,7 +45,10 @@ describe("Privatliv page", () => {
     expect(text).toContain(LEGAL_ENTITY.email);
     expect(text).toContain("Stockholm");
     expect(text).toContain("Datatilsynet");
-    expect(text).toContain("Vi bruger ingen cookies.");
+    // Truthful about the host's cookies (found live on 2026-10-11): no "no cookies" claim.
+    expect(text).not.toContain("ingen cookies");
+    expect(text).toContain("__dpl");
+    expect(text).toContain("session-id");
     expect(text).toContain("PostHog med servere i EU");
     expect(text).toContain("Dine tal og de beløb, du ser, bliver aldrig sendt.");
   });
