@@ -41,7 +41,13 @@ describe("analyticsEnabled", () => {
     const t = "phc_abc";
     expect(client.analyticsEnabled({ prod: true, hostname: "frihedsmodel.dk", token: t })).toBe(true);
     expect(client.analyticsEnabled({ prod: true, hostname: "economic-freedom-explorer.lovable.app", token: t })).toBe(true);
-    for (const h of ["localhost", "127.0.0.1", "[::1]", "app.localhost", "site.test"]) {
+    for (const h of [
+      "localhost", "127.0.0.1", "[::1]", "app.localhost", "site.test",
+      // Lovable's editor preview: our own testing, not usage.
+      "5903b716-1633-4900-a047-694f55cb68ed.lovableproject.com",
+      "id-preview--5903b716-1633-4900-a047-694f55cb68ed.lovable.app",
+      "preview--economic-freedom-explorer.lovable.app",
+    ]) {
       expect(client.analyticsEnabled({ prod: true, hostname: h, token: t })).toBe(false);
     }
     expect(client.analyticsEnabled({ prod: false, hostname: "frihedsmodel.dk", token: t })).toBe(false);

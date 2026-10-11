@@ -9,7 +9,8 @@ import { APP_STORAGE_PREFIXES } from "@/lib/localData";
  * privacy-golive-design.md §4 PR 4.
  *
  * - Loaded lazily (its own chunk) and only where analytics is enabled: production builds served
- *   from a real host. Dev, unit tests, e2e and local previews never load or send anything.
+ *   from a real host. Dev, unit tests, e2e, local previews and Lovable's editor preview never load
+ *   or send anything.
  * - Undecided and declined visitors: cookieless (`cookieless_mode: "on_reject"` with opt-out as the
  *   default), so nothing is stored on the device and the server hashes the IP. Only after "Ja tak"
  *   does PostHog persist an id, in localStorage, never a cookie.
@@ -30,11 +31,13 @@ declare global {
 }
 
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\]|.*\.localhost|.*\.test)$/;
+/** Lovable's editor preview runs a production build on these hosts; our own testing is not usage. */
+const PREVIEW_HOST = /(^|\.)lovableproject\.com$|^id-preview--.*\.lovable\.app$|^preview--.*\.lovable\.app$/;
 
 export function analyticsEnabled(opts: { prod: boolean; hostname: string; token: string; force?: boolean }): boolean {
   if (!opts.token.startsWith("phc_")) return false;
   if (opts.force) return true;
-  return opts.prod && !LOCAL_HOST.test(opts.hostname);
+  return opts.prod && !LOCAL_HOST.test(opts.hostname) && !PREVIEW_HOST.test(opts.hostname);
 }
 
 export function isAnalyticsEnabled(): boolean {
