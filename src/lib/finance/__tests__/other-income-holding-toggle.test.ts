@@ -15,6 +15,8 @@ import { sanityChecks } from "../sanity";
 import { laborTax } from "../tax";
 import { normalizeIncomeInputs, otherIncomeNetOf, otherIncomesOf } from "../otherIncome";
 import { isHoldingEnabled, withHoldingToggleApplied } from "../holdingToggle";
+import { STRESS_TESTS } from "../stress";
+import { MODEL_VERSION } from "../types";
 import type { DebtItem, IncomeInputs, Scenario, YearFlows } from "../types";
 import { useFinanceStore } from "@/store/financeStore";
 
@@ -46,6 +48,17 @@ describe("Anden indtægt replaces the family fund without changing any numbers",
     const years = project(asLegacyFamilyFund(s, 50_000, 70), A);
     for (const y of years) expect(y.flows.otherIncomeNet).toBe(y.age < 70 ? 50_000 : 0);
     expect(otherIncomesOf(asLegacyFamilyFund(s, 0, 70).inputs.income)).toEqual([]);
+  });
+
+  it("a negative legacy amount (the old field took a sign) keeps computing as before", () => {
+    const s = makeBaseScenario();
+    const legacy = asLegacyFamilyFund(s, -24_000, 60);
+    const migrated = structuredClone(legacy);
+    migrated.inputs.income = normalizeIncomeInputs(legacy.inputs.income);
+    expect(migrated.inputs.income.otherIncomes[0].annualAmount).toBe(-24_000);
+    const years = project(legacy, A);
+    for (const y of years) expect(y.flows.otherIncomeNet).toBe(y.age < 60 ? -24_000 : 0);
+    expect(project(migrated, A)).toEqual(years);
   });
 
   it("normalizeIncomeInputs turns the old fields into one net entry and is idempotent", () => {
@@ -184,6 +197,31 @@ describe("store: migration, import and new users", () => {
     expect(project(sc, A)).toEqual(before);
   });
 
+  it("upgrading a current (v17) model to v18 keeps every other setting, only the income shape changes", () => {
+    // Codex review on #56: the unversioned pre-v9 rebuild of free/pension/income ran on EVERY
+    // version bump and dropped newer fields (ASK, depot tax, stop rule). A v17 model must come
+    // out of migrate() identical apart from the family fund turning into the list.
+    const sc = { ...makeBaseScenario(), type: "base" as const, updatedAt: 1 };
+    sc.inputs.free = {
+      ...sc.inputs.free,
+      contributionStopRule: "customAge",
+      contributionStopAge: 58,
+      ask: { enabled: true, currentValue: 90_000, depositLimit: 174_200, taxRate: 0.17, autoFillFirst: true } as never,
+      depotTax: { enabled: true, method: "realizationSimple" } as never,
+    };
+    sc.inputs.holding.enabled = false;
+    const legacy = asLegacyFamilyFund(sc, 50_000, 70);
+    const migrate = useFinanceStore.persist.getOptions().migrate!;
+    const migrated = migrate(
+      structuredClone({ scenarios: [legacy], activeScenarioId: legacy.id, assumptions: A, snapshots: [] }),
+      17,
+    ) as { scenarios: Scenario[] };
+    const out = migrated.scenarios[0];
+    expect({ ...out.inputs, income: undefined }).toEqual({ ...legacy.inputs, income: undefined });
+    expect({ ...out, inputs: undefined }).toEqual({ ...legacy, inputs: undefined });
+    expect(out.inputs.income).toEqual(normalizeIncomeInputs(legacy.inputs.income));
+  });
+
   it("importing an old export converts the family fund too", () => {
     const legacyScenario = { ...asLegacyFamilyFund(makeBaseScenario(), 30_000, 65), type: "base" as const };
     useFinanceStore.getState().importJson(
@@ -193,6 +231,30 @@ describe("store: migration, import and new users", () => {
     expect(income.otherIncomes).toEqual([
       { id: "legacy-family-fund", name: "Familiefond", annualAmount: 30_000, taxation: "net", fromAge: 0, untilAge: 65 },
     ]);
+  });
+
+  it("importing an old export keeps an untyped stress test linked to its base", () => {
+    // Codex review on #56: the base must be normalized before classification, otherwise the
+    // old vs new income shape makes every legacy link look hand-edited ("custom").
+    const base = asLegacyFamilyFund(makeBaseScenario(), 50_000, 70);
+    delete (base as Partial<Scenario>).type;
+    const stress = structuredClone(base);
+    stress.id = "stress-1";
+    stress.name = "Base case – uden deltid";
+    stress.baseScenarioId = base.id;
+    stress.modifiers = { noPartTime: true } as Scenario["modifiers"];
+    STRESS_TESTS.find((t) => t.key === "noPartTime")!.apply(stress);
+    useFinanceStore.getState().importJson(
+      JSON.stringify({ scenarios: [base, stress], activeScenarioId: base.id, assumptions: A }),
+    );
+    const imported = useFinanceStore.getState().scenarios.find((x) => x.id === "stress-1")!;
+    expect(imported.type).toBe("linked_stress_test");
+    expect(imported.manuallyEdited).toBe(false);
+  });
+
+  it("exports advertise the new schema version", () => {
+    expect(MODEL_VERSION).toBe(2);
+    expect(JSON.parse(useFinanceStore.getState().exportJson()).modelVersion).toBe(2);
   });
 
   it("a new user starts neutral: holding switched off and empty, no other income", () => {

@@ -731,7 +731,12 @@ export interface Scenario {
 }
 
 /** Aktuel modelversion for lokal/eksport persistens. Bumpes ved breaking changes i datamodellen. */
-export const MODEL_VERSION = 1 as const;
+/**
+ * Dataskema-version for eksporter, snapshots og cloud-rækker.
+ * 2 (2026-10-11): `income.otherIncomes` afløser `familyFundAnnualNet`/`familyFundUntilAge`,
+ * `flows.otherIncomeNet` afløser `familyFundNet`, og `holding.enabled` er tilføjet.
+ */
+export const MODEL_VERSION = 2 as const;
 
 /**
  * Stabilt release-label for den nuværende modelversion.

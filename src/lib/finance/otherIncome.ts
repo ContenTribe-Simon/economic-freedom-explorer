@@ -24,7 +24,9 @@ export function otherIncomesOf(income: IncomeInputs): OtherIncome[] {
   if (Array.isArray(income.otherIncomes)) return income.otherIncomes;
   const legacy = income as unknown as LegacyFamilyFund;
   const amount = legacy.familyFundAnnualNet ?? 0;
-  if (!(amount > 0)) return [];
+  // Ethvert endeligt beløb ≠ 0 bevares, også et negativt (det gamle felt tog fortegn, og den
+  // gamle formel lagde det til cashflow som det var).
+  if (!Number.isFinite(amount) || amount === 0) return [];
   return [
     {
       id: LEGACY_FAMILY_FUND_ID,
@@ -53,7 +55,9 @@ export function otherIncomeForAge(
   let net = 0;
   let taxAmt = 0;
   for (const item of otherIncomesOf(income)) {
-    const amount = Number.isFinite(item.annualAmount) ? Math.max(0, item.annualAmount) : 0;
+    // Netto lægges til som det er (også et negativt beløb, som det gamle familiefond-felt tillod);
+    // brutto går gennem laborTax, der giver 0 for beløb ≤ 0.
+    const amount = Number.isFinite(item.annualAmount) ? item.annualAmount : 0;
     if (amount === 0 || age < item.fromAge || age >= item.untilAge) continue;
     if (item.taxation === "gross_labor") {
       const r = laborTax(amount, tax);

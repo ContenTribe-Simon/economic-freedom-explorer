@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Inputs from "@/pages/Inputs";
+import Report from "@/pages/Report";
 import { useFinanceStore } from "@/store/financeStore";
 import { makeBaseScenario, makeNewUserScenario } from "@/lib/finance/defaults";
 import type { IncomeInputs, Scenario } from "@/lib/finance/types";
@@ -76,5 +77,28 @@ describe("holding switch", () => {
     renderInputs();
     const toggle = within(screen.getByTestId("holding-section")).getByRole("switch");
     expect(toggle.getAttribute("aria-checked")).toBe("true");
+  });
+});
+
+describe("report", () => {
+  it("leaves out holding debt and its linked liability while holding is switched off", () => {
+    const s = makeBaseScenario();
+    s.inputs.debts = [
+      ...s.inputs.debts.filter((d) => d.kind === "private"),
+      { id: "hd", name: "Lån i selskabet", kind: "holding", balance: 600_000, interestRate: 0.05, monthlyPayment: 8_000, impact: "holding", includeInNetWorth: true },
+      { id: "pl", name: "Kaution for selskabet", kind: "personal_liability", balance: 600_000, interestRate: 0, monthlyPayment: 0, impact: "risk_only", includeInNetWorth: false, linkedDebtId: "hd" },
+    ];
+    load(s);
+    const { unmount } = render(<MemoryRouter><Report /></MemoryRouter>);
+    expect(screen.getByText("Lån i selskabet")).toBeTruthy();
+    expect(screen.getByText("Kaution for selskabet")).toBeTruthy();
+    unmount();
+
+    s.inputs.holding.enabled = false;
+    load(s);
+    render(<MemoryRouter><Report /></MemoryRouter>);
+    expect(screen.queryByText("Lån i selskabet")).toBeNull();
+    expect(screen.queryByText("Kaution for selskabet")).toBeNull();
+    expect(screen.getByText("Privat boliglån")).toBeTruthy();
   });
 });

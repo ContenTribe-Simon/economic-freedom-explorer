@@ -195,16 +195,21 @@ export const useFinanceStore = create<FinanceState>()(
           throw new Error("Filen ligner ikke en gyldig model-eksport (mangler scenarios).");
         }
         // Klassificér evt. legacy-scenarier uden `type`-felt + normalisér lifeEvents.
-        const scenarios = parsed.scenarios.map((sc) => {
+        // Normalisér ALLE scenarier først og klassificér derefter mod de normaliserede baser, så et
+        // linket stress-scenarie og dets base sammenlignes i samme form (ellers ville forskellen
+        // mellem gammel og ny indkomst-form gøre ethvert legacy-link til "custom").
+        const normalized = parsed.scenarios.map((sc) => {
           const rawEvents = Array.isArray((sc as any).inputs?.lifeEvents) ? (sc as any).inputs.lifeEvents : [];
           const lifeEvents = rawEvents.map((e: any) => normalizeLegacyLifeEvent(e));
           // Samme indkomst-normalisering som persist v18: familiefond bliver til "Anden indtægt".
           const income = sc.inputs?.income ? normalizeIncomeInputs(sc.inputs.income) : sc.inputs?.income;
-          const withEvents = { ...sc, inputs: { ...sc.inputs, lifeEvents, income } } as Scenario;
-          if (withEvents.type) return withEvents;
-          const baseScenario = withEvents.baseScenarioId ? parsed.scenarios.find((x) => x.id === withEvents.baseScenarioId) : undefined;
-          const cls = classifyLegacyScenario(withEvents, baseScenario);
-          return { ...withEvents, type: cls.type, manuallyEdited: cls.manuallyEdited };
+          return { ...sc, inputs: { ...sc.inputs, lifeEvents, income } } as Scenario;
+        });
+        const scenarios = normalized.map((sc) => {
+          if (sc.type) return sc;
+          const baseScenario = sc.baseScenarioId ? normalized.find((x) => x.id === sc.baseScenarioId) : undefined;
+          const cls = classifyLegacyScenario(sc, baseScenario);
+          return { ...sc, type: cls.type, manuallyEdited: cls.manuallyEdited };
         });
         // Samme slut-anker-normalisering som persist-migrationen (v17): importJson er OGSÅ
         // cloud-`loadModel()`s vej ind, og den rammer aldrig persist-migrate — uden dette ville
@@ -431,7 +436,11 @@ export const useFinanceStore = create<FinanceState>()(
         if (state.assumptions?.tax && "pensionPayoutRate" in state.assumptions.tax) {
           delete state.assumptions.tax.pensionPayoutRate;
         }
-        if (Array.isArray(state.scenarios)) {
+        // Hver blok herunder kører kun på data gemt FØR dens version. Uden den gate kørte f.eks.
+        // genopbygningen af free/pension/income ved hvert versionsskift og smed nyere felter væk
+        // (ASK, depotskat, stopregel). Den er rettet i v18 (Codex review på #56).
+        // v8: omlægning til debts[], partTime/statePension-objekter, lifeAnnuity, holding-strategi
+        if (version < 9 && Array.isArray(state.scenarios)) {
           const stressLabels: Record<StressModifierKey, string> = {
             noBarma: "uden Barma",
             noPartTime: "uden deltid",
@@ -544,14 +553,14 @@ export const useFinanceStore = create<FinanceState>()(
           });
         }
         // v9: sikr at confidence-felt findes (tomt objekt = brug defaults)
-        if (Array.isArray(state.scenarios)) {
+        if (version < 9 && Array.isArray(state.scenarios)) {
           state.scenarios = state.scenarios.map((sc: any) => ({
             ...sc,
             inputs: { ...sc.inputs, confidence: sc.inputs?.confidence ?? {} },
           }));
         }
         // v10: forbered modelVersion-felter + lifeEvents placeholder
-        if (Array.isArray(state.scenarios)) {
+        if (version < 10 && Array.isArray(state.scenarios)) {
           const now = Date.now();
           state.scenarios = state.scenarios.map((sc: any) => ({
             ...sc,
@@ -562,7 +571,7 @@ export const useFinanceStore = create<FinanceState>()(
         }
         // v11: klassificér eksisterende scenarier til ny scenario-type
         // (base / linked_stress_test / custom + manuallyEdited).
-        if (Array.isArray(state.scenarios)) {
+        if (version < 11 && Array.isArray(state.scenarios)) {
           const all = state.scenarios as Scenario[];
           state.scenarios = all.map((sc) => {
             if (sc.type) return sc; // allerede klassificeret (nyt felt)
@@ -572,7 +581,7 @@ export const useFinanceStore = create<FinanceState>()(
           });
         }
         // v12: tilføj eksplicit stopregel for planlagt fri opsparing (default = "stopAge")
-        if (Array.isArray(state.scenarios)) {
+        if (version < 12 && Array.isArray(state.scenarios)) {
           state.scenarios = state.scenarios.map((sc: any) => ({
             ...sc,
             inputs: {
@@ -589,14 +598,15 @@ export const useFinanceStore = create<FinanceState>()(
           state.snapshots = [];
         }
         // v14: normalisér lifeEvents til ny shape (legacy events deaktiveres)
-        if (Array.isArray(state.scenarios)) {
+        if (version < 14 && Array.isArray(state.scenarios)) {
           state.scenarios = state.scenarios.map((sc: any) => {
             const raw = Array.isArray(sc.inputs?.lifeEvents) ? sc.inputs.lifeEvents : [];
             const normalized = raw.map((e: any) => normalizeLegacyLifeEvent(e));
             return { ...sc, inputs: { ...sc.inputs, lifeEvents: normalized } };
           });
         }
-        // v15: tilføj countryProfiles på model-niveau (default-profiler hvis mangler)
+        // v15: tilføj countryProfiles på model-niveau (default-profiler hvis mangler).
+        // v13, v15 og v16 er rene "udfyld hvis mangler"-normaliseringer og kører altid.
         if (!Array.isArray(state.countryProfiles) || state.countryProfiles.length === 0) {
           state.countryProfiles = structuredClone(DEFAULT_COUNTRY_PROFILES);
         } else {
@@ -607,12 +617,12 @@ export const useFinanceStore = create<FinanceState>()(
         // v17: motor-anker-fixet — gemte snapshots med lifeExpectancy > 95 har alder-95-værdien
         // liggende under capitalAt95; omforankr slut-felterne fra snapshottets egne frosne
         // YearRows, så gamle og nye snapshots betyder det samme under samme label.
-        if (Array.isArray(state.snapshots)) {
+        if (version < 17 && Array.isArray(state.snapshots)) {
           state.snapshots = state.snapshots.map((snap: Snapshot) => normalizeSnapshotEndAnchors(snap));
         }
         // v18: familiefond-felterne bliver til listen "Anden indtægt" (én netto-post med samme
         // beløb og slutalder, så beregningen er uændret). Holding uden `enabled` er slået til.
-        if (Array.isArray(state.scenarios)) {
+        if (version < 18 && Array.isArray(state.scenarios)) {
           state.scenarios = state.scenarios.map((sc: any) =>
             sc?.inputs?.income ? { ...sc, inputs: { ...sc.inputs, income: normalizeIncomeInputs(sc.inputs.income) } } : sc,
           );
