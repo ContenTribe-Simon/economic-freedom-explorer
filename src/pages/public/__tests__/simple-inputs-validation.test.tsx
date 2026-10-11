@@ -123,7 +123,10 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
     expect(store().inputs.currentAge).toBeLessThanOrEqual(75);
   });
 
-  it("typing a negative amount into the form writes 0 to the store (onChange clamp)", () => {
+  it("a minus sign can never make an amount negative (the kroner fields accept digits only)", () => {
+    // Since backlog item 1 the amount fields are formatted text inputs, not native number inputs:
+    // a typed minus sign is ignored instead of clamping the value to 0. The guarantee this test
+    // protects is unchanged: no negative amount reaches the store.
     render(
       <TooltipProvider>
         <MemoryRouter>
@@ -134,9 +137,29 @@ describe("class 2: every numeric write is clamped in code (not just min= attribu
     fireEvent.change(screen.getByLabelText("Årlig indkomst før skat", { selector: "input" }), {
       target: { value: "-5000" },
     });
-    expect(store().inputs.annualIncome).toBe(0);
-    fireEvent.change(screen.getByLabelText("Pensionssaldo", { selector: "input" }), { target: { value: "-1" } });
+    expect(store().inputs.annualIncome).toBe(5000);
+    fireEvent.change(screen.getByLabelText("Pensionssaldo", { selector: "input" }), { target: { value: "-" } });
     expect(store().inputs.pensionBalance).toBe(0);
+  });
+
+  it("kroner fields show Danish thousands separators and read them back", () => {
+    usePublicStore.setState({ inputs: { ...DEFAULT_SIMPLE_INPUTS, annualIncome: 612_345 } });
+    render(
+      <TooltipProvider>
+        <MemoryRouter>
+          <SimpleInputs />
+        </MemoryRouter>
+      </TooltipProvider>,
+    );
+    const income = screen.getByLabelText("Årlig indkomst før skat", { selector: "input" }) as HTMLInputElement;
+    expect(income.value).toBe("612.345");
+    expect(income.inputMode).toBe("numeric");
+    // A digit typed into the middle of "123.456" regroups the whole number.
+    fireEvent.change(income, { target: { value: "123.4567" } });
+    expect(store().inputs.annualIncome).toBe(1_234_567);
+    expect(income.value).toBe("1.234.567");
+    fireEvent.change(income, { target: { value: "45.000 kr" } });
+    expect(store().inputs.annualIncome).toBe(45_000);
   });
 
   it("loadCalculation sanitizes saved entries (legacy/hand-edited persistence)", () => {
