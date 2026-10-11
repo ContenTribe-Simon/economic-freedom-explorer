@@ -180,7 +180,8 @@ commits `5109969`, `36011f2`, `0fa8b99`, `cc375f3`).
 - Public journey under hostile input: share-link decoding now rejects non-record payloads
   (a crafted JSON array previously reset the recipient's plan to defaults).
 - MCP endpoint (added via Lovable on 2026-07-04): tool inputs bounded to finite,
-  in-domain ranges.
+  in-domain ranges. Later removed entirely (2026-10-11, Simon's decision): Lovable's security
+  scan flagged it as a public, unauthenticated endpoint and the app never used it.
 - **Still open — B is not done until each of these is verified (launch-blocking):**
   - Supabase dashboard (Simon): password policy, email confirmation, auth rate limits, and
     the redirect allowlist.
