@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { PASSWORD_MIN_LENGTH, PASSWORD_RULE_TEXT, passwordProblem } from "@/lib/cloud/passwordPolicy";
+import { SIGNUP_SENT_MESSAGE, authErrorMessage, signupRedirectTo } from "@/lib/cloud/authFlow";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export default function AuthPage() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) toast.error(error.message);
+    if (error) toast.error(authErrorMessage(error));
     else toast.success("Logget ind");
   };
 
@@ -42,11 +43,29 @@ export default function AuthPage() {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/cloud` },
+      options: { emailRedirectTo: signupRedirectTo(window.location.origin, window.location.hostname) },
     });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else toast.success("Tjek din mail for at bekræfte din konto");
+    if (error) toast.error(authErrorMessage(error));
+    else toast.success(SIGNUP_SENT_MESSAGE);
+  };
+
+  // "Fik du ikke mailen?": resends the confirmation for an unconfirmed signup. Same neutral answer
+  // either way, so it reveals nothing about whether the email has an account.
+  const onResend = async () => {
+    if (!supabase || !email) {
+      toast.error("Skriv din e-mail først.");
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: signupRedirectTo(window.location.origin, window.location.hostname) },
+    });
+    setBusy(false);
+    if (error && /rate|too many/i.test(error.message)) toast.error(authErrorMessage(error));
+    else toast.success(SIGNUP_SENT_MESSAGE);
   };
 
   return (
@@ -84,6 +103,9 @@ export default function AuthPage() {
               <p id="signup-password-rule" className="mt-1 text-xs text-muted-foreground">{PASSWORD_RULE_TEXT}</p>
             </div>
             <Button disabled={busy || !isSupabaseConfigured} className="w-full">Opret konto</Button>
+            <button type="button" onClick={onResend} disabled={busy || !isSupabaseConfigured} className="w-full text-center text-xs text-muted-foreground hover:underline">
+              Fik du ikke mailen? Send den igen
+            </button>
           </form>
         </TabsContent>
       </Tabs>
