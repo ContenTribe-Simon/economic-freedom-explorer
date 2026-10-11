@@ -76,7 +76,7 @@ export default function AuthPage() {
       options: { emailRedirectTo: signupRedirectTo(window.location.origin, window.location.hostname) },
     });
     setBusy(false);
-    if (error && /rate|too many/i.test(error.message)) toast.error(authErrorMessage(error));
+    if (error) toast.error(authErrorMessage(error));
     else toast.success(RESEND_MESSAGE);
   };
 

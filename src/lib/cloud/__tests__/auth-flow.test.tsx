@@ -69,6 +69,7 @@ describe("authErrorMessage", () => {
     [{ message: "Email not confirmed" }, "Bekræft din e-mail først. Tjek din indbakke."],
     [{ code: "weak_password", message: "Password is known to be weak and easy to guess" }, "Vælg en anden adgangskode. Den er for svag eller kendt fra et datalæk."],
     [{ code: "over_email_send_rate_limit", message: "email rate limit exceeded" }, "For mange forsøg. Vent lidt, og prøv igen."],
+    [{ code: "email_address_invalid", message: "Email address is invalid" }, "Tjek, at e-mailen er skrevet rigtigt."],
     [{ message: "Something unexpected" }, "Noget gik galt. Prøv igen om lidt."],
     [null, "Noget gik galt. Prøv igen om lidt."],
   ])("%j", (err, msg) => {
@@ -124,6 +125,16 @@ describe("Auth page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fik du ikke mailen? Send den igen" }));
     await waitFor(() => expect(sb.resend).toHaveBeenCalledWith(expect.objectContaining({ type: "signup", email: "x@example.dk" })));
     expect(toast.success).toHaveBeenCalledWith(RESEND_MESSAGE);
+  });
+
+  it("a failed resend says so instead of claiming the mail was sent", async () => {
+    sb.resend.mockResolvedValueOnce({ error: { message: "Unable to validate email address: invalid format" } });
+    renderAuth();
+    const panel = await screen.findByRole("tabpanel");
+    fireEvent.change(panel.querySelector('input[type="email"]')!, { target: { value: "x@example.dk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Fik du ikke mailen? Send den igen" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Tjek, at e-mailen er skrevet rigtigt."));
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("login errors are Danish", async () => {

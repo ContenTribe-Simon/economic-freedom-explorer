@@ -40,6 +40,7 @@ export function authErrorMessage(error: { message?: string; code?: string } | nu
   const m = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
   if (m.includes("invalid login credentials") || m.includes("invalid_credentials")) return "Forkert e-mail eller adgangskode.";
   if (m.includes("email not confirmed") || m.includes("email_not_confirmed")) return "Bekræft din e-mail først. Tjek din indbakke.";
+  if (m.includes("validate email") || m.includes("email_address_invalid") || m.includes("invalid format")) return "Tjek, at e-mailen er skrevet rigtigt.";
   if (m.includes("weak") || m.includes("pwned") || m.includes("password")) return "Vælg en anden adgangskode. Den er for svag eller kendt fra et datalæk.";
   if (m.includes("rate limit") || m.includes("over_email_send_rate_limit") || m.includes("too many")) return "For mange forsøg. Vent lidt, og prøv igen.";
   return "Noget gik galt. Prøv igen om lidt.";
