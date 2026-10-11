@@ -27,7 +27,9 @@ Store-actions: `convertToCustom(id)`, `rebaseOnCurrentBase(id)`, `resetToCleanSt
 | Fil | Ansvar |
 | --- | --- |
 | `types.ts` | Centrale typer: `ScenarioInputs`, `Assumptions`, `YearRow`, `KPIs`, `LifeEvent`, `MODEL_VERSION`, `ModelExport`. |
-| `defaults.ts` | Standard-input + `makeBaseScenario()`. |
+| `defaults.ts` | Standard-input + `makeBaseScenario()` (motorens faste referencescenarie, som testene regner på) og `makeNewUserInputs()`/`makeNewUserScenario()` (neutral start for en ny bruger: holding slået fra, ingen andre indtægter). |
+| `otherIncome.ts` | "Anden indtægt": `otherIncomesOf()` (læser også gamle familiefond-felter), `normalizeIncomeInputs()`, `otherIncomeForAge()`, `otherIncomeNetOf()`. |
+| `holdingToggle.ts` | Holding til/fra: `isHoldingEnabled()` og `withHoldingToggleApplied()`. |
 | `tax.ts` | Skatteberegninger (arbejdsindkomst, aktie, pension). Rene funktioner. |
 | `projection.ts` | Hovedmotor: bygger år-for-år `YearRow[]` ud fra scenarie + antagelser. |
 | `kpis.ts` | Aggregerer `YearRow[]` til `KPIs` (robusthed, antagelsessikkerhed, breakdowns). |
@@ -49,6 +51,8 @@ ScenarioInputs ──► mergeAssumptions ──► project()  ──►  YearRo
 2. **Scenarier** påvirker kun input (`ScenarioInputs`) eller `assumptionsOverride`. Stress-modifiers i `stress.ts` muterer en kopi af scenariet og lader resten af motoren være urørt.
 3. **Pension**: Ratepension udbetales over `ratePensionPayoutYears` fra `payoutFromAge`. Livsvarig livrente kører som en stream uden saldo. Ekstra pensionsudtræk ved shortfall registreres i `pensionExtra` og lægges sammen i `pensionPayoutNet`.
 4. **Holding**: Planlagt udlodning (`holdingPlanned`) + evt. ekstra udtræk (`holdingExtra`) → `holdingDistributionNet`. Holdinggæld kan finansieres af holdingkapital, privat cashflow, ekstern, exit eller display-only.
+   - **Til/fra** (`holding.enabled`, 2026-10-11): `false` betyder ingen holding. `projectWithStopAge`, `computeFireAnalysis`, `deriveKPIs` og `sanityChecks` læser inputs gennem `withHoldingToggleApplied()`, som da nulstiller saldo, exit og udlodning og udelader holdinggæld (og hæftelser koblet til den) samt holding-livsbegivenheder. De indtastede tal bliver liggende i inputs. Mangler feltet (alle modeller fra før), er holding slået til, og objektet sendes uændret videre. Testet som "slået fra = samme model uden holding" i `other-income-holding-toggle.test.ts`.
+4b. **Anden indtægt** (`income.otherIncomes`, 2026-10-11, afløser familiefond): en liste af poster med navn, beløb pr. år, fra/til alder (udbetales når `fromAge <= alder < untilAge`) og beskatning. `"net"` lægges direkte til; `"gross_labor"` beskattes med `laborTax()` for sig selv (samme forenkling som deltid brutto), og skatten indgår i årets `taxes`. Summen er `flows.otherIncomeNet`. Gamle modeller med `familyFundAnnualNet`/`familyFundUntilAge` læses som én netto-post fra alder 0 til den gamle slutalder, hvilket regner præcis som den gamle formel; store v18 og `importJson` migrerer dem. Frosne årsrækker med `familyFundNet` læses via `otherIncomeNetOf()`, og en gemt antagelsessikkerhed for `familyFund` gælder for `otherIncome`.
 5. **Opsparing**: Tre logikker — `planned`, `cashflow`, `hybrid`. `investedAmount` = faktisk lagt i fri kapital. `unallocatedCashflow` = positivt overskud der ikke er investeret.
 6. **Cashflow** og **nettoformue** beregnes pr. år; `cashflowSurplus` kan være negativ (shortfall).
 7. **Scorekort** (`kpis.ts`):
@@ -69,7 +73,7 @@ ScenarioInputs ──► mergeAssumptions ──► project()  ──►  YearRo
 - `MODEL_VERSION` (i `types.ts`) bumpes når data-skemaet ændres.
 - `ModelExport` er det stabile eksport/import-skema (`exportJson` i `financeStore.ts`).
 - Hver `Scenario` har `createdAt`/`updatedAt`/`metadata` — klar til senere migration mod Supabase (én tabel pr. scenarie + én pr. assumptions).
-- Lokalt bruger vi fortsat `zustand/persist` med `migrate()` for opadkompatibilitet.
+- Lokalt bruger vi fortsat `zustand/persist` med `migrate()` for opadkompatibilitet (v18: familiefond → `otherIncomes`).
 
 ## Hvad senere skal til Supabase
 

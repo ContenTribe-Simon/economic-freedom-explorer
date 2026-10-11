@@ -1,8 +1,9 @@
 import { Scenario, SanityCheck, YearRow } from "./types";
+import { withHoldingToggleApplied } from "./holdingToggle";
 
 export function sanityChecks(scenario: Scenario, years: YearRow[]): SanityCheck[] {
   const out: SanityCheck[] = [];
-  const inp = scenario.inputs;
+  const inp = withHoldingToggleApplied(scenario.inputs);
   const thisYear = new Date().getFullYear();
 
   // Folkepension manuelt netto virker højt vs. grundbeløb

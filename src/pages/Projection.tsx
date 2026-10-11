@@ -12,6 +12,7 @@ import { computeFireAnalysis, type FireYearStatus, type FireAnalysis } from "@/l
 import { buildProjectionExport, buildProjectionCsv, buildYearAuditJson } from "@/lib/finance/exportProjection";
 import { toast } from "sonner";
 import { Copy, Download, X } from "lucide-react";
+import { otherIncomeNetOf } from "@/lib/finance/otherIncome";
 
 function Row({ label, value, strong, indent }: { label: string; value: number | string; strong?: boolean; indent?: boolean }) {
   return (
@@ -53,7 +54,7 @@ export function lifeAnnuityStatusText(
 export function AuditPanel({ y, inputs, fireYear, onClose, scenarioId, scenarioName }: { y: YearRow; inputs: ScenarioInputs; fireYear?: FireYearStatus; onClose: () => void; scenarioId?: string; scenarioName?: string }) {
   const f = y.flows;
   const incomeTotal =
-    f.salaryNet + f.partTimeNet + f.familyFundNet + f.statePensionNet +
+    f.salaryNet + f.partTimeNet + otherIncomeNetOf(f) + f.statePensionNet +
     (f.ratePension?.net ?? 0) + (f.lifeAnnuity?.net ?? 0) + f.holdingDistributionNet;
   return (
     <Card className="p-6 sticky top-4">
@@ -102,7 +103,7 @@ export function AuditPanel({ y, inputs, fireYear, onClose, scenarioId, scenarioN
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Indkomst (netto)</div>
           {f.salaryNet > 0 && <Row label="Løn netto" value={f.salaryNet} indent />}
           {f.partTimeNet > 0 && <Row label="Deltid netto" value={f.partTimeNet} indent />}
-          {f.familyFundNet > 0 && <Row label="Familiefond" value={f.familyFundNet} indent />}
+          {otherIncomeNetOf(f) > 0 && <Row label="Anden indtægt" value={otherIncomeNetOf(f)} indent />}
           {f.statePensionNet > 0 && <Row label="Folkepension netto" value={f.statePensionNet} indent />}
           {f.statePensionGross > 0 && (
             <>

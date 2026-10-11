@@ -18,8 +18,7 @@ function mkShortfall(): Scenario {
   s.inputs.fullRetireAge = 50;
   s.inputs.income.salaryGross = 0;
   s.inputs.income.partTime = { mode: "gross_annual", grossAnnual: 0, netMonthly: 0, fromAge: 99, untilAge: 99 };
-  s.inputs.income.familyFundAnnualNet = 0;
-  s.inputs.income.familyFundUntilAge = 0;
+  s.inputs.income.otherIncomes = [];
   s.inputs.income.statePension = { mode: "none", fromAge: 67, baseGrossAnnual: 0, effectiveTaxRate: 0, manualNetAnnual: 0 };
   s.inputs.spending.desiredMonthlyNet = 10000;
   s.inputs.debts = [];

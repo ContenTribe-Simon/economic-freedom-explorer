@@ -114,7 +114,7 @@ function drawdownScenario(
   s.inputs.stopAge = age;
   s.inputs.fullRetireAge = age;
   s.inputs.debts = [];
-  s.inputs.income.familyFundAnnualNet = 0;
+  s.inputs.income.otherIncomes = [];
   s.inputs.income.statePension = { ...s.inputs.income.statePension, mode: "none" };
   s.inputs.pension.ratePensionEnabled = false;
   s.inputs.pension.lifeAnnuity = { ...s.inputs.pension.lifeAnnuity, enabled: false };
@@ -495,7 +495,7 @@ describe("Matrix D — Tax buckets", () => {
     s.inputs.free.depotTax = { enabled: true, method: "realizationSimple", costBasis: 500_000, showDeferredTax: true };
     s.inputs.stopAge = s.inputs.person.currentAge; // force drawdown ⇒ depot realization too
     s.inputs.spending.desiredMonthlyNet = 50_000;
-    s.inputs.income.familyFundAnnualNet = 0;
+    s.inputs.income.otherIncomes = [];
     const years = project(s, defaultAssumptions);
     const si = years[0].flows.shareIncome!;
     // Low bracket can be used at most once per year.

@@ -35,7 +35,7 @@ function isolatedScenario() {
   s.inputs.free.annualExtraContribution = 0;
   s.inputs.free.cashBuffer = 0;
   s.inputs.income.salaryGross = 0;
-  s.inputs.income.familyFundAnnualNet = 0;
+  s.inputs.income.otherIncomes = [];
   s.inputs.income.statePension.mode = "none";
   s.inputs.income.partTime = { mode: "net_monthly", grossAnnual: 0, netMonthly: 0, fromAge: 99, untilAge: 99 };
   s.inputs.pension.balance = 0;

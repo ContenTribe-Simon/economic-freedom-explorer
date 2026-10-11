@@ -281,6 +281,10 @@ are anchored to the roadmap and not lost:
 - A dedicated data-visualization and UX design pass for the existing Advanced app (its
   functionality was built ahead of its UX), a separate, later-added item in that same file,
   distinct from Phase 9 (routing only, gating Advanced behind a door, no visual rework).
+- A guided journey into the Advanced app (added 2026-10-11): instead of landing on the full
+  overview, the user is taken through a few steps (carrying their simple inputs over) and
+  then reaches the full Advanced overview to keep editing. Designed together with the two
+  items above, spec first, informed by what the closed beta shows.
 
 ---
 

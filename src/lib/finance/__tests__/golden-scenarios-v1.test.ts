@@ -430,7 +430,7 @@ function pensionFirst(): Scenario {
   s.inputs.pension.payoutFromAge = 64;
   s.inputs.pension.ratePensionEnabled = false;
   s.inputs.income.statePension = { ...s.inputs.income.statePension, mode: "none" };
-  s.inputs.income.familyFundAnnualNet = 0;
+  s.inputs.income.otherIncomes = [];
   s.inputs.spending.desiredMonthlyNet = 30_000;
   s.inputs.person.currentAge = 60;
   s.inputs.stopAge = 60;

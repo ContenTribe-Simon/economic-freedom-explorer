@@ -78,7 +78,7 @@ export function toScenarioInputs(s: SimplePublicInputs): ScenarioInputs {
   // ---- Income: a single salary stream while working. Advanced / locale streams off. ----
   inp.income.salaryGross = s.annualIncome;
   inp.income.partTime = { ...inp.income.partTime, grossAnnual: 0, netMonthly: 0 };
-  inp.income.familyFundAnnualNet = 0;
+  inp.income.otherIncomes = [];
   inp.income.statePension = { ...inp.income.statePension, mode: "none" };
 
   // ---- Spending ----

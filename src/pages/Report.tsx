@@ -19,6 +19,7 @@ import { MODEL_RELEASE, MODEL_VERSION, type Snapshot } from "@/lib/finance/types
 import { Link, useSearchParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { toast } from "sonner";
+import { isHoldingEnabled } from "@/lib/finance/holdingToggle";
 
 const SP_METHOD_LABEL = {
   none: "Ingen folkepension",
@@ -365,6 +366,7 @@ export default function Report() {
         </table>
       </section>
 
+      {isHoldingEnabled(inputs) && (
       <section className="mb-6 break-inside-avoid">
         <h3 className="font-display text-base font-semibold mb-2">Holding</h3>
         <table className="w-full text-sm border-collapse">
@@ -381,6 +383,7 @@ export default function Report() {
           </tbody>
         </table>
       </section>
+      )}
 
       {inputs.debts.length > 0 && (
         <section className="mb-6 break-inside-avoid">

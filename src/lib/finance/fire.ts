@@ -20,6 +20,7 @@
 import type { Assumptions, Scenario, YearRow } from "./types";
 import { mergeAssumptions } from "./projection";
 import { defaultAssumptions } from "./defaults";
+import { withHoldingToggleApplied } from "./holdingToggle";
 
 export interface FireAssumptions {
   withdrawalRate: number;
@@ -172,7 +173,7 @@ export function computeFireAnalysis(
   fireAssumptions: FireAssumptions = FIRE_DEFAULTS,
 ): FireAnalysis {
   const a = mergeAssumptions(globalAssumptions, scenario.assumptionsOverride);
-  const inp = scenario.inputs;
+  const inp = withHoldingToggleApplied(scenario.inputs);
   const annualSpending = Math.max(0, inp.spending.desiredMonthlyNet * 12);
   const standardTarget = annualSpending / fireAssumptions.withdrawalRate;
   const leanTarget = (annualSpending * fireAssumptions.leanSpendingFactor) / fireAssumptions.withdrawalRate;

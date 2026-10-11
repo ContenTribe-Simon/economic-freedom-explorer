@@ -11,6 +11,8 @@ import {
 } from "./types";
 import { findEarliestSustainableStopAge, mergeAssumptions } from "./projection";
 import { defaultAssumptions } from "./defaults";
+import { withHoldingToggleApplied } from "./holdingToggle";
+import { otherIncomeNetOf } from "./otherIncome";
 
 // ---- Confidence helpers (pure, no projection effect) ----
 const LEVEL_VALUE: Record<ConfidenceLevel, number> = {
@@ -23,7 +25,7 @@ const LEVEL_VALUE: Record<ConfidenceLevel, number> = {
 export const DEFAULT_CONFIDENCE: Required<ScenarioConfidence> = {
   salary: "very_high",
   partTime: "high",
-  familyFund: "low",
+  otherIncome: "low",
   statePension: "high",
   ratePension: "very_high",
   lifeAnnuity: "very_high",
@@ -35,7 +37,7 @@ export const DEFAULT_CONFIDENCE: Required<ScenarioConfidence> = {
 export const CONFIDENCE_LABELS: Record<ConfidenceKey, string> = {
   salary: "Løn / arbejdsindkomst",
   partTime: "Deltidsindtægt",
-  familyFund: "Familiefond",
+  otherIncome: "Anden indtægt",
   statePension: "Folkepension",
   ratePension: "Ratepension",
   lifeAnnuity: "Livsvarig pension/livrente",
@@ -52,7 +54,14 @@ export const LEVEL_LABELS: Record<ConfidenceLevel, string> = {
 };
 
 export function getConfidence(scenario: Scenario): Required<ScenarioConfidence> {
-  return { ...DEFAULT_CONFIDENCE, ...(scenario.inputs.confidence ?? {}) };
+  const stored = (scenario.inputs.confidence ?? {}) as ScenarioConfidence & { familyFund?: ConfidenceLevel };
+  // Gemt før "Anden indtægt" afløste familiefond: brug den gamle vurdering for den nye post.
+  const { familyFund: legacyOtherIncome, ...rest } = stored;
+  return {
+    ...DEFAULT_CONFIDENCE,
+    ...(legacyOtherIncome && !rest.otherIncome ? { otherIncome: legacyOtherIncome } : {}),
+    ...rest,
+  };
 }
 
 export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: Assumptions = defaultAssumptions): KPIs {
@@ -77,7 +86,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   const earliest = findEarliestSustainableStopAge(scenario, assumptions);
   const minRequired = scenario.inputs.target?.minNetWorthAtEnd ?? 0;
   const annualSpend = Math.max(1, scenario.inputs.spending.desiredMonthlyNet * 12);
-  const inp = scenario.inputs;
+  const inp = withHoldingToggleApplied(scenario.inputs);
   const a = mergeAssumptions(assumptions, scenario.assumptionsOverride);
 
   // ===== Financial robustness — failure-driven =====
@@ -241,7 +250,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   // Effekt-vægte pr. antagelse — udledt af hvor meget den faktisk indgår
   const sumPt = years.reduce((s, y) => s + y.flows.partTimeNet, 0);
   const sumSp = years.reduce((s, y) => s + y.flows.statePensionNet, 0);
-  const sumFf = years.reduce((s, y) => s + y.flows.familyFundNet, 0);
+  const sumFf = years.reduce((s, y) => s + otherIncomeNetOf(y.flows), 0);
   const sumRate = years.reduce((s, y) => s + (y.flows.ratePension?.net ?? 0), 0);
   const sumLife = years.reduce((s, y) => s + (y.flows.lifeAnnuity?.net ?? 0), 0);
   const sumSalary = years.reduce((s, y) => s + y.flows.salaryNet, 0);
@@ -251,7 +260,7 @@ export function deriveKPIs(scenario: Scenario, years: YearRow[], assumptions: As
   const rawWeight: Record<ConfidenceKey, number> = {
     salary: sumSalary / sumNeed,
     partTime: sumPt / sumNeed,
-    familyFund: sumFf / sumNeed,
+    otherIncome: sumFf / sumNeed,
     statePension: inp.income.statePension.mode === "none" ? 0 : sumSp / sumNeed,
     ratePension: inp.pension.ratePensionEnabled ? sumRate / sumNeed : 0,
     lifeAnnuity: inp.pension.lifeAnnuity.enabled ? sumLife / sumNeed : 0,

@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { Assumptions, LifeEvent, MODEL_RELEASE, MODEL_VERSION, ModelExport, Scenario, Snapshot, StressModifierKey } from "@/lib/finance/types";
-import { defaultAssumptions, defaultInputs, makeBaseScenario } from "@/lib/finance/defaults";
+import { defaultAssumptions, makeNewUserInputs, makeNewUserScenario } from "@/lib/finance/defaults";
+import { normalizeIncomeInputs } from "@/lib/finance/otherIncome";
 import { applyStressModifierToState, classifyLegacyScenario, resolveScenario, STRESS_TESTS } from "@/lib/finance/stress";
 import { buildSnapshot, normalizeSnapshotEndAnchors } from "@/lib/finance/snapshots";
 import { normalizeLegacyLifeEvent } from "@/lib/finance/lifeEvents";
@@ -76,7 +77,8 @@ function isValidImport(parsed: unknown): parsed is { scenarios: Scenario[]; assu
   return p.scenarios.every((s) => s && typeof s === "object" && "inputs" in (s as object) && typeof (s as Scenario).name === "string");
 }
 
-const seed: Scenario = { ...makeBaseScenario(), type: "base", updatedAt: Date.now() };
+// En ny bruger starter neutralt (ingen holding, ingen andre indtægter), se makeNewUserInputs.
+const seed: Scenario = { ...makeNewUserScenario(), type: "base", updatedAt: Date.now() };
 
 export const useFinanceStore = create<FinanceState>()(
   persist(
@@ -138,7 +140,7 @@ export const useFinanceStore = create<FinanceState>()(
               createdAt: Date.now(),
               updatedAt: Date.now(),
               type: "custom",
-              inputs: structuredClone(defaultInputs),
+              inputs: makeNewUserInputs(),
             };
         set((s) => ({ scenarios: [...s.scenarios, sc], activeScenarioId: sc.id }));
         return sc.id;
@@ -156,7 +158,7 @@ export const useFinanceStore = create<FinanceState>()(
         set((s) => {
           const remaining = s.scenarios.filter((sc) => sc.id !== id);
           if (remaining.length === 0) {
-            const fresh = makeBaseScenario();
+            const fresh = makeNewUserScenario();
             return { scenarios: [fresh], activeScenarioId: fresh.id };
           }
           return {
@@ -196,7 +198,9 @@ export const useFinanceStore = create<FinanceState>()(
         const scenarios = parsed.scenarios.map((sc) => {
           const rawEvents = Array.isArray((sc as any).inputs?.lifeEvents) ? (sc as any).inputs.lifeEvents : [];
           const lifeEvents = rawEvents.map((e: any) => normalizeLegacyLifeEvent(e));
-          const withEvents = { ...sc, inputs: { ...sc.inputs, lifeEvents } } as Scenario;
+          // Samme indkomst-normalisering som persist v18: familiefond bliver til "Anden indtægt".
+          const income = sc.inputs?.income ? normalizeIncomeInputs(sc.inputs.income) : sc.inputs?.income;
+          const withEvents = { ...sc, inputs: { ...sc.inputs, lifeEvents, income } } as Scenario;
           if (withEvents.type) return withEvents;
           const baseScenario = withEvents.baseScenarioId ? parsed.scenarios.find((x) => x.id === withEvents.baseScenarioId) : undefined;
           const cls = classifyLegacyScenario(withEvents, baseScenario);
@@ -232,7 +236,7 @@ export const useFinanceStore = create<FinanceState>()(
 
         // Base
         if (!existingNames.has(STANDARD_BASE_NAME)) {
-          const base = makeBaseScenario();
+          const base = makeNewUserScenario();
           base.name = STANDARD_BASE_NAME;
           base.metadata = { ...(base.metadata ?? {}), standard: true };
           toAdd.push(base);
@@ -420,7 +424,7 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "finance-tool.v1",
-      version: 17,
+      version: 18,
       migrate: (state: any, version: number) => {
         if (!state) return state;
         // v7: fjern global pensionPayoutRate fra assumptions
@@ -605,6 +609,13 @@ export const useFinanceStore = create<FinanceState>()(
         // YearRows, så gamle og nye snapshots betyder det samme under samme label.
         if (Array.isArray(state.snapshots)) {
           state.snapshots = state.snapshots.map((snap: Snapshot) => normalizeSnapshotEndAnchors(snap));
+        }
+        // v18: familiefond-felterne bliver til listen "Anden indtægt" (én netto-post med samme
+        // beløb og slutalder, så beregningen er uændret). Holding uden `enabled` er slået til.
+        if (Array.isArray(state.scenarios)) {
+          state.scenarios = state.scenarios.map((sc: any) =>
+            sc?.inputs?.income ? { ...sc, inputs: { ...sc.inputs, income: normalizeIncomeInputs(sc.inputs.income) } } : sc,
+          );
         }
         return state;
       },

@@ -72,11 +72,11 @@ describe("assumption confidence", () => {
 
   it("unused assumptions are flagged with note and don't dominate score", () => {
     const s = makeBaseScenario();
-    s.inputs.income.familyFundAnnualNet = 0;
-    s.inputs.confidence = { ...DEFAULT_CONFIDENCE, familyFund: "speculative" };
+    s.inputs.income.otherIncomes = [];
+    s.inputs.confidence = { ...DEFAULT_CONFIDENCE, otherIncome: "speculative" };
     const { kpis } = run(s);
-    const ff = kpis.confidenceBreakdown.find((f) => f.key === "familyFund");
-    // familyFund med vægt 0 bør ikke optræde i top-5 listen
+    const ff = kpis.confidenceBreakdown.find((f) => f.key === "otherIncome");
+    // otherIncome med vægt 0 bør ikke optræde i top-5 listen
     expect(ff).toBeUndefined();
   });
 
