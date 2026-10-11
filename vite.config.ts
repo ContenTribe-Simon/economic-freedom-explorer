@@ -67,8 +67,8 @@ function cspMetaPlugin(supabaseUrl: string): Plugin {
 
 /**
  * Build-only site metadata (Phase 12 C/D, PR 2): always emits robots.txt (advanced and debug
- * routes disallowed); with a valid VITE_SITE_URL also emits sitemap.xml, a robots Sitemap line,
- * og:url and absolute social-image URLs. The domain is undecided, so without the variable those
+ * routes disallowed); with a valid VITE_SITE_URL also emits sitemap.xml, a robots Sitemap line
+ * and absolute social-image URLs. The domain is undecided, so without the variable those
  * absolute-URL parts are omitted rather than wrong. Logic lives in src/build/siteMeta.ts.
  */
 function siteMetaPlugin(rawSiteUrl: string): Plugin {

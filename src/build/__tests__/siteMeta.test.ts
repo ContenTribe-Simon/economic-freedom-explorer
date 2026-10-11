@@ -80,11 +80,13 @@ describe("applySiteUrl", () => {
     expect(applySiteUrl(html, null)).toBe(html);
   });
 
-  it("makes every social-image URL absolute and adds og:url", () => {
+  it("makes every social-image URL absolute and adds no route-pinning URL", () => {
     const out = applySiteUrl(html, "https://frihedsmodel.dk");
     expect(out).not.toContain('content="/og-image.png"');
     expect(out.match(/content="https:\/\/frihedsmodel\.dk\/og-image\.png"/g)?.length).toBe(2);
-    expect(out).toContain('<meta property="og:url" content="https://frihedsmodel.dk/start" />');
+    // One index.html serves every route: a static og:url/canonical would pin all of them,
+    // including shared /resultat links, to the landing page.
+    expect(out).not.toContain("og:url");
     expect(out).not.toContain('rel="canonical"');
   });
 });

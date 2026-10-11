@@ -2,10 +2,9 @@
  * Build-time site metadata (Phase 12 C/D, PR 2 — go-live hygiene). Pure functions only, so the
  * Vite plugin in vite.config.ts and the unit tests share one implementation.
  *
- * The production domain is not decided yet, so everything that needs an ABSOLUTE URL (og:url,
- * absolute social-image URLs, sitemap.xml, the robots Sitemap line) is driven by one
- * optional build variable, VITE_SITE_URL. Unset or invalid means those are omitted rather than
- * emitted wrong: a missing og:url is harmless, one pointing at the wrong host is not.
+ * The production domain is not decided yet, so everything that needs an ABSOLUTE URL (social-image
+ * URLs, sitemap.xml, the robots Sitemap line) is driven by one optional build variable,
+ * VITE_SITE_URL. Unset or invalid means those are omitted rather than emitted wrong.
  */
 
 /** Public routes worth indexing. The input and result screens are app state, not landing pages. */
@@ -60,16 +59,13 @@ export function sitemapXml(siteUrl: string): string {
 
 /**
  * Rewrites the built index.html for a known site URL: the relative social-image URLs become
- * absolute (crawlers such as Facebook require it) and og:url is added. Returns the html unchanged
- * without a site URL. No canonical link: in a single-page app one static canonical would point
- * every route, including future content pages, at the landing page.
+ * absolute (crawlers such as Facebook require it). Returns the html unchanged without a site URL.
+ * Deliberately no canonical link and no og:url: the same index.html is the SPA fallback for every
+ * route, so one static value would declare every page (including shared /resultat links and
+ * future content pages) to be the landing page. Crawlers fall back to the fetched URL instead.
  */
 export function applySiteUrl(html: string, siteUrl: string | null): string {
   if (!siteUrl) return html;
   const image = `${siteUrl}${SOCIAL_IMAGE_PATH}`;
-  const ogUrl = `  <meta property="og:url" content="${siteUrl}${SITEMAP_PATHS[0]}" />\n  `;
-  return html
-    .split(`content="${SOCIAL_IMAGE_PATH}"`)
-    .join(`content="${image}"`)
-    .replace("</head>", `${ogUrl}</head>`);
+  return html.split(`content="${SOCIAL_IMAGE_PATH}"`).join(`content="${image}"`);
 }
