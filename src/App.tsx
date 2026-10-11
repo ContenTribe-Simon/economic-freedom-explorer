@@ -8,6 +8,7 @@ import Start from "./pages/public/Start";
 import SimpleInputs from "./pages/public/SimpleInputs";
 import Resultat from "./pages/public/Resultat";
 import GemOgDel from "./pages/public/GemOgDel";
+import Privatliv from "./pages/public/Privatliv";
 import Dashboard from "./pages/Dashboard";
 import Inputs from "./pages/Inputs";
 import Assumptions from "./pages/Assumptions";
@@ -62,6 +63,7 @@ const App = () => (
               <Route path="/simple-inputs" element={<SimpleInputs />} />
               <Route path="/resultat" element={<Resultat />} />
               <Route path="/gem-og-del" element={<GemOgDel />} />
+              <Route path="/privatliv" element={<Privatliv />} />
 
               {/* Advanced app inside the shell, behind the Advanced door (see AdvancedDoor.tsx).
                   Paths are unchanged except the dashboard, which moves from "/" to /dashboard —

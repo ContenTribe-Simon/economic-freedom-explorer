@@ -8,7 +8,7 @@
  */
 
 /** Public routes worth indexing. The input and result screens are app state, not landing pages. */
-export const SITEMAP_PATHS = ["/start"] as const;
+export const SITEMAP_PATHS = ["/start", "/privatliv"] as const;
 
 /**
  * Routes kept out of search results: the advanced app (behind the opt-in door) and the debug
