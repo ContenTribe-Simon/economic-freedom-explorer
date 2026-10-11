@@ -18,6 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { DeleteAccountSection } from "@/components/cloud/DeleteAccountSection";
 import { Cloud, FilePlus2, FolderOpen, Pencil, Save, Trash2 } from "lucide-react";
 
 export default function CloudPage() {
@@ -141,6 +142,14 @@ export default function CloudPage() {
           </ul>
         )}
       </section>
+
+      <DeleteAccountSection
+        email={user.email ?? ""}
+        onDeleted={() => {
+          toast.success("Din konto er slettet");
+          navigate("/dashboard", { replace: true });
+        }}
+      />
 
       <AlertDialog open={pendingLoad !== null} onOpenChange={(o) => !o && setPendingLoad(null)}>
         <AlertDialogContent>

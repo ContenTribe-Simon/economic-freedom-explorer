@@ -50,6 +50,16 @@ describe("Privatliv page", () => {
     expect(text).toContain("Dine tal og de beløb, du ser, bliver aldrig sendt.");
   });
 
+  it("promises account deletion on the cloud page only because that page really offers it", async () => {
+    renderAt("/privatliv", <Privatliv />);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("På cloud-siden kan du slette enkelte modeller eller hele kontoen.");
+    const { readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const cloud = readFileSync(path.resolve(__dirname, "../../Cloud.tsx"), "utf8");
+    expect(cloud).toContain("<DeleteAccountSection");
+  });
+
   it("follows the public copy rules", () => {
     renderAt("/privatliv", <Privatliv />);
     const text = document.body.textContent ?? "";
