@@ -9,6 +9,7 @@ import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, DEFAULT_SIMPLE_INPUTS } from "@/lib/finance/public";
 import { formatDaLongDate, formatKr, headlineStopAge } from "@/lib/publicFormat";
 import { shareUrlFor } from "@/lib/publicShare";
+import { track } from "@/lib/analytics/client";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import { PUBLIC_DISCLAIMER, REAL_TERMS_NOTE } from "@/lib/publicCopy";
 import "./start.css";
@@ -54,6 +55,7 @@ export default function GemOgDel() {
 
   const onSave = () => {
     saveCalculation(name);
+    track("calculation_saved");
     setJustSaved(true);
     window.clearTimeout(savedTimer.current);
     savedTimer.current = window.setTimeout(() => setJustSaved(false), 2600);
@@ -69,6 +71,7 @@ export default function GemOgDel() {
       shareFieldRef.current?.select();
       return;
     }
+    track("share_link_copied");
     setCopied(true);
     window.clearTimeout(copyTimer.current);
     copyTimer.current = window.setTimeout(() => setCopied(false), 2200);

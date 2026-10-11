@@ -9,6 +9,7 @@ import { usePublicStore } from "@/store/publicStore";
 import { computePublicResult, type PublicDriver, type PublicResult, type StatusColorToken } from "@/lib/finance/public";
 import { formatKr, headlineStopAge } from "@/lib/publicFormat";
 import { decodeShareInputs, readSharePayload } from "@/lib/publicShare";
+import { track } from "@/lib/analytics/client";
 import { deriveSavingsSensitivity } from "@/lib/publicSensitivity";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import "./start.css";
@@ -126,6 +127,11 @@ export default function Resultat() {
     navigate("/resultat", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per mount/link change
   }, [location.search, location.hash]);
+
+  // One event per visit to the answer screen; no properties (the result itself never leaves).
+  useEffect(() => {
+    track("calculation_completed");
+  }, []);
 
   const result = useMemo(() => computePublicResult(inputs), [inputs]);
   // The 1-lever sensitivity helper: a second REAL pipeline run with monthlySavings + 1.000

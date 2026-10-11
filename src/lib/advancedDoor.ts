@@ -3,6 +3,8 @@
  * entry; the advanced surface is an explicit, per-device opt-in — same engine, same data).
  * Plain localStorage rather than a store: this is a routing boundary, not app state.
  */
+import { track } from "@/lib/analytics/client";
+
 const ADVANCED_DOOR_KEY = "frihedsmodel-advanced-door.v1";
 
 export function isAdvancedDoorOpen(): boolean {
@@ -14,6 +16,7 @@ export function isAdvancedDoorOpen(): boolean {
 }
 
 export function openAdvancedDoor(): void {
+  track("advanced_door_opened");
   try {
     localStorage.setItem(ADVANCED_DOOR_KEY, "open");
   } catch {
