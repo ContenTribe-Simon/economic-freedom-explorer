@@ -1,7 +1,8 @@
 /**
  * Phase 12 workstream B (security): hostile-condition tests for the public share-link decoder.
  *
- * The share link CONTAINS the inputs (base64url JSON in the `d` query param on /resultat) and
+ * The share link CONTAINS the inputs (base64url JSON in the `d` fragment param on /resultat;
+ * legacy links: query param) and
  * is opened by a RECIPIENT — so a crafted `d` is adversary-controlled input that lands directly
  * in another person's browser. `decodeShareInputs` is the whole trust boundary: it must never
  * throw, never pollute, and only ever yield a valid, sanitized SimplePublicInputs (or null).

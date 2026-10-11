@@ -26,9 +26,11 @@ eller gøres print-synlig).
 
 ## 3. Deling på tværs af browsere kan ikke testes før live-deploy
 
-Ikke en fejl, ingen handling nu: dele-links (`/resultat?d=...`) er verificeret lokalt og i
-e2e, men rigtig kryds-browser/kryds-enheds-test (iOS Safari, Android Chrome, mail-klienters
-link-håndtering) kræver en offentligt tilgængelig URL. Tages op, når appen er deployet.
+Ikke en fejl, ingen handling nu: dele-links (`/resultat#d=...`; ældre links med `?d=` læses
+stadig) er verificeret lokalt og i e2e, men rigtig kryds-browser/kryds-enheds-test (iOS
+Safari, Android Chrome, mail-klienters link-håndtering, herunder at `#d=` bevares når linket
+åbnes fra en mail eller besked) kræver en offentligt tilgængelig URL. Tages op, når appen er
+deployet.
 
 ---
 
