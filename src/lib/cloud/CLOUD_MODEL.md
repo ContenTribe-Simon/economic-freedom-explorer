@@ -155,7 +155,10 @@ veje:
   fjerner `profiles`, `finance_models` og `finance_snapshots`. Logikken og testene ligger i
   `handler.ts` / `src/lib/cloud/__tests__/delete-account-handler.test.ts`; `config.toml` sætter
   `verify_jwt = true`.
-- **Deploy:** Lovable deployer edge functions fra repoet (bekræftet: `mcp` blev deployet sådan).
+- **Deploy:** Lovable deployer edge functions fra repoet, men **kun via Lovables egen agent**.
+  GitHub-sync og Publish deployer dem IKKE (bekræftet 2026-10-11: `delete-account` var merget og
+  publiceret, men først live efter et eksplicit deploy). En ny eller ændret funktion skal derfor
+  deployes bevidst gennem Lovable-agenten efter merge, og verificeres live bagefter.
   `SUPABASE_URL`, `SUPABASE_ANON_KEY` og `SUPABASE_SERVICE_ROLE_KEY` stilles til rådighed af
   platformen. `ALLOWED_ORIGINS` (valgfri, kommasepareret) tilføjer et eget domæne til CORS; uden den
   er `*.lovable.app`, `*.lovableproject.com` og `localhost:8080` tilladt.
