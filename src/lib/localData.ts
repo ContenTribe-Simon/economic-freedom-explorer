@@ -14,6 +14,19 @@ export const APP_STORAGE_KEYS = [
 /** PostHog's own keys (persisted id after "Ja tak", its consent flag). */
 export const APP_STORAGE_PREFIXES = ["ph_", "__ph_"] as const;
 
+/** App-owned sessionStorage keys: a share link's figures parked by public/share-guard.js. */
+export const APP_SESSION_KEYS = ["frihedsmodel-share-payload"] as const;
+
+/** Removes the app's sessionStorage keys; never throws (storage may be denied). */
+export function clearSessionAppData(storage?: Pick<Storage, "removeItem">): void {
+  try {
+    const s = storage ?? window.sessionStorage;
+    for (const k of APP_SESSION_KEYS) s.removeItem(k);
+  } catch {
+    // Storage denied: nothing was stored there either.
+  }
+}
+
 /** Supabase's persisted session (`sb-<project-ref>-auth-token`, src/integrations/supabase/client.ts). */
 export function isSessionKey(key: string): boolean {
   return /^sb-.+-auth-token$/.test(key);

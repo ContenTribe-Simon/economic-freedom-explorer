@@ -9,13 +9,14 @@
  */
 (function () {
   try {
-    if (location.pathname !== "/resultat") return; // share links only ever point here
+    // Share links only ever point at the result route; the SPA also accepts trailing slashes there.
+    if (!/^\/resultat\/*$/.test(location.pathname)) return;
     var hash = location.hash || "";
     var search = location.search || "";
     var m = /(?:^#|&)d=([^&]*)/.exec(hash) || /(?:^\?|&)d=([^&]*)/.exec(search);
     if (!m) return;
     sessionStorage.setItem("frihedsmodel-share-payload", decodeURIComponent(m[1]));
-    history.replaceState(history.state, "", location.pathname);
+    history.replaceState(history.state, "", "/resultat");
   } catch (e) {
     // sessionStorage blocked: leave the URL alone so the share link still works in the app.
   }

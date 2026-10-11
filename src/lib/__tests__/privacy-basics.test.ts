@@ -6,7 +6,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { PUBLIC_DISCLAIMER, REAL_TERMS_NOTE } from "@/lib/publicCopy";
 import { FEEDBACK_MAILTO, LEGAL_ENTITY } from "@/lib/legalEntity";
-import { APP_STORAGE_KEYS, clearLocalAppData, isSessionKey, isWipeSignal } from "@/lib/localData";
+import { APP_SESSION_KEYS, APP_STORAGE_KEYS, clearLocalAppData, clearSessionAppData, isSessionKey, isWipeSignal } from "@/lib/localData";
+import { SHARE_STASH_KEY, takeStashedSharePayload } from "@/lib/publicShare";
 
 describe("PUBLIC_DISCLAIMER", () => {
   it("is the canonical text from the public data contract, verbatim", () => {
@@ -30,6 +31,32 @@ describe("LEGAL_ENTITY", () => {
     expect(url.pathname).toBe(LEGAL_ENTITY.email);
     expect(url.searchParams.get("subject")).toBe("Feedback på Frihedsmodel");
     expect(url.searchParams.has("body")).toBe(false);
+  });
+});
+
+describe("share stash in sessionStorage (public/share-guard.js)", () => {
+  it("the guard, the app and the wipe agree on the key name", () => {
+    const guard = readFileSync(path.resolve(__dirname, "../../../public/share-guard.js"), "utf8");
+    expect(guard).toContain(`"${SHARE_STASH_KEY}"`);
+    expect(APP_SESSION_KEYS).toContain(SHARE_STASH_KEY);
+  });
+
+  it("the wipe removes it", () => {
+    sessionStorage.setItem(SHARE_STASH_KEY, "payload");
+    clearSessionAppData();
+    expect(sessionStorage.getItem(SHARE_STASH_KEY)).toBeNull();
+    expect(() => clearSessionAppData({ removeItem: () => { throw new Error("denied"); } })).not.toThrow();
+  });
+
+  it("reading the stash never throws where sessionStorage is denied", () => {
+    const desc = Object.getOwnPropertyDescriptor(window, "sessionStorage")!;
+    Object.defineProperty(window, "sessionStorage", { configurable: true, get: () => { throw new DOMException("denied", "SecurityError"); } });
+    try {
+      expect(takeStashedSharePayload()).toBeNull();
+      expect(() => clearSessionAppData()).not.toThrow();
+    } finally {
+      Object.defineProperty(window, "sessionStorage", desc);
+    }
   });
 });
 

@@ -18,7 +18,7 @@ async function withHostAnalyticsProbe(page: import("@playwright/test").Page) {
   await page.route("**/__host-analytics-probe.js", (r) =>
     r.fulfill({ contentType: "text/javascript", body: "window.__probeHref = location.href;" }),
   );
-  await page.route(/\/resultat(\?.*)?$/, async (route) => {
+  await page.route(/\/resultat\/*(\?.*)?$/, async (route) => {
     const res = await route.fetch();
     const html = (await res.text()).replace("</head>", '<script defer src="/__host-analytics-probe.js"></script></head>');
     await route.fulfill({ response: res, body: html });
@@ -27,6 +27,7 @@ async function withHostAnalyticsProbe(page: import("@playwright/test").Page) {
 
 for (const [label, url] of [
   ["fragment link", `${PREVIEW}/resultat#d=${payload}`],
+  ["trailing-slash link", `${PREVIEW}/resultat/#d=${payload}`],
   ["legacy ?d= link", `${PREVIEW}/resultat?d=${payload}`],
 ] as const) {
   test(`${label}: host analytics never sees the figures, the plan still loads`, async ({ page }) => {

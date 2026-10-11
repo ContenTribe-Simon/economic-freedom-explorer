@@ -66,10 +66,12 @@ export const SHARE_STASH_KEY = "frihedsmodel-share-payload";
  * The payload public/share-guard.js moved out of the URL before any analytics could read it. Read
  * once and removed, so a later visit to /resultat does not re-apply an old share link.
  */
-export function takeStashedSharePayload(storage: Pick<Storage, "getItem" | "removeItem"> = window.sessionStorage): string | null {
+export function takeStashedSharePayload(storage?: Pick<Storage, "getItem" | "removeItem">): string | null {
   try {
-    const v = storage.getItem(SHARE_STASH_KEY);
-    if (v !== null) storage.removeItem(SHARE_STASH_KEY);
+    // Resolved inside the try: merely reading window.sessionStorage throws where storage is denied.
+    const s = storage ?? window.sessionStorage;
+    const v = s.getItem(SHARE_STASH_KEY);
+    if (v !== null) s.removeItem(SHARE_STASH_KEY);
     return v;
   } catch {
     return null;

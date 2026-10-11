@@ -16,7 +16,7 @@ import {
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { PublicFooter } from "@/components/public/PublicFooter";
 import { LEGAL_ENTITY } from "@/lib/legalEntity";
-import { clearLocalAppData } from "@/lib/localData";
+import { clearLocalAppData, clearSessionAppData } from "@/lib/localData";
 import { supabase } from "@/integrations/supabase/client";
 import "./start.css";
 
@@ -66,6 +66,7 @@ export default function Privatliv() {
       // Offline or not signed in: the stored session is removed below either way.
     }
     clearLocalAppData();
+    clearSessionAppData();
     try {
       sessionStorage.setItem(WIPED_FLAG, "1");
     } catch {
